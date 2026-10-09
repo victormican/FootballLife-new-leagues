@@ -2411,6 +2411,7 @@ static uint32_t cont_add(void* rec, uint32_t club)
 #define CWC_KO  200
 #define CWC_GROUPS 8
 #define CWC_N 32
+#define CWC_PER_COUNTRY 2    /* FIFA 2025: at most two clubs from one country */
 
 /* A world that builds the 2025 format as a competition of its own hands its ids over through
  * fl26_swiss_cwc, and those are the ones used below.  Zero means "this world did not ask", and
@@ -2697,13 +2698,31 @@ static void cwc_game_champions(u32vec* list)
 }
 
 static uint32_t g_cwc[CWC_N];
+static uint32_t g_cwc[CWC_N];
+static uint16_t g_cwc_country[CWC_N];   /* the country of each entrant, for the cap in cwc_add */
 static int cwc_add(unsigned* n, uint32_t c)
 {
   if (*n >= CWC_N || !(c >> 14) || has_club(g_cwc, *n, c)) return 0;
+  /* FIFA 2025 caps one country at two clubs. Put here, not in the access list, because this is
+     the one funnel every entrant goes through and a cap anywhere else is a cap some path
+     misses: the fixed list below hands out four clubs of the United States and nothing in it
+     could notice.
+     The exception the rules give -- more than two when more clubs of that country won their
+     confederation's top competition inside the cycle -- is not worked out here. Nobody has
+     tracked who won what over four seasons, and working it out from last season's form would
+     hand a country a third place on no evidence. A world that wants one puts a club into a
+     league of its own by hand; this cap leaves it out until that rule is finished. */
+  unsigned char* ow = (unsigned char*)((owner_fn)(uintptr_t)(g_base + OWNER_RVA))();
+  int f = team_country(ow ? *(void**)(ow + 0x48) : 0, c);
+  if (f >= 0) {                     /* an unknown country is not capped, and not counted either */
+    int seen = 0;
+    for (unsigned i = 0; i < *n; i++) seen += g_cwc_country[i] == (uint16_t)f;
+    if (seen >= CWC_PER_COUNTRY) return 0;
+    g_cwc_country[*n] = (uint16_t)f;
+  }
   g_cwc[(*n)++] = c;
   return 1;
 }
-
 /* A world that built the 2025 format as its own competition: the game never asks for it, so
    nothing would ever hand it a field. Filled here instead, on the same signal the continental
    cups use -- the Champions League progressing, r == 2 -- and once a season like them. The list
