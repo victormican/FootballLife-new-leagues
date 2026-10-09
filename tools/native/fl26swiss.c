@@ -2435,10 +2435,21 @@ static uint16_t cwc_ko(void) { return g_cwc_ko ? g_cwc_ko : (uint16_t)CWC_KO; }
    Neither given means every season, which is what the game's own annual tournament does. */
 static int cwc_season(void)
 {
+  static int said = -1;
   int y = (abs_day() + 183) / 365;
-  if (g_cwc_cycle) return y == g_cwc_cycle;
-  if (g_cwc_every > 1) return y >= g_cwc_from && (y - g_cwc_from) % g_cwc_every == 0;
-  return 1;
+  int yes = g_cwc_cycle ? y == g_cwc_cycle
+           : g_cwc_every > 1 ? (y >= g_cwc_from && (y - g_cwc_from) % g_cwc_every == 0)
+           : 1;
+  /* Once a season, and always the first time, say what number this is and whether it plays.
+     A career's first season is number 0, not 1 -- (0 + 183) / 365 is 0 -- so a world written
+     from=1 waits a whole year for nothing, and the log is how that is found out in one run
+     rather than by playing four careers. */
+  if (y != said) {
+    said = y;
+    logf("fl26swiss: Club World Cup: season %d (day %d), %s", y, abs_day(),
+         yes ? "plays this season" : "does not play this season");
+  }
+  return yes;
 }
 
 __declspec(dllexport) int fl26_swiss_cwc(const uint16_t* v, int n)
