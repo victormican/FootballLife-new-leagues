@@ -78,10 +78,19 @@ LEAGUE = {"name": "Checks CWC Test", "country": "Albania", "clubs": 16, "legs": 
 
 def main():
     # what turns it on, and what does not
-    ok("true: the knockout is the id the module has", plan(True) == mkcwc.KO)
+    ok("true: the knockout is the id the module has", plan(True)["ko"] == mkcwc.KO)
+    ok(
+        "true: every season, which is what the game's own does",
+        plan(True)["cycle"] == 0,
+    )
+    ok("a cycle: that season and no other", plan({"cycle": 3})["cycle"] == 3)
+    ok("a cycle of 0 means every season", plan({"cycle": 0})["cycle"] == 0)
+    refuses({"cycle": -1}, "a negative cycle is refused")
+    refuses({"cycle": 101}, "a cycle past 100 is refused")
+    refuses({"cycle": "third"}, "a cycle that is not a number is refused")
     ok(
         '{"ko": 200}: the same id, asked for by name',
-        plan({"ko": mkcwc.KO}) == mkcwc.KO,
+        plan({"ko": mkcwc.KO})["ko"] == mkcwc.KO,
     )
     ok("absent: off", plan(None) is None)
     ok("false: off", plan(False) is None)
@@ -160,7 +169,9 @@ def main():
             n_on = len({comp[i + M.CID_OFF] for i in range(0, len(comp), M.COMP)})
             off_db = build(tmp, base, {"world": "_FL26CwcCount", "leagues": [LEAGUE]})
             off_comp = M.load(off_db, "Competition.bin")
-            n_off = len({off_comp[i + M.CID_OFF] for i in range(0, len(off_comp), M.COMP)})
+            n_off = len(
+                {off_comp[i + M.CID_OFF] for i in range(0, len(off_comp), M.COMP)}
+            )
             ok(
                 "on: exactly one competition more than the same world without it",
                 n_on == n_off + 1,
@@ -185,5 +196,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

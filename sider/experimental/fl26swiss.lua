@@ -134,6 +134,7 @@ end
 -- domestic cup, dated by it: fl26_swiss_ccup_like, called before fl26_swiss_ccup) and
 -- draw=byes|random|seeded|off (its cup draw, fl26_swiss_cupdraw; byes when not given).
 local confed = {}               -- read_world: the confed line, { flag, code } pairs
+  local cwc = nil                 -- read_world: the cwc line, { group stage, knockout, cycle }
 local CUPDRAW = { all = 1 }     -- read_world: the cupdraw lines, a mode per cup and one for all (0 off, 1 seeded, 2 random, 3 byes)
 local DRAWMODE = { off = 0, seeded = 1, random = 2, byes = 3 }
 local function read_world(ctx)
@@ -167,6 +168,13 @@ local function read_world(ctx)
     end
     local dr, dl = line:match("^%s*dates%s+(%d+)%s+like=(%d+)")
     if dr then dlike[#dlike + 1] = { tonumber(dr), tonumber(dl) } end
+    -- cwc <group stage regulation> <knockout regulation> [cycle=N]
+    -- The 2025 Club World Cup as a competition of this world's own, beside the game's annual
+    -- one. cycle= is the season it plays in, counted as the DLL counts them; 0 is every season.
+    local cr, ck, crest2 = line:match("^%s*cwc%s+(%d+)%s+(%d+)%s*(.*)$")
+    if cr then
+      cwc = { tonumber(cr), tonumber(ck), tonumber(crest2:match("cycle=(%d+)") or 0) }
+    end
     local cid, crest = line:match("^%s*ccup%s+(%d+)(.*)$")
     if cid then
       local c = { tonumber(cid), tonumber(crest:match("ko=(%d+)") or 0), tonumber(crest:match("groups=(%d+)") or 0), {} }
@@ -426,6 +434,17 @@ function m.init(ctx)
             log(string.format("fl26swiss: world file -- %d single-match league cup(s), %d taken", nlike, m))
           end
         end
+          if cwc then
+            local pw = ffi.C.GetProcAddress(h, "fl26_swiss_cwc")
+            if pw == nil then
+              log("fl26swiss: this fl26swiss.dll has no 2025 Club World Cup (fl26_swiss_cwc); the world's is not played")
+            else
+              local wbuf = ffi.new("uint16_t[3]", cwc[1], cwc[2], cwc[3])
+              local w = tonumber(ffi.cast("fl26_swiss_access_t", pw)(wbuf, 3))
+              log(string.format("fl26swiss: world file -- Club World Cup, group stage regulation %d, knockout %d, season %d (%d taken)",
+                                cwc[1], cwc[2], cwc[3], w))
+            end
+          end
         local pc = ffi.C.GetProcAddress(h, "fl26_swiss_ccup")
         if pc == nil then
           log("fl26swiss: this fl26swiss.dll runs no continental cups (fl26_swiss_ccup); the world file's are not played")

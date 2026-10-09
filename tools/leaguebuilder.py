@@ -4589,11 +4589,10 @@ def build(pl, base, game, replace=False, log=print):
     for c, h in zip(hc, pl.get("home_cups") or []):
         h["cid"] = c["cid"]  # for its emblem (pictures)
     rename_competitions(pl, db, log)
-    # after the continental cups, so it sees the ids they took and never lands on one: this is
-    # the game's own competition 1, and the id it needs is the one fl26swiss.dll has compiled in
-    # as CWC_KO, which free_comp_ids keeps out of their pool
+    # after the continental cups, so it sees the ids they took and never lands on one
+    cwclines = []
     if pl.get("club_world_cup"):
-        club_world_cup(tmp, db, log)
+        cwclines = [club_world_cup(tmp, db, pl["club_world_cup"], log)]
 
     # the world file: the tables' own reading (fl26world.from_tables), with what the recipe
     # knows better -- the country chosen, and how many clubs go up and down
@@ -4693,7 +4692,8 @@ def build(pl, base, game, replace=False, log=print):
         + (["nopool " + " ".join(str(t) for t in nopool)] if nopool else [])
         + newfaces
         + fans
-        + ["cupdraw %s" % pl.get("cup_draw", "seeded")],
+        + ["cupdraw %s" % pl.get("cup_draw", "seeded")]
+        + cwclines,
         qlines,
     )
     json.dump(
@@ -5439,59 +5439,72 @@ def continental(cups, root, db, log=print, start=None):
 
 
 def club_world_cup_plan(recipe):
-    """the recipe's Club World Cup request: the regulation id of the knockout, or None for off.
+    """the recipe's Club World Cup request, or None for off.
 
-    `club_world_cup: true` (or an object) turns the shipped Club World Cup into the 2025 format;
-    `{"ko": N}` picks the knockout's regulation id.  The default is mkcwc.KO, the id
-    fl26swiss.c has compiled in as CWC_KO: the DLL looks the knockout up by that number, so any
-    other id needs the module rebuilt with the same number in CWC_KO.  Refused here rather than
-    at build time, because by then the recipe has already been planned.
+    `club_world_cup: true` adds the 2025 format as a competition of the world's own, beside the
+    game's annual one.  An object may say:
+
+      "ko":     the knockout's regulation id. It has to be mkcwc.KO, the number fl26swiss.dll
+                looks the knockout up by; anything else needs the module rebuilt. Refused here,
+                because by build time the recipe has been planned already.
+      "cycle":  the season it plays in, counted as the DLL counts them: the season of a career is
+                (day + 183) / 365, so it starts at 1 and rises by one every year. 0 (the default)
+                is every season, which is what the game's own tournament does. A world that wants
+                the real four-year rule does not put a number here -- that is the module's date
+                test, and asking for a season is the way to try the format out first.
     """
     import mkcwc
 
     ask = recipe.get("club_world_cup")
     if ask in (False, None, {}, ""):
         return None
-    ko = mkcwc.KO
+    ko, cycle = mkcwc.KO, 0
     if isinstance(ask, dict):
+        num = lambda k: int(ask.get(k, 0))
         try:
-            ko = int(ask.get("ko", ko))
+            ko, cycle = (mkcwc.KO if "ko" not in ask else num("ko")), num("cycle")
         except (TypeError, ValueError):
             raise BuildError(
-                'club_world_cup: "ko" is a regulation id, a whole number, not %r'
-                % (ask.get("ko"),)
+                'club_world_cup: "ko" and "cycle" are whole numbers, not %r'
+                % ({k: ask.get(k) for k in ("ko", "cycle") if k in ask},)
             )
     elif ask is not True:
         raise BuildError(
-            'club_world_cup: true, or an object with "ko", not %r' % (ask,)
+            'club_world_cup: true, or an object with "ko" and "cycle", not %r' % (ask,)
         )
     if ko != mkcwc.KO:
         raise BuildError(
-            "club_world_cup: regulation %d is not the one fl26swiss.dll looks the knockout up "
-            "by.  It has %d compiled in as CWC_KO; leave the recipe at true, or rebuild the "
-            "module with %d in CWC_KO to go with it." % (ko, mkcwc.KO, ko)
+            "club_world_cup: regulation %d is not the one fl26swiss.dll looks the knockout up by. "
+            "It has %d compiled in as CWC_KO; leave it out of the recipe, or rebuild the module "
+            "with %d in CWC_KO to go with it." % (ko, mkcwc.KO, ko)
         )
-    return ko
+    if cycle < 0 or cycle > 100:
+        raise BuildError(
+            "club_world_cup: cycle %d is not a season between 0 and 100" % cycle
+        )
+    return {"ko": ko, "cycle": cycle}
 
 
-def club_world_cup(root, db, log=print):
-    """reshape the shipped Club World Cup into the 2025 format with mkcwc.py into the world's
-    tables in <db>: 32 clubs in eight groups of four, then a single-match knockout of sixteen.
+def club_world_cup(root, db, ask, log=print):
+    """build the 2025 format into the world's tables in <db> with mkcwc.py: 32 clubs in eight
+    groups of four played once round, then a single-match knockout of sixteen.
 
-    Not one of the continental cups: this is the game's own competition 1, and the field is
-    chosen at run time from league tables by fl26swiss's CWC access list, not from entries.  So
-    it needs no `ccup` line and none of ccup's ids -- only the rows, and the regulation id the
-    DLL has compiled in.
+    The game's own Club World Cup, competition 1, is left exactly as it is; this is a second
+    competition beside it. The field is not written here: it is chosen from league tables at run
+    time by fl26swiss's CWC access list, so there are no entries and no club list.
+
+    Returns the world file's cwc line: the two regulation ids and the season to play it in.
     """
     import mkcwc
 
-    said = call(mkcwc, ["--base", db, "--out", root, "--ko", mkcwc.KO])
+    said = call(mkcwc, ["--base", db, "--out", root, "--ko", ask["ko"]])
     made = [l for l in said.splitlines() if l.strip().startswith("reg ")]
+    reg = int(said.split("reg ", 1)[1].split()[0]) if "reg " in said else 0
     log(
-        "  Club World Cup: 32 clubs, 8 groups of 4, knockout regulation %d (%d rows)"
-        % (mkcwc.KO, len(made))
+        "  Club World Cup: competition of our own, group stage regulation %d, knockout %d, %d "
+        "groups of 4" % (reg, ask["ko"], mkcwc.GROUPS)
     )
-    return None
+    return "cwc %d %d cycle=%d" % (reg, ask["ko"], ask["cycle"])
 
 
 def home_cups(pl, confed):
