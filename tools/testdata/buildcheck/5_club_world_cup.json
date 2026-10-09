@@ -1,0 +1,12 @@
+{
+  "world": "_FL26Cwc32",
+  "club_world_cup": true,
+  "leagues": [
+    { "name": "Checks CWC Alchemist", "country": "Albania", "clubs": 16, "legs": 2 },
+    { "name": "Checks CWC Zimbabwe", "country": "Zimbabwe", "clubs": 16, "legs": 2 },
+    { "name": "Checks CWC Scotland", "country": "Scotland", "clubs": 18, "legs": 2 },
+    { "name": "Checks CWC Wales", "country": "Wales", "clubs": 16, "legs": 2 },
+    { "name": "Checks CWC Chile", "country": "Chile", "clubs": 16, "legs": 2 },
+    { "name": "Checks CWC Peru", "country": "Peru", "clubs": 18, "legs": 2 }
+  ]
+}
