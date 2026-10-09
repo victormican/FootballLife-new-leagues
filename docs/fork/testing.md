@@ -37,6 +37,7 @@ exe. See `tools/flpaths.py`.
 | `test_newlife_update.py` | two NewLife folders (older, newer) | *Update my leagues to this version* takes the newer clubs and squads and keeps the league's own settings |
 | `test_retired_modules.py` | | `ensure_modules` switches a bundled module off only when its bundle is loaded too |
 | `test_shift_newlife.py` | | Remove club / Insert club move the league's NewLife ids with the places |
+| `test_siderroot.py` | | `siderroot.py` puts on a world the ini does not list yet, above the root it replaces, leaving the other `_FL26` roots off and a root of the game's alone; a name that is a prefix of a listed one does not activate it |
 | `test_squadimport.py` | | the table import reads the game's player id and the fields |
 
 ```
