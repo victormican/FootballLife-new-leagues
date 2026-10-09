@@ -5458,19 +5458,27 @@ def club_world_cup_plan(recipe):
     ask = recipe.get("club_world_cup")
     if ask in (False, None, {}, ""):
         return None
-    ko, cycle = mkcwc.KO, 0
+    ko, cycle, every, frm = mkcwc.KO, 0, 0, 0
     if isinstance(ask, dict):
         num = lambda k: int(ask.get(k, 0))
         try:
-            ko, cycle = (mkcwc.KO if "ko" not in ask else num("ko")), num("cycle")
+            ko = mkcwc.KO if "ko" not in ask else num("ko")
+            cycle, every, frm = num("cycle"), num("every"), num("from")
         except (TypeError, ValueError):
             raise BuildError(
-                'club_world_cup: "ko" and "cycle" are whole numbers, not %r'
-                % ({k: ask.get(k) for k in ("ko", "cycle") if k in ask},)
+                'club_world_cup: "ko", "cycle", "every" and "from" are whole numbers, not %r'
+                % (
+                    {
+                        k: ask.get(k)
+                        for k in ("ko", "cycle", "every", "from")
+                        if k in ask
+                    },
+                )
             )
     elif ask is not True:
         raise BuildError(
-            'club_world_cup: true, or an object with "ko" and "cycle", not %r' % (ask,)
+            'club_world_cup: true, or an object with "ko", "cycle", "every" and "from", not %r'
+            % (ask,)
         )
     if ko != mkcwc.KO:
         raise BuildError(
@@ -5478,11 +5486,18 @@ def club_world_cup_plan(recipe):
             "It has %d compiled in as CWC_KO; leave it out of the recipe, or rebuild the module "
             "with %d in CWC_KO to go with it." % (ko, mkcwc.KO, ko)
         )
-    if cycle < 0 or cycle > 100:
+    for v, what in ((cycle, "cycle"), (every, "every"), (frm, "from")):
+        if v < 0 or v > 100:
+            raise BuildError(
+                "club_world_cup: %s %d is not a number between 0 and 100" % (what, v)
+            )
+    if every and every < 2:
         raise BuildError(
-            "club_world_cup: cycle %d is not a season between 0 and 100" % cycle
+            "club_world_cup: every %d means every season; leave it out instead" % every
         )
-    return {"ko": ko, "cycle": cycle}
+    if frm and not every:
+        raise BuildError("club_world_cup: from without every says nothing")
+    return {"ko": ko, "cycle": cycle, "every": every, "from": frm}
 
 
 def club_world_cup(root, db, ask, log=print):
@@ -5504,7 +5519,13 @@ def club_world_cup(root, db, ask, log=print):
         "  Club World Cup: competition of our own, group stage regulation %d, knockout %d, %d "
         "groups of 4" % (reg, ask["ko"], mkcwc.GROUPS)
     )
-    return "cwc %d %d cycle=%d" % (reg, ask["ko"], ask["cycle"])
+    if ask["cycle"]:
+        when = "cycle=%d" % ask["cycle"]
+    elif ask["every"]:
+        when = "every=%d from=%d" % (ask["every"], ask["from"])
+    else:
+        when = ""
+    return ("cwc %d %d %s" % (reg, ask["ko"], when)).strip()
 
 
 def home_cups(pl, confed):

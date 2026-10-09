@@ -2422,21 +2422,38 @@ static uint32_t cont_add(void* rec, uint32_t club)
  * different country in each.  Same reason the league list and the UEFA access list come from the
  * world file; see fl26_swiss_access. */
 static uint16_t g_cwc_reg = 0, g_cwc_ko = 0;
-static int g_cwc_cycle = 0;
+static int g_cwc_cycle = 0, g_cwc_every = 0, g_cwc_from = 0;
 
 static uint16_t cwc_reg(void) { return g_cwc_reg ? g_cwc_reg : (uint16_t)CWC_REG; }
 static uint16_t cwc_ko(void) { return g_cwc_ko ? g_cwc_ko : (uint16_t)CWC_KO; }
 
+/* when the cup is played. Two ways, and only one of them is the rule:
+     a season            one season and no other. A testing handle: it lets a world put the
+                         format in front of the player in the next career whatever the date is.
+     every N seasons     the real thing. The FIFA Club World Cup is a quadrennial tournament,
+                         so 4, counting from the season the world says it starts in.
+   Neither given means every season, which is what the game's own annual tournament does. */
+static int cwc_season(void)
+{
+  int y = (abs_day() + 183) / 365;
+  if (g_cwc_cycle) return y == g_cwc_cycle;
+  if (g_cwc_every > 1) return y >= g_cwc_from && (y - g_cwc_from) % g_cwc_every == 0;
+  return 1;
+}
+
 __declspec(dllexport) int fl26_swiss_cwc(const uint16_t* v, int n)
 {
-  /* v[0] the group stage's regulation id, v[1] the knockout's, v[2] the season it plays in
-     (0 = every season). */
+  /* v[0] the group stage's regulation id, v[1] the knockout's, v[2] the one season,
+     v[3] every how many seasons, v[4] counting from which. */
   if (!v || n < 2) return 0;
   g_cwc_reg = v[0];
   g_cwc_ko = v[1];
   g_cwc_cycle = n > 2 ? (int)v[2] : 0;
-  logf("fl26swiss: Club World Cup: group stage regulation %u, knockout %u, season %d",
-       (unsigned)g_cwc_reg, (unsigned)g_cwc_ko, g_cwc_cycle);
+  g_cwc_every = n > 3 ? (int)v[3] : 0;
+  g_cwc_from = n > 4 ? (int)v[4] : 0;
+  logf("fl26swiss: Club World Cup: group stage regulation %u, knockout %u, %s",
+       (unsigned)g_cwc_reg, (unsigned)g_cwc_ko,
+       g_cwc_cycle ? "one season only" : g_cwc_every > 1 ? "every fourth season" : "every season");
   return 1;
 }
 
@@ -2733,7 +2750,7 @@ static char cwc_own_fill(void* started)
 {
   static int filled = -1;
   int year = (abs_day() + 183) / 365;
-  if (!g_cwc_reg || (g_cwc_cycle && year != g_cwc_cycle)) return 0;
+  if (!g_cwc_reg || !cwc_season()) return 0;
   if (filled == year || !cwc_world()) return 0;
   u32vec none = { 0, 0, 0 };
   char ok = cwc_setcl(cwc_reg(), &none, 1);

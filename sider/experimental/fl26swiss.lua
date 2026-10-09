@@ -173,7 +173,8 @@ local function read_world(ctx)
     -- one. cycle= is the season it plays in, counted as the DLL counts them; 0 is every season.
     local cr, ck, crest2 = line:match("^%s*cwc%s+(%d+)%s+(%d+)%s*(.*)$")
     if cr then
-      cwc = { tonumber(cr), tonumber(ck), tonumber(crest2:match("cycle=(%d+)") or 0) }
+      cwc = { tonumber(cr), tonumber(ck), tonumber(crest2:match("cycle=(%d+)") or 0),
+              tonumber(crest2:match("every=(%d+)") or 0), tonumber(crest2:match("from=(%d+)") or 0) }
     end
     local cid, crest = line:match("^%s*ccup%s+(%d+)(.*)$")
     if cid then
@@ -439,10 +440,13 @@ function m.init(ctx)
             if pw == nil then
               log("fl26swiss: this fl26swiss.dll has no 2025 Club World Cup (fl26_swiss_cwc); the world's is not played")
             else
-              local wbuf = ffi.new("uint16_t[3]", cwc[1], cwc[2], cwc[3])
-              local w = tonumber(ffi.cast("fl26_swiss_access_t", pw)(wbuf, 3))
-              log(string.format("fl26swiss: world file -- Club World Cup, group stage regulation %d, knockout %d, season %d (%d taken)",
-                                cwc[1], cwc[2], cwc[3], w))
+              local wbuf = ffi.new("uint16_t[5]", cwc[1], cwc[2], cwc[3], cwc[4], cwc[5])
+              local w = tonumber(ffi.cast("fl26_swiss_access_t", pw)(wbuf, 5))
+              local when = cwc[3] > 0 and ("season " .. cwc[3])
+                        or cwc[4] > 1 and ("every " .. cwc[4] .. " seasons from " .. cwc[5])
+                        or "every season"
+              log(string.format("fl26swiss: world file -- Club World Cup, group stage regulation %d, knockout %d, %s (%d taken)",
+                                cwc[1], cwc[2], when, w))
             end
           end
         local pc = ffi.C.GetProcAddress(h, "fl26_swiss_ccup")
