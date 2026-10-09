@@ -88,6 +88,14 @@ def main():
     refuses({"cycle": -1}, "a negative cycle is refused")
     refuses({"cycle": 101}, "a cycle past 100 is refused")
     refuses({"cycle": "third"}, "a cycle that is not a number is refused")
+    # the quadrennial rule, counted on the game's calendar year rather than on a tally of days
+    ok("a year: the real four-year rule", plan({"year": 2026})["year"] == 2026)
+    refuses({"year": 1989}, "a year before 1990 is refused")
+    refuses({"year": 1899}, "a year the game's date could not hold is refused")
+    refuses({"year": 2201}, "a year past 2200 is refused")
+    refuses({"year": "two thousand"}, "a year that is not a number is refused")
+    refuses({"year": 2026, "cycle": 3}, "a year and a cycle together is refused")
+    refuses({"year": 2026, "every": 4}, "a year and every together is refused")
     ok(
         '{"ko": 200}: the same id, asked for by name',
         plan({"ko": mkcwc.KO})["ko"] == mkcwc.KO,

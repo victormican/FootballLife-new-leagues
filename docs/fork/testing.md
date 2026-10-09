@@ -19,6 +19,7 @@ exe. See `tools/flpaths.py`.
 
 | test | arguments | what it proves |
 |---|---|---|
+| `test_club_world_cup.py` | | the 2025 Club World Cup as a competition of its own: `club_world_cup` off/true/`cycle`/`every`/`from`/`year` and what each refuses, competition 1 untouched, and the ten new rows (`mkcwc.py`) |
 | `test_country_order.py` | | League order (0.2.0) follows the recipe's `country_order` and never `league_order` (the Leagues page's drag order) |
 | `test_crestmatch.py` | | the crest file name matcher |
 | `test_cup_draw.py` | | `cup_draw` becomes the `cupdraw` line; `seeded` unless the recipe says otherwise; any other value is refused |

@@ -5447,30 +5447,34 @@ def club_world_cup_plan(recipe):
       "ko":     the knockout's regulation id. It has to be mkcwc.KO, the number fl26swiss.dll
                 looks the knockout up by; anything else needs the module rebuilt. Refused here,
                 because by build time the recipe has been planned already.
-      "cycle":  the season it plays in, counted as the DLL counts them: the season of a career is
-                (day + 183) / 365, so it starts at 1 and rises by one every year. 0 (the default)
-                is every season, which is what the game's own tournament does. A world that wants
-                the real four-year rule does not put a number here -- that is the module's date
-                test, and asking for a season is the way to try the format out first.
+      "cycle":  the one season it plays in and no other. A testing handle: it puts the format in
+                front of the player in the next career whatever the date is. 0 (the default) is
+                every season, which is what the game's own tournament does.
+      "every":  every how many seasons, "from" counting from which. Counting seasons.
+      "year":   the real rule. The Club World Cup is quadrennial, so this is a calendar year to
+                count four-year steps from: 2026 gives 2026, 2030, 2034. The module reads the year
+                out of the game's own date, so this lines the cup up with the years the real
+                tournament is played in rather than with a tally made of days. 1990 to 2200.
     """
     import mkcwc
 
     ask = recipe.get("club_world_cup")
     if ask in (False, None, {}, ""):
         return None
-    ko, cycle, every, frm = mkcwc.KO, 0, 0, 0
+    ko, cycle, every, frm, year = mkcwc.KO, 0, 0, 0, 0
     if isinstance(ask, dict):
         num = lambda k: int(ask.get(k, 0))
         try:
             ko = mkcwc.KO if "ko" not in ask else num("ko")
             cycle, every, frm = num("cycle"), num("every"), num("from")
+            year = num("year")
         except (TypeError, ValueError):
             raise BuildError(
-                'club_world_cup: "ko", "cycle", "every" and "from" are whole numbers, not %r'
+                'club_world_cup: "ko", "cycle", "every", "from" and "year" are whole numbers, not %r'
                 % (
                     {
                         k: ask.get(k)
-                        for k in ("ko", "cycle", "every", "from")
+                        for k in ("ko", "cycle", "every", "from", "year")
                         if k in ask
                     },
                 )
@@ -5497,7 +5501,23 @@ def club_world_cup_plan(recipe):
         )
     if frm and not every:
         raise BuildError("club_world_cup: from without every says nothing")
-    return {"ko": ko, "cycle": cycle, "every": every, "from": frm}
+    # A calendar year, not a season number: the module reads it out of the game's own date and
+    # only believes it between 1990 and 2200, so anything else would quietly mean never.
+    if year and not 1990 <= year <= 2200:
+        raise BuildError(
+            "club_world_cup: year %d is not a calendar year the game's date can hold "
+            "(1990 to 2200). It counts every N years on the year itself, not on a season."
+            % year
+        )
+    if year and cycle:
+        raise BuildError(
+            "club_world_cup: year and cycle ask for different things; keep one"
+        )
+    if year and every:
+        raise BuildError(
+            "club_world_cup: year already counts every four years; every is for counting seasons"
+        )
+    return {"ko": ko, "cycle": cycle, "every": every, "from": frm, "year": year}
 
 
 def club_world_cup(root, db, ask, log=print):
@@ -5521,6 +5541,8 @@ def club_world_cup(root, db, ask, log=print):
     )
     if ask["cycle"]:
         when = "cycle=%d" % ask["cycle"]
+    elif ask["year"]:
+        when = "year=%d" % ask["year"]
     elif ask["every"]:
         when = "every=%d from=%d" % (ask["every"], ask["from"])
     else:

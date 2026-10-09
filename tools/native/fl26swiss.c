@@ -2422,32 +2422,44 @@ static uint32_t cont_add(void* rec, uint32_t club)
  * different country in each.  Same reason the league list and the UEFA access list come from the
  * world file; see fl26_swiss_access. */
 static uint16_t g_cwc_reg = 0, g_cwc_ko = 0;
-static int g_cwc_cycle = 0, g_cwc_every = 0, g_cwc_from = 0;
+static int g_cwc_cycle = 0, g_cwc_every = 0, g_cwc_from = 0, g_cwc_year = 0;
 
 static uint16_t cwc_reg(void) { return g_cwc_reg ? g_cwc_reg : (uint16_t)CWC_REG; }
 static uint16_t cwc_ko(void) { return g_cwc_ko ? g_cwc_ko : (uint16_t)CWC_KO; }
 
-/* when the cup is played. Two ways, and only one of them is the rule:
+/* When the cup is played. Three ways, and only one of them is the rule:
      a season            one season and no other. A testing handle: it lets a world put the
                          format in front of the player in the next career whatever the date is.
-     every N seasons     the real thing. The FIFA Club World Cup is a quadrennial tournament,
-                         so 4, counting from the season the world says it starts in.
-   Neither given means every season, which is what the game's own annual tournament does. */
+     every N seasons     counted on the module's own season number.
+     from a year         the real thing. The FIFA Club World Cup is quadrennial, so every 4 years
+                         counted on the game's calendar year, not on a season tally: 2026 gives
+                         2026, 2030, 2034 -- the same years the real tournament is played in.
+   Neither given means every season, which is what the game's own annual tournament does.
+ *
+ * The season number is log_season()'s, the one every other guard in this module counts on
+ * (SAID_RESET). Counting a second time with a different constant made this cup disagree with the
+ * rest of the module about which season a day falls in. The year is the game's own u16, read from
+ * the calendar the way season_year() reads it; it is 0 when there is no game to read it from
+ * (a test), and then the four-year rule cannot be judged, so the season rule stands instead. */
 static int cwc_season(void)
 {
-  static int said = -1;
-  int y = (abs_day() + 183) / 365;
-  int yes = g_cwc_cycle ? y == g_cwc_cycle
-           : g_cwc_every > 1 ? (y >= g_cwc_from && (y - g_cwc_from) % g_cwc_every == 0)
+  static int said = -1000;
+  int s = log_season();                 /* the module's season number */
+  int y = season_year();                /* the game's calendar year, 0 if unreadable */
+  int n = g_cwc_every > 1 ? g_cwc_every : 4;
+  int on_year = g_cwc_year && y > 0;    /* a year asked for, and one there is to read */
+  int yes = g_cwc_cycle ? s == g_cwc_cycle
+           : on_year ? (y >= g_cwc_year && (y - g_cwc_year) % n == 0)
+           : g_cwc_every > 1 ? (s >= g_cwc_from && (s - g_cwc_from) % g_cwc_every == 0)
            : 1;
-  /* Once a season, and always the first time, say what number this is and whether it plays.
-     A career's first season is number 0, not 1 -- (0 + 183) / 365 is 0 -- so a world written
-     from=1 waits a whole year for nothing, and the log is how that is found out in one run
-     rather than by playing four careers. */
-  if (y != said) {
-    said = y;
-    logf("fl26swiss: Club World Cup: season %d (day %d), %s", y, abs_day(),
-         yes ? "plays this season" : "does not play this season");
+  /* Once a season, and always the first time, say what number this is and whether it plays. Both
+     numbers go in the log: the season says where the module is, the year says where the calendar
+     is, and telling them apart in one run is what stops the two from being confused again. */
+  if (s != said) {
+    said = s;
+    logf("fl26swiss: Club World Cup: season %d, year %d (day %d), %s%s", s, y, abs_day(),
+         yes ? "plays this season" : "does not play this season",
+         g_cwc_year && !y ? " [asked for a year and there is none to read: fell back on seasons]" : "");
   }
   return yes;
 }
@@ -2455,16 +2467,19 @@ static int cwc_season(void)
 __declspec(dllexport) int fl26_swiss_cwc(const uint16_t* v, int n)
 {
   /* v[0] the group stage's regulation id, v[1] the knockout's, v[2] the one season,
-     v[3] every how many seasons, v[4] counting from which. */
+     v[3] every how many, v[4] counting from which season, v[5] counting from which year. */
   if (!v || n < 2) return 0;
   g_cwc_reg = v[0];
   g_cwc_ko = v[1];
   g_cwc_cycle = n > 2 ? (int)v[2] : 0;
   g_cwc_every = n > 3 ? (int)v[3] : 0;
   g_cwc_from = n > 4 ? (int)v[4] : 0;
+  g_cwc_year = n > 5 ? (int)v[5] : 0;
   logf("fl26swiss: Club World Cup: group stage regulation %u, knockout %u, %s",
        (unsigned)g_cwc_reg, (unsigned)g_cwc_ko,
-       g_cwc_cycle ? "one season only" : g_cwc_every > 1 ? "every fourth season" : "every season");
+       g_cwc_cycle ? "one season only"
+       : g_cwc_year ? "every 4 years from the year the world names"
+       : g_cwc_every > 1 ? "every fourth season" : "every season");
   return 1;
 }
 

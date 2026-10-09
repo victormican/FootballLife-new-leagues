@@ -170,11 +170,14 @@ local function read_world(ctx)
     if dr then dlike[#dlike + 1] = { tonumber(dr), tonumber(dl) } end
     -- cwc <group stage regulation> <knockout regulation> [cycle=N]
     -- The 2025 Club World Cup as a competition of this world's own, beside the game's annual
-    -- one. cycle= is the season it plays in, counted as the DLL counts them; 0 is every season.
+    -- one. cycle= is the one season it plays in, from= counts seasons, and year= is the real
+    -- four-year rule counted on the game's calendar year (2026 gives 2026, 2030, 2034).
+    -- None of them means every season.
     local cr, ck, crest2 = line:match("^%s*cwc%s+(%d+)%s+(%d+)%s*(.*)$")
     if cr then
       cwc = { tonumber(cr), tonumber(ck), tonumber(crest2:match("cycle=(%d+)") or 0),
-              tonumber(crest2:match("every=(%d+)") or 0), tonumber(crest2:match("from=(%d+)") or 0) }
+              tonumber(crest2:match("every=(%d+)") or 0), tonumber(crest2:match("from=(%d+)") or 0),
+              tonumber(crest2:match("year=(%d+)") or 0) }
     end
     local cid, crest = line:match("^%s*ccup%s+(%d+)(.*)$")
     if cid then
@@ -440,9 +443,10 @@ function m.init(ctx)
             if pw == nil then
               log("fl26swiss: this fl26swiss.dll has no 2025 Club World Cup (fl26_swiss_cwc); the world's is not played")
             else
-              local wbuf = ffi.new("uint16_t[5]", cwc[1], cwc[2], cwc[3], cwc[4], cwc[5])
-              local w = tonumber(ffi.cast("fl26_swiss_access_t", pw)(wbuf, 5))
+              local wbuf = ffi.new("uint16_t[6]", cwc[1], cwc[2], cwc[3], cwc[4], cwc[5], cwc[6])
+              local w = tonumber(ffi.cast("fl26_swiss_access_t", pw)(wbuf, 6))
               local when = cwc[3] > 0 and ("season " .. cwc[3])
+                        or cwc[6] > 0 and ("every " .. math.max(cwc[4], 4) .. " years from " .. cwc[6])
                         or cwc[4] > 1 and ("every " .. cwc[4] .. " seasons from " .. cwc[5])
                         or "every season"
               log(string.format("fl26swiss: world file -- Club World Cup, group stage regulation %d, knockout %d, %s (%d taken)",

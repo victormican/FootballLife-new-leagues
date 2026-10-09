@@ -33,8 +33,14 @@ knockout matches played, and the July teardown was clean.
   `CWC_KO` in fl26swiss.c to match).
 - **A configurable field.** The 32 places come from a fixed access list in fl26swiss.c, not from
   the recipe.
-- **Every four years.** It plays every season (mid-December); the real one is every four years
-  in summer.
+- ~~**Every four years.**~~ Done, on the world's recipe: `"club_world_cup": {"year": 2026}`. The
+  module reads the calendar year out of the game's own date (`season_year()`, the u16 at
+  `TODAY_OFF + 8`, which it only believes between 1990 and 2200) and plays on that year and every
+  fourth year after it, so 2026 gives 2026, 2030 and 2034. It still plays mid-December, in the
+  game's own season calendar, not in a summer of its own. The season numbers it logs come from
+  `log_season()`, the count every other guard in the module uses. `cycle` (one season, for trying
+  the format out) and `every`/`from` (every N seasons) still work; `year` refuses to sit beside
+  either of them.
 - **Calendar.** Its days are fixed and are not checked against the league and continental
   calendars of the world.
 - The game's own clubs pools (the only Africa and Oceania clubs it has) go into the fourth pot.
