@@ -7899,6 +7899,19 @@ uint64_t date_handler(uint64_t reg, void* vec)
 #define CUPSEL_INIT_RVA 0xb1c990
 typedef char (*cupsel_fn)(void* self, uint64_t a, uint64_t b, uint64_t c);
 static uint32_t g_cupsel_n = 0;
+/* the competitions the world built (the ccup lines' cid=): Cup mode lists the shipped cups
+   only, so these are added to its list when there is room. */
+static uint16_t g_cupcid[MAX_CCUP];
+static int g_ncupcid = 0;
+__declspec(dllexport) int fl26_swiss_cup_cids(const uint16_t* v, int n)
+{
+  g_ncupcid = 0;
+  for (int i = 0; i < n && g_ncupcid < MAX_CCUP; i++)
+    if (v[i]) g_cupcid[g_ncupcid++] = v[i];
+  logf("fl26swiss: Cup mode: %d competition(s) of the world to expose", g_ncupcid);
+  return g_ncupcid;
+}
+
 char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
 {
   unsigned char** pb = (unsigned char**)(self + 0x90);
@@ -7920,6 +7933,29 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
     w += 12;
   }
   if (gone) *pe = w;
+  /* add the world's own cups, if the vector has room; an entry is the 12 bytes of an existing
+     one with its competition id replaced, so the menu's name/logo lookup still has a template */
+  {
+    unsigned char** cap = (unsigned char**)(self + 0xa0);
+    size_t have = (size_t)(w - *pb) / 12;
+    size_t room = (*cap && *cap > *pb) ? (size_t)(*cap - *pb) / 12 : have;
+    int added = 0, short_ = 0;
+    for (int i = 0; i < g_ncupcid; i++) {
+      uint32_t cid = g_cupcid[i];
+      int there = 0;
+      for (unsigned char* p = *pb; p + 12 <= w; p += 12)
+        if (*(uint32_t*)p == cid) there = 1;
+      if (there) continue;
+      if (have >= room) { short_ = 1; break; }
+      if (w > *pb) memcpy(w, *pb, 12); else memset(w, 0, 12);
+      *(uint32_t*)w = cid;
+      w += 12; have++; added++;
+    }
+    if (added || short_)
+      logf("fl26swiss: Cup mode -- %d world cup(s) added, %s (list %u of %u)", added,
+           short_ ? "no room for the rest" : "all in", (unsigned)have, (unsigned)room);
+    if (added) *pe = w;
+  }
   return ((cupsel_fn)(uintptr_t)(g_base + CUPSEL_INIT_RVA))(self, a, b, c);
 }
 

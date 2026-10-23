@@ -191,7 +191,8 @@ local function read_world(ctx)
     end
     local cid, crest = line:match("^%s*ccup%s+(%d+)(.*)$")
     if cid then
-      local c = { tonumber(cid), tonumber(crest:match("ko=(%d+)") or 0), tonumber(crest:match("groups=(%d+)") or 0), {} }
+      local c = { tonumber(cid), tonumber(crest:match("ko=(%d+)") or 0), tonumber(crest:match("groups=(%d+)") or 0), {},
+                  nil, nil, tonumber(crest:match("cid=(%d+)") or 0) }
       for er, ep in (crest:match("entry=([%d:,]+)") or ""):gmatch("(%d+):(%d+)") do
         c[4][#c[4] + 1] = { tonumber(er), tonumber(ep) }
       end
@@ -501,6 +502,20 @@ function m.init(ctx)
           end
           local k = tonumber(ffi.cast("fl26_swiss_access_t", pc)(cbuf, #ccups))
           log(string.format("fl26swiss: world file -- %d continental cup(s), %d accepted", #ccups, k))
+          -- their competition ids, for Kick Off > Cup: the game's Cup list is the shipped one
+          local ids = {}
+          for _, c in ipairs(ccups) do if c[6] and c[6] > 0 then ids[#ids + 1] = c[6] end end
+          if #ids > 0 then
+            local pci = ffi.C.GetProcAddress(h, "fl26_swiss_cup_cids")
+            if pci == nil then
+              log("fl26swiss: this fl26swiss.dll cannot expose the world's cups in Cup mode (fl26_swiss_cup_cids)")
+            else
+              local ibuf = ffi.new("uint16_t[?]", #ids)
+              for i, v in ipairs(ids) do ibuf[i - 1] = v end
+              local m = tonumber(ffi.cast("fl26_swiss_access_t", pci)(ibuf, #ids))
+              log(string.format("fl26swiss: world file -- %d cup(s) for Kick Off > Cup, %d taken", #ids, m))
+            end
+          end
           local olen, nopt = 0, 0
           for _, c in ipairs(ccups) do
             if c.opts then olen = olen + 5 + #c.opts.days + #c.opts.clubs; nopt = nopt + 1 end

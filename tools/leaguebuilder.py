@@ -5260,16 +5260,21 @@ def ccup_alt(line, alt):
 
 def ccup_options(line, cup):
     """a world file ccup line with a domestic cup's options (fl26swiss.lua reads them): the day
-    it is filled on, national (no continental rule on who may play), its days, invited clubs"""
+    it is filled on, national (no continental rule on who may play), its days, invited clubs --
+    and always the competition id, so Kick Off > Cup can list the cup."""
+    words = []
+    if cup.get("cid"):
+        words.append("cid=%d" % cup["cid"])
     o = cup.get("opts")
-    if not o:
+    if o:
+        words += ["fill=%d" % o["fill"], "national=%d" % o["national"],
+                  "days=" + ",".join(map(str, o["days"]))]
+        if o.get("clubs"):
+            words.append("clubs=" + ",".join(map(str, o["clubs"])))
+        if o.get("like"):                              # 0.2.0: a single-match league cup
+            words += ["like=%d" % o["like"], "draw=%s" % (o.get("draw") or "byes")]
+    if not words:
         return line
-    words = ["fill=%d" % o["fill"], "national=%d" % o["national"],
-             "days=" + ",".join(map(str, o["days"]))]
-    if o.get("clubs"):
-        words.append("clubs=" + ",".join(map(str, o["clubs"])))
-    if o.get("like"):                                  # 0.2.0: a single-match league cup
-        words += ["like=%d" % o["like"], "draw=%s" % (o.get("draw") or "byes")]
     head, sep, name = line.partition(" name=")
     return "%s %s%s%s" % (head, " ".join(words), sep, name)
 
