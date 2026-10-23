@@ -1,40 +1,67 @@
-# Club World Cup with 32 clubs (unfinished, not in Mod Studio)
+# Club World Cup with 32 clubs, as a competition of its own
 
-The 2025 format -- 32 clubs, eight groups of four played once, then a single-match knockout of
-sixteen -- works in the game, but it was never wired into Mod Studio. The code is here for anyone
-who wants to finish it. Mod Studio itself does not use it, and nothing below is supported.
+The 2025 format — 32 clubs, eight groups of four played once, then a single-match knockout of
+sixteen — is built as a **second competition**, beside the game's annual four-club Club World
+Cup (competition 1, which stays untouched). It plays every four years from 2026.
 
-## What exists
+## What the build writes
 
-- **`tools/mkcwc.py`** reshapes competition 1 (the Club World Cup) in the tables: regulation 1
-  becomes the group stage (a copy of the Libertadores group stage with one round, replicas
-  1025, 2049 ... 8193) and a new regulation, 200 by default (`--ko`), the knockout of sixteen.
-  `--dry` prints the plan and writes nothing.
+`tools/mkcwc.py` (called by the League Builder when the recipe has `club_world_cup`):
 
-  ```
-  python tools/mkcwc.py --base <pesdb dir> --out <livecpk root> [--ko 200] [--dry]
-  ```
+- a **competition row** copied from competition 1 with a free competition id (from 130 up);
+- the **group stage**: the Copa Libertadores group stage (32 clubs, eight replicas) with one
+  round per group, replicas at `<reg> + 1024 * (group + 1)`;
+- the **knockout**: the shipped competition 1's single-match template with sixteen clubs;
+- all twenty name slots copied from the shipped Club World Cup regulation.
 
-- **`tools/native/fl26swiss.c`** already carries the run-time half (search `CWC_`): when the game
-  hands the Club World Cup its entrants on regulation 1, the field is replaced by 32 clubs from
-  league tables (the access list in the source, pots of eight), drawn into eight groups with the
-  game's own group draw, handed over to the knockout when the groups end, and dated
-  (`CWC_GROUP_DAYS` / `CWC_KO_DAYS`). A world without the reshaped rows (no regulation 200 or no
-  replica 1025) is left alone, which is why it is inert in every Mod Studio world.
+The ids are chosen against the world's own tables, so no league or cup id is taken. They are
+kept in the world's `leaguebuilder-plan.json` and handed back on a rebuild.
 
-Tested once in a private world (two seasons in one session): 48/48 group matches and 16/16
-knockout matches played, and the July teardown was clean.
+## What the module does
 
-## What is missing
+`fl26swiss.dll` reads the world file's line
 
-- **Mod Studio integration.** `leaguebuilder.py` does not call `mkcwc.py`; the rows have to be
-  written into the world by hand or by a new Build step. Check that the knockout regulation id
-  is not one the builder already hands out in that world (pass a free one with `--ko`, and change
-  `CWC_KO` in fl26swiss.c to match).
-- **A configurable field.** The 32 places come from a fixed access list in fl26swiss.c, not from
-  the recipe.
-- **Every four years.** It plays every season (mid-December); the real one is every four years
-  in summer.
-- **Calendar.** Its days are fixed and are not checked against the league and continental
-  calendars of the world.
-- The game's own clubs pools (the only Africa and Oceania clubs it has) go into the fourth pot.
+```
+cwc <group stage reg> <knockout reg> year=2026 every=4 host=6
+```
+
+`fl26_swiss_cwc` takes the ids and the frequency; `fl26_swiss_cwc_access` takes the ranking (
+one `(regulation, confederation)` pair per top division of the world file; the DLL adds the
+game's own top flights).
+
+When the Champions League play-off progresses (`r == 2`), in a season the rule says plays:
+
+1. asks each league's final table (kept at the July teardown, the live table, or a table
+   counted from the matches) for its clubs;
+2. fills the FIFA quotas — **UEFA 12, CONMEBOL 6, AFC 4, CAF 4, CONCACAF 4, OFC 1, host 1** —
+   champions first, then runners-up, league by league in the ranking order;
+3. drops a third club of the same country (`CWC_PER_COUNTRY 2`);
+4. sets the field, runs the game's own group draw, hands the eight groups to `register_all`;
+5. when every group is over, puts the winners and runners-up into the knockout in the 2025
+   bracket order and starts it.
+
+Dates are borrowed from the World Cup's shapes and moved to `CWC_GROUP_DAYS` / `CWC_KO_DAYS`.
+
+## The four-year rule
+
+`cwc_season()` reads the game's calendar year (`season_year()`) and plays when
+`(year - year0) % every == 0`, 2026, 2030, 2034. `year=` is the first year; `every=` is the
+period (4 by default). `cycle=<season>` forces one season (testing) and `every=1` plays every
+season.
+
+## The ranking
+
+The world file supplies the ranking: every top division, in the order the League Builder lists
+it (the UEFA ranking and the South American places use the same order). The DLL adds the game's
+own top flights (Premier League, LaLiga, ...), so a world that only adds lower divisions still
+asks the big five. This is the same table the continental cups use when
+`continental_rank: true`.
+
+## Limits
+
+- The knockout id must be free; `mkcwc.py` picks one and never uses 255 (the "no league"
+  sentinel).
+- The group replicas are ids above 1023; `fl26swiss` intercepts their dates, so the date stub's
+  1..255 table is not involved.
+- A world without the rows is left alone: `cwc_world()` checks the knockout and the first and
+  last replica.

@@ -47,6 +47,8 @@ Rules that hold for every key:
 | `newlife_ids` | {"<NewLife id>": world id} | written by Build (`pin_newlife`): the world id each NewLife club got, so it keeps it | tables |
 | `newlife_game` | object | written by the NewLife page: what *Bring the game's leagues to this season* changed, so it can be undone or redone | none (it feeds `edits` and `players`) |
 | `league_order` | list | Mod Studio's Leagues page row order. Build does not read it | none |
+| `continental_rank` | bool, default false | fill the CAF, CONCACAF and OFC cups (and the Copa Centroamericana) from the world's own top divisions, in the order they are listed; the Copa Centroamericana winner takes a CONCACAF Champions Cup place | `ccup`, `confed` |
+| `club_world_cup` | bool or {cid, reg, ko, name, year, every, host} | the FIFA Club World Cup as a competition of its own: 32 clubs, eight groups of four, a knockout of sixteen, every `every` years from `year` (2026, 4 by default), quotas by confederation, two clubs a country | `cwc` |
 
 ## A league
 
@@ -56,11 +58,11 @@ Rules that hold for every key:
 | `country` | `Country.bin` name | flag, Competition Info name, region | `country=`, `conf=` |
 | `flag` | picture | replaces the game's flag of that country while the world is on | pictures |
 | `logo` | picture | the league's emblem | pictures |
-| `clubs` | 10..24 | league size | `clubs=` |
+| `clubs` | 10..30 | league size (10..24 is the tested range; 30 is new and waits for a game test, for Argentina) | `clubs=` |
 | `legs` | 1..4 | how often each pair meets | `legs=` |
 | `above` | league name or a shipped reg id | the league one division up | `above=`, `tier=` |
 | `exchange` | number, default 3 | clubs going up and down between the two | `promote=`, `demote=` |
-| `split` | {legs, groups: [n, n], group_legs} | Scottish-style split (`mksplit.py`) | `split` |
+| `split` | {legs, groups: [n, n] or [n, n, n], group_legs} | Scottish-style split (`mksplit.py`); Ecuador's 16 clubs, two legs and groups 6/6/4 is `{legs: 2, groups: [6,6,4], group_legs: 2}` | `split` |
 | `apertura` | true or {"playoff": 8/4/0} | Apertura/Clausura, optional knockout playoff; `playoff_logo` | `split ... carry=0`, `ccup` |
 | `season` | `august` (default) or `calendar` | a new country's top division plays February-December | `season <region> 1` |
 | `real_calendar` | {first, last, break, days, also} or `false` (0.2.0) | the league's own season dates (`"07-25"`, `"05-23"`, `["12-21", "01-22"]` or null, weekday names); without it the country's real calendar (`tools/realcal.py` COUNTRY, by tier), else the confederation's; `false`: the old calendar | `rcal` |

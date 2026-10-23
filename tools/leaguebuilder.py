@@ -24,7 +24,8 @@ which league sits above -- and nothing about ids:
   country     a Country.bin name (flag, Competition Info name, the region's country)
   flag        optional picture of the country's flag; replaces the game's own flag of that
               country (Select Team, nationality) while the world is on
-  clubs       10..24, the range seasons have been played with
+  clubs       10..30; 10..24 is the range seasons have been played with, 30 is new
+              (Argentina's Primera needs it) and waits for a game test
   legs        how many times each pair meets, 1..4
   above       a league of this recipe (by name) or a shipped regulation id (e.g. 81, Ligue 2);
               the league becomes the division below it, in its region, promotion both ways
@@ -241,7 +242,7 @@ import flpaths
 GAME = os.environ.get("FL26_DIR", r"C:\Football Life 2026")
 R_ABOVE = 0x04
 LEGS_SHIFT, LEGS_MASK = 12, 7
-CLUBS_MIN, CLUBS_MAX, LEGS_MAX = 10, 24, 4
+CLUBS_MIN, CLUBS_MAX, LEGS_MAX = 10, 30, 4
 # "others": the game's groups of clubs in no league, by the nibble at T_POOL of a club's record
 # (Team.bin: 1 Classic Teams, 2 Other European, 3 Other Asia-Oceania, 6 Other Latin American,
 # 7 Other Africa; 5 holds the three "ML Default" clubs). The Discord request of 2026-10-06:
@@ -801,7 +802,7 @@ def game_others(base, leagues):
 RECIPE_SETTINGS = ("game_europe", "uefa_seed", "uefa_rank", "europe_first", "game_cups", "preseason_cups",
                    "ccup_names", "ccup_logos", "caf_super_cup", "caf_super_cup_logo", "cup_draw",
                    "country_order", "game_seasons", "saudi_august", "newlife_ids", "newlife_game",
-                   "league_order", "packs", "club_world_cup")
+                   "league_order", "packs", "club_world_cup", "continental_rank")
 
 
 def recipe_from_plan(pl, base):
@@ -2141,10 +2142,21 @@ def plan(recipe, base, prev=None):
     bad = lbplayers.check(full)
     if bad:
         raise BuildError("player changes:\n  " + "\n  ".join(bad[:20]))
+    if recipe.get("continental_rank"):
+        continental_rank(out, confederations(base), cty, lambda *_: None)
     ge, gr, gn, gcc = game_europe(recipe, regrow, region_of_cid, base)
     room = {p["rid"]: p["clubs"] for p in out}
     room.update({r: entries_of(base, regrow[r][M.R_CID]) for r, _p, _c, _a in gcc})
     cups, notes = ccup_plan([(p["rid"], pos, comp, 0) for p in out for pos, comp in p["europe"]] + gcc, room)
+    if recipe.get("continental_rank"):
+        cent = next((c for c in cups if c["number"] == 16), None)
+        concacaf = next((c for c in cups if c["number"] == 13), None)
+        if cent and concacaf and concacaf["entry"]:
+            # the Central American Cup is the qualifier: its winner takes the last place of the
+            # Champions Cup (an MLS fill place), and it is built first so `ko=` resolves
+            concacaf["entry"] = concacaf["entry"][:-1] + [("ko", 16)]
+            cups = [cent] + [c for c in cups if c is not cent]
+            notes.append("CONCACAF Champions Cup: the Copa Centroamericana winner takes a place")
     for c in cups:            # a game league's cup winner: its national cup is the game's (#95)
         c["winners"] = [[e[1], home_cup(regrow, region_of_cid, region_of_cid.get(regrow[e[1]][M.R_CID]))]
                         for e in c["entry"] if e[0] == "cup" and e[1] in regrow
@@ -3087,6 +3099,53 @@ def apart(field):
                 field[2 * t + 1], field[2 * u + 1] = field[2 * u + 1], field[2 * t + 1]
                 break
     return field
+
+
+CENTRAL_AMERICA = {"belize", "costa rica", "el salvador", "guatemala", "honduras",
+                   "nicaragua", "panama"}
+
+
+def continental_rank(leagues, confed, cty=None, log=print):
+    """Continental cup places by the confederation's own ranking (recipe key continental_rank).
+
+    The game has no leagues of its own in Africa or Oceania and only MLS in North America, so the
+    CAF, CONCACAF and OFC cups are filled from the world's leagues. This gives each of them, in
+    the order the world file lists the confederation's top divisions (the League Builder's order,
+    the same one the CWC ranking uses):
+
+        CAF Champions League     position 1 of the first 16 CAF leagues
+        CAF Confederation Cup    position 2 of the first 8 CAF leagues
+        CONCACAF Champions Cup   position 1 of the first 8 CONCACAF leagues (MLS fills the rest)
+        OFC Champions League     position 1 of the first 8 OFC leagues
+
+    A place the recipe already names is left as it is; a league with fewer clubs than the position
+    is skipped. The cups' own size/cap rules (ccup_plan) still apply, so a confederation with
+    fewer leagues than places gets a smaller cup, and ccup_short tops a cup up to four.
+    """
+    rank = {"CAF Champions League": (6, 1, 16, False), "CAF Confederation Cup": (7, 2, 8, False),
+            "CONCACAF Champions Cup": (13, 1, 8, False),
+            "Copa Centroamericana": (16, 1, 16, True),
+            "OFC Champions League": (14, 1, 8, False)}
+    names = {c: n for c, n, _code, _conf, _fill in fl26world.CCUPS}
+    for name, (cup, pos, room, central) in rank.items():
+        conf = next(cf for c, _n, _code, cf, _f in fl26world.CCUPS if c == cup)
+        mine = [p for p in leagues
+                if confed.get(p.get("country")) == conf and not p.get("exhibition")
+                and (p.get("tier") or 1) == 1
+                and (not central or (cty and (cty.get(p.get("country")) or ("",))[0].lower()
+                                     in CENTRAL_AMERICA))]
+        n = 0
+        for p in mine[:room]:
+            if p.get("clubs", 0) < pos:
+                continue
+            have = p.get("europe") or []
+            if (pos, cup) in have:
+                continue
+            have.append((pos, cup))
+            p["europe"] = have
+            n += 1
+        if n:
+            log("  %s: %d place(s) by the %s ranking" % (names[cup], n, name.split()[0]))
 
 
 def ccup_plan(own, clubs=None):
@@ -4608,7 +4667,7 @@ def free_comp_ids(db, reserved=(), low=False):
     taken = (used_reg | CCUP_KEEP | W.BAD_REG | set(W.MOVED_REG.values()) | set(fl26world.DEFAULT_SLOT)
              | set(fl26world.NO_SLOT_IDS) | set(reserved))
     return ([c for c in W.cid_pool(CID_FROM, low) if c not in used_cid and c != UECL_CID],
-            [r for r in range(CCUP_REG_FROM, 1024) if r not in taken])
+            [r for r in range(CCUP_REG_FROM, 1024) if r not in taken and r != 255])
 
 
 def like_reg(db, code):

@@ -273,9 +273,16 @@ CCUPS = [
     # and Challenge League"); the shipped Asian leagues fill it from the places after ACL Two's.
     (15, "AFC Challenge League", "FL_AFCCHL", 3,
      [(r, p) for k in range(4) for r, p in ((_J1, 11 + k), (_CSL, 10 + k), (_SPL, 11 + k))]),
+    # CONCACAF's second cup, under the Champions Cup: the Central American Cup, sixteen clubs
+    # in four groups of four and a knockout of the first two.  It is the qualifier the real
+    # Champions Cup has for Central America, so the winner takes a place in the Champions Cup
+    # (leaguebuilder.continental_rank links them).  The game ships only MLS in the confederation,
+    # so its shipped-league list is empty on purpose: it is filled from the world's own Central
+    # American leagues.
+    (16, "Copa Centroamericana", "FL_CENTAM", 6, []),
 ]
 CCUP_KNOCKOUT = {13}              # cups that play no groups: a knockout of 16 (or 8, 4) from the start
-COMPETITIONS += [(c, n) for c, n, _code, _conf, _fill in CCUPS]
+COMPETITIONS += [(c, name) for c, name, _code, _conf, _fill in CCUPS]
 # The shipped leagues that fill the cups above, by regulation (for Check the plan).
 FILL_NAMES = {_BRA: "Brasileirão Série A (Brazil)", _ARG: "Liga Profesional (Argentina)",
               _CHI: "Liga de Primera (Chile)", _COL: "Liga BetPlay (Colombia)", _J1: "J1 League (Japan)",
