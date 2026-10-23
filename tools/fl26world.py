@@ -94,21 +94,24 @@ def chain_cups(leagues):
 DEFAULT_SLOT = {
     11: 28, 49: 49, 60: 40, 61: 41, 62: 42, 74: 74, 76: 80, 93: 61, 94: 62, 96: 64, 98: 66,
     100: 81, 109: 82, 110: 83, 111: 84, 112: 85, 113: 86, 114: 87, 121: 68, 138: 107, 139: 108,
-    140: 109, 143: 110, 144: 111, 145: 112, 146: 113, 170: 22, 171: 29, 173: 43, 174: 69,
-    176: 71, 178: 72, 179: 73, 180: 75, 181: 76, 182: 77, 190: 112,
+    140: 109, 143: 110, 144: 111, 145: 112, 146: 113, 170: 22, 171: 29, 173: 43,
+    178: 72, 181: 76, 182: 77, 190: 112,
 }
 # Regulation ids a world may still use, but with no Select Team slot: the league plays its season
 # and is not in the Select Team / Kick Off list. Until 28 September these took slots 6, 5 and 4 --
 # free in the parameter table, but the list keeps the Asia-Oceania national teams and the two
 # Classic Teams entries there, so a 37th-39th league hid them (GitHub #26). fl26comptab refuses
 # PROTECTED_SLOTS for the same reason, also in world files written before this.
-NO_SLOT_IDS = (183, 184, 185)
+# Since 2026-10-23 183, 184 and 185 sit on slots 182, 183 and 184 instead: every league of a
+# world is in Select Team.
+NO_SLOT_IDS = ()
 PROTECTED_SLOTS = (4, 5, 6)
 # Slots the Select Team list fills with a group of the game's own "other clubs" when no league
-# sits there (fl26slotnames). Four of our ids land on them, so a big world hid those groups
-# (GitHub #73: Other European and Other Latin American gone with 36 leagues). The builder hands
-# these ids out last, in this order: the two small groups before the hidden ids above, the two
-# big ones (Sparta Prague, APOEL ... / Penarol, LDU Quito ...) only after them.
+# sits there (fl26slotnames). Four of our ids used to land on them, so a big world hid those
+# groups (GitHub #73: Other European and Other Latin American gone with 36 leagues). They are
+# kept free now: 174, 176, 179, 180, 183, 184 and 185 take slots 185..188 and 182..184 instead
+# (SPARE_SLOT), so "Other Clubs (Africa)", "Other", "Other Latin American Teams" and "Other
+# European Leagues" stay in Select Team in every world.
 POOL_SLOTS = {75: "Other Clubs (Africa)", 71: "Other", 73: "Other Latin American Teams",
               69: "Other European Leagues"}
 POOL_BEFORE_HIDDEN = (75, 71)
@@ -117,24 +120,34 @@ POOL_AFTER_HIDDEN = (73, 69)
 # (254, 253 ... 197) and a Select Team slot of its own above 123. Needs fl26slots250 (slots up
 # to 249), fl26slot7 (a club's league slot is a whole byte, not 7 bits) and a caps set whose
 # --date-keys include these ids (the shipped set dates 197..255). Handed out after the ids with
-# a slot of their own and before the pool and no-slot ids, so no group of the game is hidden.
+# a slot of their own and before the spare and pool ids, so no group of the game is hidden.
 # 255 stays out: 0xff is "no league" in more than one place. 196 and below are taken: 191..196
 # split-season phases (mksplit), 188/189 the Europa play-offs, 186/187 the Conference League,
 # and the date stub (datecave.py) knows ids up to 255 only -- so 36 + 3 + 58 = 97 leagues is
-# the ceiling of this layout; the next one needs a wider date stub.
+# the ceiling of that first layout.
 EXTRA_IDS = tuple(range(254, 196, -1))
 EXTRA_SLOT = {r: 124 + i for i, r in enumerate(EXTRA_IDS)}      # 254 -> 124 ... 197 -> 181
+# Seven more slots, 182..188, for the seven ids that used to borrow the game's "other clubs"
+# groups (174, 176, 179, 180) or had no slot at all (183, 184, 185). They are dated by the
+# shipped caps set and their slots are past 128, which fl26slot7 makes safe for a league. With
+# them the pool slots 69, 71, 73 and 75 are never taken, so the game's four "other clubs"
+# groups stay in Select Team and every league of the world is listed.
+SPARE_SLOT = {183: 182, 184: 183, 185: 184, 174: 185, 176: 186, 179: 187, 180: 188}
 DEFAULT_SLOT.update(EXTRA_SLOT)
+DEFAULT_SLOT.update(SPARE_SLOT)
 
 
 def id_rank(r):
-    """sort key of a regulation id in the builder's free list: a slot of its own first, then the
-    slots of the two small "other clubs" groups, the ids with no slot, the two big groups"""
+    """sort key of a regulation id in the builder's free list: a slot of its own first, the
+    extra slots, the seven spares, then the pool groups (no id maps to one now) and the ids with
+    no slot"""
     s = DEFAULT_SLOT.get(r)
     if s is None:
         return (2, 0)
     if r in EXTRA_SLOT:
         return (0, 1)           # after the shipped slots, before any id that hides a group
+    if r in SPARE_SLOT:
+        return (0, 2)           # and before any pool slot: the game's four groups stay
     if s in POOL_BEFORE_HIDDEN:
         return (1, POOL_BEFORE_HIDDEN.index(s))
     if s in POOL_AFTER_HIDDEN:
