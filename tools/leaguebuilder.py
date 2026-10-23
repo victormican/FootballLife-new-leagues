@@ -802,7 +802,8 @@ def game_others(base, leagues):
 RECIPE_SETTINGS = ("game_europe", "uefa_seed", "uefa_rank", "europe_first", "game_cups", "preseason_cups",
                    "ccup_names", "ccup_logos", "caf_super_cup", "caf_super_cup_logo", "cup_draw",
                    "country_order", "game_seasons", "saudi_august", "newlife_ids", "newlife_game",
-                   "league_order", "packs", "club_world_cup", "continental_rank", "leagues_cup")
+                   "league_order", "packs", "club_world_cup", "continental_rank", "leagues_cup",
+                   "state_cups")
 
 
 def recipe_from_plan(pl, base):
@@ -917,6 +918,8 @@ def recipe_from_plan(pl, base):
         rec["newlife_ids"] = pins
     if pl.get("club_world_cup"):
         rec["club_world_cup"] = copy.deepcopy(pl["club_world_cup"])
+    if pl.get("state_cups"):
+        rec["state_cups"] = copy.deepcopy(pl["state_cups"])
     return rec
 
 
@@ -2218,6 +2221,7 @@ def plan(recipe, base, prev=None):
             "cup_draw": cup_draw(recipe),
             # the FIFA Club World Cup as a competition of this world's own, every four years
             "club_world_cup": recipe.get("club_world_cup") or None,
+            "state_cups": recipe.get("state_cups") or [],
             # the cups' ids of the last Build, {key: {cid, reg, ...}}: build() gives each its own back
             "prev_cup_ids": kept_cups(prev_cups, names, [s["code"] for s in gsupers]),
             # B159: a world built with competition ids under 130 (eu4, r12) goes on with them
@@ -4144,6 +4148,7 @@ def build(pl, base, game, replace=False, log=print):
     rounds = qual_rounds(pl)
     uecl, qlines = europe(tmp, db, log, bool(pl.get("uecl")), pl.get("uecl_name"), rounds)
     national_cups(pl, tmp, db, log)
+    state_lines = state_cups(pl, tmp, db, log)
     game_super_cups(pl, tmp, db, log)
     hc = home_cups(pl, confed)
     own_cup = {p["rid"]: (p.get("own_cup") or {}).get("reg") for p in pl["leagues"]}
@@ -4266,6 +4271,7 @@ def build(pl, base, game, replace=False, log=print):
                           + kickorder_lines(pl, base, confed)
                           + (["nopool " + " ".join(str(t) for t in nopool)] if nopool else []) + newfaces
                           + fans
+                          + state_lines
                           + ["cupdraw %s" % pl.get("cup_draw", "seeded")]
                           + (["cwc %d %d year=%d every=%d host=%d"
                               % (cwc["reg"], cwc["ko"],
@@ -5084,6 +5090,61 @@ def cup_seeding(teams, top):
     out = []
     for i in range(max(len(hi), len(lo))):
         out += hi[i:i + 1] + lo[i:i + 1]
+    return out
+
+
+def state_cups(pl, root, db, log=print):
+    """Brazilian state cups (Paulista, Carioca, ...) as cups of their own.
+
+    A state cup is not a league: its clubs are a fixed list from one state, it plays before the
+    national league (January to April) and it must not take clubs away from the league. The
+    recipe gives it `{name, teams: [team ids], groups, fill, days, region, code, logo}`:
+
+        groups 0   a straight knockout of len(teams) (2, 4, 8, 16 or 32)
+        groups N   N groups of four, then a knockout of the first two (the Paulista shape)
+        fill       the day it is filled (20 = 20 January in the season frame)
+        days       the days its rounds are played on
+        region     the competition region (128 Brazil)
+
+    mkccup.py writes the competition and its entries (the team ids, `0:<id>`), fl26swiss fills
+    the field with the invited clubs (`clubs=`), dates it and runs it. The competition id goes
+    on the ccup line as `cid=`, so Kick Off > Cup offers it too.
+    """
+    import mkccup
+    out = []
+    for k, c in enumerate(pl.get("state_cups") or []):
+        name = str(c.get("name") or "").strip() or "State Cup %d" % (k + 1)
+        teams = [int(t) for t in c.get("teams") or []]
+        groups = int(c.get("groups") or 0)
+        if not teams:
+            log("  %s: no teams -- skipped" % name)
+            continue
+        if groups and len(teams) != 4 * groups:
+            raise BuildError("%s: %d clubs, but %d groups of four want %d"
+                             % (name, len(teams), groups, 4 * groups))
+        if not groups and len(teams) not in (2, 4, 8, 16, 32):
+            raise BuildError("%s: a straight knockout of %d clubs -- use 2, 4, 8, 16 or 32"
+                             % (name, len(teams)))
+        cids, regs = pinned_ids(pl, db, "state:" + name)
+        need = 2 if groups else 1
+        if not cids or len(regs) < need:
+            raise out_of_ids(name)
+        cid, reg = cids[0], regs[0]
+        ko = regs[1] if groups else reg
+        region = int(c.get("region") if c.get("region") is not None else 0)
+        code = str(c.get("code") or "FL_ST%02d" % (k + 1))
+        entry = ",".join("0:%d" % t for t in teams)
+        call(mkccup, ["--base", db, "--out", root, "--cup",
+                      "|".join(str(x) for x in (name, code, cid, reg, ko, groups, entry, 4, region))])
+        line = ("ccup %d ko=%d groups=%d entry=%s cid=%d fill=%d national=1 days=%s clubs=%s name=%s"
+                % (reg, ko, groups, ",".join("0:0" for _t in teams), cid,
+                   int(c.get("fill") or 20),
+                   ",".join(str(int(d)) for d in c.get("days") or [20, 27, 34, 41, 48, 55, 62, 69]),
+                   ",".join(str(t) for t in teams), name))
+        out.append(line)
+        pl.setdefault("cup_ids", {})["state:" + name] = {"cid": cid, "reg": reg, "ko": ko}
+        log("  %s: competition %d, %s, %d clubs" % (name, cid,
+            "%d group(s) of four" % groups if groups else "a knockout", len(teams)))
     return out
 
 

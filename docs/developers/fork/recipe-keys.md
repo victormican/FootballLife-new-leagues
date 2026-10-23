@@ -49,6 +49,7 @@ Rules that hold for every key:
 | `league_order` | list | Mod Studio's Leagues page row order. Build does not read it | none |
 | `continental_rank` | bool, default false | fill the CAF, CONCACAF and OFC cups (and the Copa Centroamericana) from the world's own top divisions, in the order they are listed; the Copa Centroamericana winner takes a CONCACAF Champions Cup place | `ccup`, `confed` |
 | `leagues_cup` | bool or {"mx": "<league name>"} | the Leagues Cup between MLS and the recipe's Mexican league: 16 + 16 clubs, eight groups of four, a knockout of sixteen (the 36-club phase one is not supported) | `ccup` |
+| `state_cups` | list of {name, teams, groups, fill, days, region, code} | Brazilian state cups: a fixed list of clubs, groups or a knockout, filled in January and played on the given days; each club enters only its own state's cup | `ccup` |
 | `club_world_cup` | bool or {cid, reg, ko, name, year, every, host} | the FIFA Club World Cup as a competition of its own: 32 clubs, eight groups of four, a knockout of sixteen, every `every` years from `year` (2026, 4 by default), quotas by confederation, two clubs a country | `cwc` |
 
 ## A league

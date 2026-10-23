@@ -146,7 +146,7 @@ def main():
             raise SystemExit("%s: competition %d or regulation(s) %s are taken in this world"
                              % (cup["name"], cup["cid"], taken or ""))
         for r, _p in cup["entry"]:
-            if r not in cid_of_reg:
+            if r != 0 and r not in cid_of_reg:      # 0:<team id>: an invited club, not a place
                 raise SystemExit("%s: no league regulation %d in this world" % (cup["name"], r))
         used_cid.add(cup["cid"])
         used_reg.update(ids)
@@ -196,6 +196,10 @@ def main():
 
         clubs = []
         for r, p in cup["entry"]:
+            if r == 0:                  # an invited club, by team id
+                if p not in clubs:
+                    clubs.append(p)
+                continue
             if p < 1:                   # a cup's winner: nobody to write before it is played
                 continue
             lst = [t for _o, t in sorted(listed.get(cid_of_reg[r], []))]
