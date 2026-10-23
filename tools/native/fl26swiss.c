@@ -2654,8 +2654,12 @@ static void cont_swap(uint16_t id, u32vec* list, const char* where)
                 (unsigned)h->reg, h->rank ? "position" : "winner", (unsigned)h->rank, to, c);
   }
   if (comp == LIBQ && id < 1024) put += cont_standins(k, list, n, blk, pool, put, id);
-  logf("fl26swiss: %s (reg %u, %s) -- day %d: %u clubs, %u from pool %d; %u put in (%u newly paired), %u pool clubs left; our places %u, paired %u",
-       CONT_NAME[k], (unsigned)id, where, today(), (unsigned)n, npool, pool, put, g_nmap[k] - before, left, g_ncont[k], g_nmap[k]);
+  unsigned dup = 0;
+  for (size_t i = 0; i < n; i++)
+    for (size_t j = i + 1; j < n; j++)
+      if (same_club(list->b[i], list->b[j])) dup++;
+  logf("fl26swiss: %s (reg %u, %s) -- day %d: %u clubs, %u from pool %d; %u put in (%u newly paired), %u pool clubs left; our places %u, paired %u, %u duplicate(s)",
+       CONT_NAME[k], (unsigned)id, where, today(), (unsigned)n, npool, pool, put, g_nmap[k] - before, left, g_ncont[k], g_nmap[k], dup);
 }
 /* One club added to a regulation's list -- the way the AFC builder fills its groups, straight
  * from the list it had before set_clubs saw it (measured 2026-09-27: reg 15 held our eight, its
@@ -3984,6 +3988,12 @@ static int ccup_fill_one(int k, void* started)
        test left it at that, never registered (2026-09-30, cup 201). Only this season's own
        field -- a save made after the fill and loaded again -- counts as filled; anything else
        is replaced (set_clubs clears the list first). */
+    unsigned cdup = 0;
+    for (unsigned i = 0; i < n; i++)
+      for (unsigned j = i + 1; j < n; j++)
+        if (same_club(g_ccup_field[k][i], g_ccup_field[k][j])) cdup++;
+    if (cdup)
+      logf("fl26swiss: cup %u -- %u duplicate club(s) in its field of %u", (unsigned)c->reg, cdup, n);
     if (held) {
       int same = held == n;
       for (unsigned i = 0; i < n && same; i++) same = has_club(rec_clubs(rec), held, g_ccup_field[k][i]);

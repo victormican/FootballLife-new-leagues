@@ -2150,7 +2150,10 @@ def plan(recipe, base, prev=None):
     ge, gr, gn, gcc = game_europe(recipe, regrow, region_of_cid, base)
     room = {p["rid"]: p["clubs"] for p in out}
     room.update({r: entries_of(base, regrow[r][M.R_CID]) for r, _p, _c, _a in gcc})
-    cups, notes = ccup_plan([(p["rid"], pos, comp, 0) for p in out for pos, comp in p["europe"]] + gcc, room)
+    own_places_list = [(p["rid"], pos, comp, 0) for p in out for pos, comp in p["europe"]] + gcc
+    own_places_list, _dropped = drop_game_places(own_places_list, base)
+    cups, notes = ccup_plan(own_places_list, room)
+    dedupe_continental(out, lambda *_: None)
     if recipe.get("leagues_cup"):
         # MLS v Liga MX: sixteen clubs of each, eight groups of four and a knockout of sixteen.
         # The real 2025 cup has 36 clubs (18 + 18), three cross-league matches and the top four
@@ -3169,6 +3172,88 @@ def continental_rank(leagues, confed, cty=None, log=print):
             n += 1
         if n:
             log("  %s: %d place(s) by the %s ranking" % (names[cup], n, name.split()[0]))
+
+
+def dedupe_continental(leagues, log=print):
+    """One club, one continental cup.
+
+    A recipe may name the same league position for two cups of the same confederation -- the AFC
+    Champions League and the AFC Champions League Two, the CONCACAF Champions Cup and the Copa
+    Centroamericana, the Libertadores and the Sudamericana. The position is the same club, so it
+    would enter both. The higher cup keeps it; the lower one loses the place (its field is topped
+    up by ccup_short or by the game's own entrants). Position 0 (a cup winner) is left alone: it
+    is another club, and the runtime ccup_taken covers the case where it is not.
+
+    The cup order is the one fl26world.CCUPS uses, with the game's own AFC Champions League (5)
+    before the cups of ours (8, 15) and the game's Libertadores (3) before the Sudamericana (9).
+    """
+    order = {5: 0, 3: 0, 13: 0, 6: 0, 14: 0, 8: 1, 9: 1, 16: 1, 7: 1, 15: 2}
+    for p in leagues:
+        euro = p.get("europe") or []
+        best = {}
+        for pos, comp in euro:
+            if pos == 0:
+                continue
+            if pos not in best or order.get(comp, 50) < order.get(best[pos], 50):
+                best[pos] = comp
+        keep, added = [], set()
+        for pos, comp in euro:
+            if pos == 0:
+                keep.append((pos, comp))
+                continue
+            if best.get(pos) != comp or (pos, comp) in added:
+                if (pos, comp) not in added:
+                    log("  %s: position %d goes to competition %d, not %d (one club, one cup)"
+                        % (p["name"], pos, best.get(pos), comp))
+                continue
+            added.add((pos, comp))
+            keep.append((pos, comp))
+        p["europe"] = keep
+
+
+def game_entry_clubs(base, cid):
+    """the team ids in a competition's entry list, from the world's tables"""
+    ents = M.load(base, "CompetitionEntry.bin")
+    return {int.from_bytes(ents[i:i + 4], "little") for i in range(0, len(ents), M.ENT)
+            if ents[i + M.E_CID] == cid}
+
+
+def place_club(base, reg, pos):
+    """the club at a league position, from the tables: the entry list of the regulation's
+    competition, in its own order. None when the position is not there."""
+    comp, regs, ents = (M.load(base, n) for n in
+                        ("Competition.bin", "CompetitionRegulation.bin", "CompetitionEntry.bin"))
+    cid = next((regs[i + M.R_CID] for i in range(0, len(regs), M.REG)
+                if int.from_bytes(regs[i + M.R_ID:i + M.R_ID + 2], "little") == reg), None)
+    if cid is None:
+        return None
+    rows = sorted((ents[i + M.E_ORDER], int.from_bytes(ents[i:i + 4], "little"))
+                  for i in range(0, len(ents), M.ENT) if ents[i + M.E_CID] == cid)
+    return rows[pos - 1][1] if 1 <= pos <= len(rows) else None
+
+
+def drop_game_places(own, base):
+    """A club already in the game's own AFC Champions League (competition 8) or Libertadores
+    (competition 5) is not put into one of our AFC or South American cups by the same position.
+
+    The game's field is set before ours in a season, but the live regulation the module reads
+    when our cups fill can still be empty, and then the same club entered both. The entry list
+    on disk is the one the game starts from, so the places are held against it here.
+    """
+    afc = game_entry_clubs(base, 8)
+    lib = game_entry_clubs(base, 5)
+    out, dropped = [], []
+    for e in own:
+        r, pos, comp, alt = e
+        if pos > 0:
+            if comp in (8, 15) and place_club(base, r, pos) in afc:
+                dropped.append((r, pos, comp))
+                continue
+            if comp == 9 and place_club(base, r, pos) in lib:
+                dropped.append((r, pos, comp))
+                continue
+        out.append(e)
+    return out, dropped
 
 
 def ccup_plan(own, clubs=None):
