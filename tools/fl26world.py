@@ -280,6 +280,10 @@ CCUPS = [
     # so its shipped-league list is empty on purpose: it is filled from the world's own Central
     # American leagues.
     (16, "Copa Centroamericana", "FL_CENTAM", 6, []),
+    # The Leagues Cup, MLS v Liga MX.  It is not a confederation cup with a ranking of its own:
+    # its field is the two leagues, so leaguebuilder.plan adds it from the recipe's
+    # `leagues_cup` key (16 MLS + 16 Liga MX, eight groups of four, a knockout of sixteen).
+    (17, "Leagues Cup", "FL_LEAGUESCUP", 6, []),
 ]
 CCUP_KNOCKOUT = {13}              # cups that play no groups: a knockout of 16 (or 8, 4) from the start
 COMPETITIONS += [(c, name) for c, name, _code, _conf, _fill in CCUPS]

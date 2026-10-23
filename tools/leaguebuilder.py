@@ -802,7 +802,7 @@ def game_others(base, leagues):
 RECIPE_SETTINGS = ("game_europe", "uefa_seed", "uefa_rank", "europe_first", "game_cups", "preseason_cups",
                    "ccup_names", "ccup_logos", "caf_super_cup", "caf_super_cup_logo", "cup_draw",
                    "country_order", "game_seasons", "saudi_august", "newlife_ids", "newlife_game",
-                   "league_order", "packs", "club_world_cup", "continental_rank")
+                   "league_order", "packs", "club_world_cup", "continental_rank", "leagues_cup")
 
 
 def recipe_from_plan(pl, base):
@@ -2148,6 +2148,25 @@ def plan(recipe, base, prev=None):
     room = {p["rid"]: p["clubs"] for p in out}
     room.update({r: entries_of(base, regrow[r][M.R_CID]) for r, _p, _c, _a in gcc})
     cups, notes = ccup_plan([(p["rid"], pos, comp, 0) for p in out for pos, comp in p["europe"]] + gcc, room)
+    if recipe.get("leagues_cup"):
+        # MLS v Liga MX: sixteen clubs of each, eight groups of four and a knockout of sixteen.
+        # The real 2025 cup has 36 clubs (18 + 18), three cross-league matches and the top four
+        # of each league into the quarter-finals; the engine plays groups of four, so this is
+        # the closest supported shape.  MLS is the game's regulation 51; Liga MX is a league of
+        # the recipe (Mexico has no shipped league in this game), named by `mx` or found by its
+        # country flag 124 ("Mexican First Division" in the worlds built so far).
+        spec = recipe["leagues_cup"] if isinstance(recipe["leagues_cup"], dict) else {}
+        want = str(spec.get("mx") or "Mexican First Division").strip().lower()
+        mx = next((p for p in out if p["name"].strip().lower() == want), None)
+        if mx is None:
+            mx = next((p for p in out if p.get("country") == 124 and not p.get("exhibition")), None)
+        if mx is None:
+            notes.append("Leagues Cup: no Mexican league in the recipe -- add one (Mexico, 18 clubs) or name it in leagues_cup.mx")
+        else:
+            cups.append({"number": 17, "name": "Leagues Cup", "code": "FL_LEAGUESCUP", "conf": 6,
+                         "groups": 8,
+                         "entry": [(r, p) for p in range(1, 17) for r in (51, mx["rid"])]})
+            notes.append("Leagues Cup: 32 clubs, 16 MLS + 16 %s, eight groups of four, a knockout of sixteen (the 36-club phase one is not a shape the engine draws)" % mx["name"])
     if recipe.get("continental_rank"):
         cent = next((c for c in cups if c["number"] == 16), None)
         concacaf = next((c for c in cups if c["number"] == 13), None)
