@@ -648,6 +648,8 @@ static uint16_t ko_row(uint16_t id) { return id == 4 ? 1027 : id == 6 ? 1029 : i
 static const int KO_ORDER[KO_N] = { 0, 15, 7, 8, 3, 12, 4, 11, 1, 14, 6, 9, 2, 13, 5, 10 };
 
 static int cwc_world(void);
+static uint16_t cwc_reg(void);
+static uint16_t cwc_ko(void);
 static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag);
 static u32vec* cwc_game_champions(u32vec* list);
 static void cont_note(uint16_t id, void* vec);
@@ -725,7 +727,7 @@ char setcl_handler(uint64_t id, u32vec* list, uint64_t flag)
       }
     }
   }
-  if (r == 1 && cwc_world()) return cwc_setcl(id, list, flag);
+  if (r == cwc_reg() && cwc_world()) return cwc_setcl(id, list, flag);
   if (r == 1 && list && list->b && list->e > list->b) list = cwc_game_champions(list);
   if (is_playoff(r)) { char ok; if (q_setcl(r, id, flag, &ok)) return ok; }
   /* A group of one of our splits is handed the regular phase's table rows by 0x141343d70, which
@@ -2697,6 +2699,114 @@ static uint32_t cont_add(void* rec, uint32_t club)
 #define CWC_KO  200
 #define CWC_GROUPS 8
 #define CWC_N 32
+#define CWC_PER_COUNTRY 2    /* FIFA 2025: at most two clubs from one country */
+
+/* A world that builds the 2025 format as a competition of its own hands its ids over through
+ * fl26_swiss_cwc, and those are the ones used below.  Zero means "this world did not ask", and
+ * then the compiled-in CWC_REG/CWC_KO stand, so a world that never calls the export keeps the
+ * behaviour it had: competition 1 reshaped in place.
+ *
+ * No id a world builds can be compiled in -- every world hands out its own, and they mean a
+ * different country in each.  Same reason the league list and the UEFA access list come from the
+ * world file; see fl26_swiss_access. */
+static uint16_t g_cwc_reg = 0, g_cwc_ko = 0;
+static int g_cwc_cycle = 0, g_cwc_every = 0, g_cwc_from = 0, g_cwc_year = 0;
+static int g_cwc_host = 6;             /* the confederation with the host's extra place */
+
+/* The world's own ranking table for the Cup: one pair per top-division league, (regulation,
+ * confederation), in the order the world file lists them -- which is the League Builder's order,
+ * the one the UEFA ranking and the South American places already use.  The DLL fills each
+ * confederation's FIFA quota from those leagues' final tables, champions first, then runners-up
+ * and so on, so a confederation with more leagues than places still sends its best ones.  Without
+ * a table (a world built before this) the compiled-in CWC_ACCESS below stands, unchanged. */
+#define CWC_ACC_MAX 256
+typedef struct { uint16_t reg; uint8_t conf; } cwcacc2_t;
+static cwcacc2_t g_cwc_acc[CWC_ACC_MAX];
+static int g_cwc_nacc = 0;
+/* The game's own top leagues, for the world file's table to sit beside: the five big ones and
+ * the other shipped top flights, then South America, Asia and the United States.  The world
+ * file lists only the leagues a world ADDS; without these a quota of 12 UEFA places would be
+ * filled from the added leagues alone and the Premier League would never be asked. */
+static const cwcacc2_t CWC_BASE[] = {
+  {17,2},{19,2},{18,2},{50,2},{20,2},{21,2},{22,2},{155,2},
+  {39,2},{111,2},{114,2},{117,2},{119,2},{128,2},{137,2},
+  {29,4},{30,4},{67,4},{51,6},{52,3},{120,3},{162,3},
+};
+__declspec(dllexport) int fl26_swiss_cwc_access(const uint16_t* v, int n)
+{
+  g_cwc_nacc = 0;
+  for (int i = 0; i < n && g_cwc_nacc < CWC_ACC_MAX; i++) {
+    uint16_t r = v[2 * i];
+    unsigned c = v[2 * i + 1];
+    if (!r || c < 2 || c > 7) continue;
+    g_cwc_acc[g_cwc_nacc].reg = r;
+    g_cwc_acc[g_cwc_nacc].conf = (uint8_t)c;
+    g_cwc_nacc++;
+  }
+  logf("fl26swiss: Club World Cup: %d league(s) in the world's ranking table", g_cwc_nacc);
+  return g_cwc_nacc;
+}
+
+static uint16_t cwc_reg(void) { return g_cwc_reg ? g_cwc_reg : (uint16_t)CWC_REG; }
+static uint16_t cwc_ko(void) { return g_cwc_ko ? g_cwc_ko : (uint16_t)CWC_KO; }
+
+/* When the cup is played. Three ways, and only one of them is the rule:
+     a season            one season and no other. A testing handle: it lets a world put the
+                         format in front of the player in the next career whatever the date is.
+     every N seasons     counted on the module's own season number.
+     from a year         the real thing. The FIFA Club World Cup is quadrennial, so every 4 years
+                         counted on the game's calendar year, not on a season tally: 2026 gives
+                         2026, 2030, 2034 -- the same years the real tournament is played in.
+   Neither given means every season, which is what the game's own annual tournament does.
+ *
+ * The season number is log_season()'s, the one every other guard in this module counts on
+ * (SAID_RESET). Counting a second time with a different constant made this cup disagree with the
+ * rest of the module about which season a day falls in. The year is the game's own u16, read from
+ * the calendar the way season_year() reads it; it is 0 when there is no game to read it from
+ * (a test), and then the four-year rule cannot be judged, so the season rule stands instead. */
+static int cwc_season(void)
+{
+  static int said = -1000;
+  int s = log_season();                 /* the module's season number */
+  int y = season_year();                /* the game's calendar year, 0 if unreadable */
+  int n = g_cwc_every > 1 ? g_cwc_every : 4;
+  int on_year = g_cwc_year && y > 0;    /* a year asked for, and one there is to read */
+  int yes = g_cwc_cycle ? s == g_cwc_cycle
+           : on_year ? (y >= g_cwc_year && (y - g_cwc_year) % n == 0)
+           : g_cwc_every > 1 ? (s >= g_cwc_from && (s - g_cwc_from) % g_cwc_every == 0)
+           : 1;
+  /* Once a season, and always the first time, say what number this is and whether it plays. Both
+     numbers go in the log: the season says where the module is, the year says where the calendar
+     is, and telling them apart in one run is what stops the two from being confused again. */
+  if (s != said) {
+    said = s;
+    logf("fl26swiss: Club World Cup: season %d, year %d (day %d), %s%s", s, y, abs_day(),
+         yes ? "plays this season" : "does not play this season",
+         g_cwc_year && !y ? " [asked for a year and there is none to read: fell back on seasons]" : "");
+  }
+  return yes;
+}
+
+__declspec(dllexport) int fl26_swiss_cwc(const uint16_t* v, int n)
+{
+  /* v[0] the group stage's regulation id, v[1] the knockout's, v[2] the one season,
+     v[3] every how many, v[4] counting from which season, v[5] counting from which year. */
+  if (!v || n < 2) return 0;
+  g_cwc_reg = v[0];
+  g_cwc_ko = v[1];
+  g_cwc_cycle = n > 2 ? (int)v[2] : 0;
+  g_cwc_every = n > 3 ? (int)v[3] : 0;
+  g_cwc_from = n > 4 ? (int)v[4] : 0;
+  g_cwc_year = n > 5 ? (int)v[5] : 0;
+  g_cwc_host = n > 6 && v[6] >= 2 && v[6] <= 7 ? (int)v[6] : 6;
+  logf("fl26swiss: Club World Cup: group stage regulation %u, knockout %u, %s",
+       (unsigned)g_cwc_reg, (unsigned)g_cwc_ko,
+       g_cwc_cycle ? "one season only"
+       : g_cwc_year ? "every 4 years from the year the world names"
+       : g_cwc_every > 1 ? "every fourth season" : "every season");
+  return 1;
+}
+
 #define R_BRA 29
 #define R_ARG 30
 #define R_USA 51
@@ -2722,9 +2832,9 @@ static const int CWC_BRACKET[16][2] = {   /* {group, place}: A1-B2, C1-D2, E1-F2
   {1,0},{0,1},{3,0},{2,1},{5,0},{4,1},{7,0},{6,1} };
 #define REGALL_RVA 0x1343bf0   /* register_all(ctx, vec_u16* ids) */
 typedef void (*regall_fn)(void* ctx, void* ids);
-static uint16_t cwc_rep(int g) { return (uint16_t)(CWC_REG + 1024 * (g + 1)); }
-static int cwc_world(void) { return get_rec(CWC_KO) && get_rec(cwc_rep(0)) && get_rec(cwc_rep(CWC_GROUPS - 1)); }
-static int cwc_id(uint16_t id) { return id == CWC_REG || (id > 1024 && (id & 0x3ff) == CWC_REG && id <= cwc_rep(CWC_GROUPS - 1)); }
+static uint16_t cwc_rep(int g) { return (uint16_t)(cwc_reg() + 1024 * (g + 1)); }
+static int cwc_world(void) { return get_rec(cwc_ko()) && get_rec(cwc_rep(0)) && get_rec(cwc_rep(CWC_GROUPS - 1)); }
+static int cwc_id(uint16_t id) { uint16_t m = cwc_reg(); return id == m || (id > 1024 && (id & 0x3ff) == m && id <= cwc_rep(CWC_GROUPS - 1)); }
 
 /* ---- a phase of our splits: its table from its played matches ----
  *
@@ -2991,16 +3101,54 @@ static u32vec* cwc_game_champions(u32vec* list)
 }
 
 static uint32_t g_cwc[CWC_N];
+static uint16_t g_cwc_country[CWC_N];   /* the country of each entrant, for the cap in cwc_add */
 static int cwc_add(unsigned* n, uint32_t c)
 {
   if (*n >= CWC_N || !(c >> 14) || has_club(g_cwc, *n, c)) return 0;
+  /* FIFA 2025 caps one country at two clubs. Put here, not in the access list, because this is
+     the one funnel every entrant goes through and a cap anywhere else is a cap some path
+     misses: the fixed list below hands out four clubs of the United States and nothing in it
+     could notice.
+     The exception the rules give -- more than two when more clubs of that country won their
+     confederation's top competition inside the cycle -- is not worked out here. Nobody has
+     tracked who won what over four seasons, and working it out from last season's form would
+     hand a country a third place on no evidence. A world that wants one puts a club into a
+     league of its own by hand; this cap leaves it out until that rule is finished. */
+  unsigned char* ow = (unsigned char*)((owner_fn)(uintptr_t)(g_base + OWNER_RVA))();
+  int f = team_country(ow ? *(void**)(ow + 0x48) : 0, c);
+  if (f >= 0) {                     /* an unknown country is not capped, and not counted either */
+    int seen = 0;
+    for (unsigned i = 0; i < *n; i++) seen += g_cwc_country[i] == (uint16_t)f;
+    if (seen >= CWC_PER_COUNTRY) return 0;
+    g_cwc_country[*n] = (uint16_t)f;
+  }
   g_cwc[(*n)++] = c;
   return 1;
 }
 
+/* A world that built the 2025 format as its own competition: the game never asks for it, so
+   nothing would ever hand it a field. Filled here instead, on the same signal the continental
+   cups use -- the Champions League progressing, r == 2 -- and once a season like them. The list
+   handed over is empty: the field is CWC_ACCESS's, and the game's own pool clubs (the only
+   Africa and Oceania it has) have no place in a competition of ours. g_cwc_cycle is 0 until
+   the world's file says otherwise, and then it is the season to play it in. */
+static char cwc_own_fill(void* started)
+{
+  static int filled = -1;
+  int year = (abs_day() + 183) / 365;
+  if (!g_cwc_reg || !cwc_season()) return 0;
+  if (filled == year || !cwc_world()) return 0;
+  u32vec none = { 0, 0, 0 };
+  char ok = cwc_setcl(cwc_reg(), &none, 1);
+  filled = year;
+  logf("fl26swiss: Club World Cup: our own competition, regulation %u, filled on day %d (season %d) -> %d",
+       (unsigned)cwc_reg(), today(), year, (int)ok);
+  return ok;
+}
+
 static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag)
 {
-  unsigned char* rec = get_rec(CWC_REG);
+  unsigned char* rec = get_rec(cwc_reg());
   unsigned char* g0 = get_rec(cwc_rep(0));
   size_t offered = list && list->b ? (size_t)(list->e - list->b) : 0;
   if (rec && g0 && rec_count(rec) == CWC_N && rec_count(g0)) {
@@ -3010,6 +3158,44 @@ static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag)
   }
   unsigned n = 0, gaps = 0, game = 0;
   const size_t POT3 = 24;
+  if (g_cwc_nacc) {
+    /* the world's ranking: each confederation gets its FIFA quota (UEFA 12, AFC 4, CONMEBOL 6,
+       CAF 4, CONCACAF 4, OFC 1) plus the host's one. Champions first, then runners-up, league by
+       league in the order the world file lists them; cwc_add caps a country at two. */
+    static const int QUOTA[6] = { 12, 4, 6, 4, 4, 1 };   /* conf 2..7: UEFA, AFC, CONMEBOL, CAF, CONCACAF, OFC */
+    cwcacc2_t acc[CWC_ACC_MAX];
+    int na = 0;
+    for (size_t i = 0; i < sizeof CWC_BASE / sizeof CWC_BASE[0] && na < CWC_ACC_MAX; i++) {
+      int dup = 0;
+      for (int j = 0; j < na; j++) dup |= acc[j].reg == CWC_BASE[i].reg;
+      if (!dup) acc[na++] = CWC_BASE[i];
+    }
+    for (int i = 0; i < g_cwc_nacc && na < CWC_ACC_MAX; i++) {
+      int dup = 0;
+      for (int j = 0; j < na; j++) dup |= acc[j].reg == g_cwc_acc[i].reg;
+      if (!dup) acc[na++] = g_cwc_acc[i];
+    }
+    for (int ci = 0; ci < 6; ci++) {
+      int conf = ci + 2, want = QUOTA[ci] + (conf == g_cwc_host);
+      for (int rank = 1; rank <= FINAL_MAX && want > 0; rank++) {
+        for (int j = 0; j < na && want > 0; j++) {
+          if (acc[j].conf != conf) continue;
+          const char* how = "";
+          uint32_t c = cwc_club(acc[j].reg, rank, &how);
+          if (!c || !(c >> 14) || has_club(g_cwc, n, c)) continue;
+          if (cwc_add(&n, c)) {
+            want--;
+            logf("fl26swiss:   Club World Cup %2u: conf %d reg %u position %u -> %08x (%s)",
+                 n, conf, (unsigned)acc[j].reg, (unsigned)rank, c, how);
+          }
+        }
+      }
+      if (want > 0) {
+        gaps += (unsigned)want;
+        logf("fl26swiss: Club World Cup -- confederation %d: %d place(s) left unfilled", conf, want);
+      }
+    }
+  } else {
   for (size_t i = 0; i < sizeof CWC_ACCESS / sizeof CWC_ACCESS[0]; i++) {
     if (i == POT3) {                                 /* the game's own entrants open pot 4, */
       uint32_t cw[MAX_CCUP_FWD]; uint16_t cc[MAX_CCUP_FWD];   /* after the champions of our */
@@ -3032,6 +3218,7 @@ static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag)
            (unsigned)CWC_ACCESS[i].rank, c, how);
     else gaps++;
   }
+  }
   static const uint16_t RESERVE[5] = { R_ENG, R_ESP, R_ITA, R_GER, R_FRA };
   for (int rank = 3, stuck = 0; n < CWC_N && rank <= FINAL_MAX && stuck < 2; rank++) {
     unsigned before = n; const char* how;
@@ -3048,14 +3235,14 @@ static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag)
   char ok = ((setclr_fn)(uintptr_t)g_tramp_setcl)(id, &v, flag);
   run_flush();
   u32vec w = { g_cwc, g_cwc + CWC_N, g_cwc + CWC_N };
-  ((gdraw_fn)(uintptr_t)(g_base + GDRAW_RVA))(CWC_REG, &w, 1);
+  ((gdraw_fn)(uintptr_t)(g_base + GDRAW_RVA))(cwc_reg(), &w, 1);
   run_flush();
   char line[160]; int p = 0;
   for (int g = 0; g < CWC_GROUPS; g++) {
     unsigned char* rg = get_rec(cwc_rep(g));
     p += snprintf(line + p, sizeof line - p, " %c:%u", 'A' + g, rg ? rec_count(rg) : 0);
   }
-  logf("fl26swiss: Club World Cup -- reg 1 holds %u, groups%s", rec ? rec_count(rec) : 0, line);
+  logf("fl26swiss: Club World Cup -- reg %u holds %u, groups%s", (unsigned)cwc_reg(), rec ? rec_count(rec) : 0, line);
   /* The groups have to enter the season themselves. A competition due on a registration date
    * goes through register_all 0x141343bf0, which runs the door for the master and then for
    * every row whose parent field (+0x76) names it -- that is how the Libertadores groups get
@@ -3078,12 +3265,12 @@ static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag)
 static unsigned g_cwc_groups_done = 0;
 static int cwc_progress(uint16_t r, void* started)
 {
-  if (r == CWC_REG) g_cwc_groups_done = (1u << CWC_GROUPS) - 1;
+  if (r == cwc_reg()) g_cwc_groups_done = (1u << CWC_GROUPS) - 1;
   else g_cwc_groups_done |= 1u << (((r >> 10) - 1) & 31);
   logf("fl26swiss: Club World Cup -- progression for reg %u on day %d (groups reported %02x)",
        (unsigned)r, today(), g_cwc_groups_done);
   if (g_cwc_groups_done != (1u << CWC_GROUPS) - 1) return 0;
-  unsigned char* ko = get_rec(CWC_KO);
+  unsigned char* ko = get_rec(cwc_ko());
   if (!ko || rec_count(ko)) return 0;
   static uint32_t buf[16];
   for (int i = 0; i < 16; i++) {
@@ -3098,20 +3285,20 @@ static int cwc_progress(uint16_t r, void* started)
     buf[i] = *(uint32_t*)(t + CWC_BRACKET[i][1] * 20);
   }
   u32vec v = { buf, buf + 16, buf + 16 };
-  ((setcl_fn)(uintptr_t)(g_base + SETCL_RVA))(CWC_KO, &v, 1);
+  ((setcl_fn)(uintptr_t)(g_base + SETCL_RVA))(cwc_ko(), &v, 1);
   run_flush();
   logf("fl26swiss: Club World Cup -- knockout reg %u now %u clubs (A1 %08x v B2 %08x ...)",
-       (unsigned)CWC_KO, rec_count(ko), buf[0], buf[1]);
+       (unsigned)cwc_ko(), rec_count(ko), buf[0], buf[1]);
   g_cwc_groups_done = 0;
   if (rec_count(ko) != 16) return 0;
-  start_stage(started, CWC_KO);
+  start_stage(started, cwc_ko());
   return 1;
 }
 
 /* dates: borrow the World Cup's records, keep their rounds and kinds, move the days */
 static uint64_t cwc_dates(uint16_t id, uint64_t reg, void* vec)
 {
-  int ko = id == CWC_KO;
+  int ko = id == cwc_ko();
   uint64_t rv = ((date_fn)(uintptr_t)g_tramp_date)((reg & ~(uint64_t)0xffff) | (ko ? R_WCKO : R_WCGROUP), vec);
   vec_t* v = (vec_t*)vec;
   size_t have = (v->b && v->e >= v->b) ? (size_t)(v->e - v->b) / sizeof(date_t) : 0;
@@ -3137,7 +3324,7 @@ static uint64_t cwc_dates(uint16_t id, uint64_t reg, void* vec)
     size_t k = i * want / have;
     r[i].day = ko ? CWC_KO_DAYS[k] : CWC_GROUP_DAYS[k];
   }
-  cont_note(CWC_REG, vec);                         /* reg 1's days, for the leagues that feed it */
+  cont_note(cwc_reg(), vec);                       /* the cup's days, for the leagues that feed it */
   if (!(said & bit))
     logf("fl26swiss: Club World Cup -- reg %u dated: %s days %u..%u (%u records)", (unsigned)id,
          ko ? "knockout" : "groups", r[0].day, r[have - 1].day, (unsigned)have);
@@ -4217,7 +4404,7 @@ char prog_handler(void* ctx, uint64_t id, void* started)
     g_prog_seen[r] = 1;
     logf("fl26swiss: progression asked for reg %u -> %d", (unsigned)r, (int)ok);
   }
-  if (r == 2) { if (uecl_fill(started)) ok = 1; if (ccup_fill(started)) ok = 1; }
+  if (r == 2) { if (uecl_fill(started)) ok = 1; if (ccup_fill(started)) ok = 1; if (cwc_own_fill(started)) ok = 1; }
   else if (r == UECL_REG || r == UECL_ROW) { if (uecl_ko(started)) ok = 1; }
   return ok;
 }
@@ -7528,7 +7715,7 @@ uint64_t date_handler(uint64_t reg, void* vec)
     const split_t* s; int part;
     if (vec && (part = split_part(id, &s)) != 0) { uint64_t rv = split_dates(id, reg, vec, part, s); split_keys(); return rv; }
   }
-  if (vec && (cwc_id(id) || id == CWC_KO) && cwc_world()) return cwc_dates(id, reg, vec);
+  if (vec && (cwc_id(id) || id == cwc_ko()) && cwc_world()) return cwc_dates(id, reg, vec);
   if (vec) {
     int ko, k = ccup_of(id, &ko);
     if (k >= 0 && ccup_world(&g_ccup[k])) return ccup_dates(k, ko, id, reg, vec);
@@ -8160,7 +8347,7 @@ vec16_t* teardown_pre(uint64_t ctx, vec16_t* in)
   if (cwc) {
     int ncwc = 0;
     for (int g = -2; g < CWC_GROUPS; g++) {
-      uint16_t id = g == -2 ? CWC_KO : g == -1 ? CWC_REG : cwc_rep(g);
+      uint16_t id = g == -2 ? cwc_ko() : g == -1 ? cwc_reg() : cwc_rep(g);
       int there = 0;
       for (int j = 0; j < k; j++) if (g_td_list[j] == id) there = 1;
       if (!there && get_rec(id) && k < 512) { g_td_list[k++] = id; ncwc++; }

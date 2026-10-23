@@ -205,9 +205,10 @@ which league sits above -- and nothing about ids:
 What plan() decides, so that nothing is left to a person to get wrong:
 
   regulation ids   mkworld's free list, taking ids that have a Select Team slot
-                   (fl26world.DEFAULT_SLOT) -- 11, 49, 60, 61, ... -- first, then the three
-                   without one (fl26world.NO_SLOT_IDS: those leagues play, but are not in the
-                   Select Team list); never one of BAD_REG
+                   (fl26world.DEFAULT_SLOT) -- 11, 49, 60, 61, ... -- first, then the extra
+                   slots 124..181 and the seven spares 182..188; never one of BAD_REG and
+                   never the game's pool slots 69/71/73/75, so its "other clubs" groups stay
+                   in Select Team
   competition ids  from 130 up, the range FL's own added leagues use, never 174 (the
                    Conference League's)
   team ids         a league's "club_ids" where it gives one; every other club counts up from
@@ -800,7 +801,7 @@ def game_others(base, leagues):
 RECIPE_SETTINGS = ("game_europe", "uefa_seed", "uefa_rank", "europe_first", "game_cups", "preseason_cups",
                    "ccup_names", "ccup_logos", "caf_super_cup", "caf_super_cup_logo", "cup_draw",
                    "country_order", "game_seasons", "saudi_august", "newlife_ids", "newlife_game",
-                   "league_order", "packs")
+                   "league_order", "packs", "club_world_cup")
 
 
 def recipe_from_plan(pl, base):
@@ -913,6 +914,8 @@ def recipe_from_plan(pl, base):
         pins = dict(rec.get("newlife_ids") or {})
         pins.update({str(k): int(v) for k, v in nlt.items()})
         rec["newlife_ids"] = pins
+    if pl.get("club_world_cup"):
+        rec["club_world_cup"] = copy.deepcopy(pl["club_world_cup"])
     return rec
 
 
@@ -2182,6 +2185,8 @@ def plan(recipe, base, prev=None):
             "pack_faces": recipe.get("pack_faces", True) is not False,
             "country_order": recipe.get("country_order") or None,
             "cup_draw": cup_draw(recipe),
+            # the FIFA Club World Cup as a competition of this world's own, every four years
+            "club_world_cup": recipe.get("club_world_cup") or None,
             # the cups' ids of the last Build, {key: {cid, reg, ...}}: build() gives each its own back
             "prev_cup_ids": kept_cups(prev_cups, names, [s["code"] for s in gsupers]),
             # B159: a world built with competition ids under 130 (eu4, r12) goes on with them
@@ -3907,6 +3912,16 @@ def build(pl, base, game, replace=False, log=print):
     club_order(pl, ents, regs, raw, top_id, log)
     with contextlib.redirect_stdout(io.StringIO()):
         M.write_tables(tmp, comp, regs, ents)
+    cwc = None
+    if pl.get("club_world_cup"):
+        import mkcwc
+        spec = pl["club_world_cup"] if isinstance(pl["club_world_cup"], dict) else {}
+        cwc = mkcwc.apply(os.path.join(tmp, "common", "etc", "pesdb"), tmp,
+                          cid=spec.get("cid"), reg=spec.get("reg"), ko=spec.get("ko"),
+                          name=spec.get("name") or "FIFA Club World Cup")
+        log("  Club World Cup: competition %d, group stage %d, knockout %d (%d rows)"
+            % (cwc["cid"], cwc["reg"], cwc["ko"], cwc["rows"]))
+        pl["club_world_cup"] = dict(spec, cid=cwc["cid"], reg=cwc["reg"], ko=cwc["ko"])
     lap("clubs and tables")
 
     import lbplayers
@@ -4173,7 +4188,13 @@ def build(pl, base, game, replace=False, log=print):
                           + kickorder_lines(pl, base, confed)
                           + (["nopool " + " ".join(str(t) for t in nopool)] if nopool else []) + newfaces
                           + fans
-                          + ["cupdraw %s" % pl.get("cup_draw", "seeded")],
+                          + ["cupdraw %s" % pl.get("cup_draw", "seeded")]
+                          + (["cwc %d %d year=%d every=%d host=%d"
+                              % (cwc["reg"], cwc["ko"],
+                                 int((pl.get("club_world_cup") or {}).get("year") or 2026),
+                                 int((pl.get("club_world_cup") or {}).get("every") or 4),
+                                 int((pl.get("club_world_cup") or {}).get("host") or 6))]
+                             if cwc else []),
                           qlines)
     pl.pop("prev_cup_ids", None)      # this Build's own are in cup_ids; the old ones must not pile up
     for p in pl["leagues"] + (pl.get("others") or []):

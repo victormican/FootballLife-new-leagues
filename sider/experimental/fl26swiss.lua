@@ -134,6 +134,7 @@ end
 -- domestic cup, dated by it: fl26_swiss_ccup_like, called before fl26_swiss_ccup) and
 -- draw=byes|random|seeded|off (its cup draw, fl26_swiss_cupdraw; byes when not given).
 local confed = {}               -- read_world: the confed line, { flag, code } pairs
+local cwc = nil                 -- read_world: the cwc line, { group stage, knockout, cycle, every, from, year }
 local CUPDRAW = { all = 1 }     -- read_world: the cupdraw lines, a mode per cup and one for all (0 off, 1 seeded, 2 random, 3 byes)
 local DRAWMODE = { off = 0, seeded = 1, random = 2, byes = 3 }
 local function read_world(ctx)
@@ -176,6 +177,17 @@ local function read_world(ctx)
       if dl then
         dlike[#dlike + 1] = { tonumber(dr), tonumber(dl), tonumber(ds or 0), dd }
       end
+    end
+    -- cwc <group stage regulation> <knockout regulation> [cycle=N] [every=N from=N] [year=N]
+    -- The 2025 Club World Cup as a competition of this world's own, beside the game's annual
+    -- one. cycle= is the one season it plays in, from= counts seasons, and year= is the real
+    -- four-year rule counted on the game's calendar year (2026 gives 2026, 2030, 2034).
+    -- None of them means every season.
+    local cr, ck, crest2 = line:match("^%s*cwc%s+(%d+)%s+(%d+)%s*(.*)$")
+    if cr then
+      cwc = { tonumber(cr), tonumber(ck), tonumber(crest2:match("cycle=(%d+)") or 0),
+              tonumber(crest2:match("every=(%d+)") or 0), tonumber(crest2:match("from=(%d+)") or 0),
+              tonumber(crest2:match("year=(%d+)") or 0), tonumber(crest2:match("host=(%d+)") or 0) }
     end
     local cid, crest = line:match("^%s*ccup%s+(%d+)(.*)$")
     if cid then
@@ -558,6 +570,44 @@ function m.init(ctx)
           for i, p in ipairs(confed) do cbuf[2 * i - 2], cbuf[2 * i - 1] = p[1], p[2] end
           local m = tonumber(ffi.cast("fl26_swiss_access_t", pc)(cbuf, #confed))
           log(string.format("fl26swiss: world file -- confederations of %d countries", m))
+        end
+      end
+      if cwc then
+        -- the ranking table the quotas are filled from: every top division of the world file,
+        -- (regulation, confederation), in the order the file lists them. fl26swiss.dll adds the
+        -- game's own top flights (Premier League, LaLiga ...) and takes each confederation's
+        -- champions first, then runners-up, so a confederation with more leagues than places
+        -- still sends its best.
+        do
+          local pa = ffi.C.GetProcAddress(h, "fl26_swiss_cwc_access")
+          if pa == nil then
+            log("fl26swiss: this fl26swiss.dll has no Cup ranking table (fl26_swiss_cwc_access); its built-in list stands")
+          else
+            local list = {}
+            for _, L in ipairs(world) do
+              if L.conf and L.conf >= 2 and L.conf <= 7 and not L.exhibition
+                 and (not L.tier or L.tier == 1) then
+                list[#list + 1] = { L.id, L.conf }
+              end
+            end
+            local ab = ffi.new("uint16_t[?]", math.max(2 * #list, 1))
+            for i, e in ipairs(list) do ab[2 * i - 2], ab[2 * i - 1] = e[1], e[2] end
+            local m = tonumber(ffi.cast("fl26_swiss_access_t", pa)(ab, #list))
+            log(string.format("fl26swiss: world file -- Club World Cup ranking of %d league(s) by confederation", m))
+          end
+        end
+        local pw = ffi.C.GetProcAddress(h, "fl26_swiss_cwc")
+        if pw == nil then
+          log("fl26swiss: this fl26swiss.dll has no 2025 Club World Cup (fl26_swiss_cwc); the world's is not played")
+        else
+          local wbuf = ffi.new("uint16_t[7]", cwc[1], cwc[2], cwc[3], cwc[4], cwc[5], cwc[6], cwc[7])
+          local w = tonumber(ffi.cast("fl26_swiss_access_t", pw)(wbuf, 7))
+          local when = cwc[3] > 0 and ("season " .. cwc[3])
+                    or cwc[6] > 0 and ("every " .. math.max(cwc[4], 4) .. " years from " .. cwc[6])
+                    or cwc[4] > 1 and ("every " .. cwc[4] .. " seasons from " .. cwc[5])
+                    or "every season"
+          log(string.format("fl26swiss: world file -- Club World Cup, group stage regulation %d, knockout %d, %s (%d taken)",
+                            cwc[1], cwc[2], when, w))
         end
       end
       -- the country cups' draws: seeds against unseeded clubs (fl26_swiss_cupdraw). A cup of the
