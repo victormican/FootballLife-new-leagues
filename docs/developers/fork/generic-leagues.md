@@ -53,3 +53,25 @@ without a new id. A genuinely new competition still needs the 16-bit id work of
 `%LOCALAPPDATA%\Temp\opencode\leagues-before-<timestamp>\` holds Team.bin, Player.bin,
 PlayerAssignment.bin, Competition.bin, CompetitionRegulation.bin, CompetitionEntry.bin and the
 world file before the insertion.
+
+## Giving them more clubs without a Build (2026-10-24)
+
+The number of clubs a league plays is the **six low bits of `CompetitionRegulation.bin` +0x0b**
+(`mkleague.R_TEAMS`), and the clubs are `CompetitionEntry.bin` rows with `order` 1..n; the
+calendar is laid out by the game from that count and the regulation's dates. So a league can
+grow after the Build:
+
+```
+python tools/grow_leagues.py --base <world pesdb> --worldfile <fl26world.txt> \
+    --clubs 20 --big 5 --big-clubs 30
+```
+
+It clones clubs (a Team.bin row + 22 assignments + players with `playeredit.free_ids` ids), adds
+the entries, rewrites the regulation's count and the world line's `clubs=`, and **rotates the
+country**: each league takes one of the (region, country, conf) triples the world's own test
+leagues already use, in turn, and its existing clubs are re-flagged too -- the first generic
+world was 126 leagues of Croatian clubs.
+
+What it does not do: a cup's fields (Oceania's row is skipped), the edit tables of the game
+(`fl26edit.dll` must be built with `TEAMS` >= clubs + 1), and the fixture/match arrays, which is
+why the world stays inside 8,000 rounds and 65,000 matches.
