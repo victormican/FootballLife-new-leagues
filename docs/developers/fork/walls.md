@@ -69,11 +69,12 @@ key widened, and the entry key repacked. The list of exact byte patches is in
 
 ## The competition parameter table: 255 rows
 
-`fl26comptab` aborts the whole list when the copy of the competition parameter table would
-pass **255 rows** (`too many rows -- aborting`): the game ships **165** rows and the module can
-append **90** of ours. That is the real Select Team ceiling for leagues that need a row of their
-own; a league whose regulation id is one of the shipped 165 reuses that row (moves it) and does
-not count.
+`fl26comptab` used to abort the whole list when the copy of the competition parameter table
+would pass **255 rows** (`too many rows -- aborting`): the game ships **165** rows and the
+module could append **90** of ours. That was the module's own safety, not the game's: the count
+is patched through `COUNT_SITES` as a **dword**, so 2026-10-24 it was raised to **400** and a
+world with **134 leagues** (165 + 129) installs. A league whose regulation id is one of the
+shipped 165 reuses that row (moves it) and does not count.
 
 The world `_FL26All` hit it with 134 leagues (8 on shipped rows, 126 new): the copy was 291
 rows. Dropping 36 left 98 leagues = 8 + 90, exactly 255. A world with 158 leagues (the old

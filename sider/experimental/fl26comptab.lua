@@ -621,7 +621,9 @@ function m.init(ctx)
     if i then rows[i] = row_set(rows[i], OFF_DEMOTE, string.char(d)) end
   end
   local n = #rows
-  if n > 255 then log("fl26comptab: too many rows -- aborting"); return end
+  -- 255 was the module's own safety: the game's count is patched as a dword (COUNT_SITES),
+  -- so the table can hold more. 400 lets a world with ~230 of ours through (165 + 235).
+  if n > 400 then log("fl26comptab: too many rows -- aborting"); return end
 
   -- 4. allocate the copy within +-2GB of the code, write it
   local body = table.concat(rows)
