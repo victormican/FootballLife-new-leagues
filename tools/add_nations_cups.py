@@ -81,6 +81,8 @@ PRESETS = {
         68,
         [69, 72],
     ),
+    "asean": ("ASEAN Cup", 3, 8, 150, [165, 168, 171], "FL_ASEAN", 148, [149, 152]),
+    "caribbean": ("Caribbean Cup", 6, 8, 150, [160, 163, 166], "FL_CRBC", 148, [149, 152]),
     "nl-concacaf": (
         "CONCACAF Nations League",
         6,
