@@ -67,6 +67,19 @@ Nothing has changed in the conclusion: ids above 255 need the three high-byte re
 key widened, and the entry key repacked. The list of exact byte patches is in
 `competition-id-16-bit.md`.
 
+## The competition parameter table: 255 rows
+
+`fl26comptab` aborts the whole list when the copy of the competition parameter table would
+pass **255 rows** (`too many rows -- aborting`): the game ships **165** rows and the module can
+append **90** of ours. That is the real Select Team ceiling for leagues that need a row of their
+own; a league whose regulation id is one of the shipped 165 reuses that row (moves it) and does
+not count.
+
+The world `_FL26All` hit it with 134 leagues (8 on shipped rows, 126 new): the copy was 291
+rows. Dropping 36 left 98 leagues = 8 + 90, exactly 255. A world with 158 leagues (the old
+copy) kept 68 of them on shipped rows to stay inside the cap. More than 90 new rows needs the
+game's count widened (it is a byte), the same kind of job as the competition ids above 255.
+
 ## Leagues: the slot table, not the ids
 
 A league needs a **Select Team slot** and a competition. The slot table has 250 entries
