@@ -47,6 +47,7 @@ def main():
     big = int(get("--big-clubs", "30"))
     dry = "--dry" in a
     limit = int(get("--limit", "0"))
+    skip = int(get("--skip", "0"))
     squad_n = int(get("--squad", "0"))
 
     raw = bytearray(
@@ -123,7 +124,7 @@ def main():
     for k, (n, reg, kv) in enumerate(leagues):
         cid = int(kv.get("cid", "-1"))
         have = int(kv.get("clubs", "0") or 0)
-        target = big if k < nbig else want
+        target = big if (skip <= k < skip + nbig) else want
         if kv.get("name") == "Oceania":
             continue
         if cid < 0 or have <= 0 or target <= have:
