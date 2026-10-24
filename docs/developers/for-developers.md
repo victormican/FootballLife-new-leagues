@@ -178,6 +178,7 @@ players 0x17c, clubs 0x690, coaches 0x258, regulations 0x314, match records 0x25
 | `cup_invites.py` | choose a cup's first-round clubs by team id or name (Other groups and game clubs included); the recipe key is `cup_clubs` |
 | `super_cup4.py` | turn a shipped two-club super cup into the four-club version (semis + final), keeping its cid and regulation |
 | `add_nations_cups.py` | build the national-team competitions the game has not got (Gold Cup, OFC Nations, OFC qualifier, both Nations Leagues) out of the world's own national teams |
+| `make_carabao.py` | put the Carabao Cup into a world with no free competition id (it takes one state cup's row), 44 clubs from the Premier League and the Championship, and its winner's Conference League place in the uefa list |
 | `dayplan.py` | measure a running season and print the `--date-offsets` day-spread that clears the per-day ceiling (792, or 280 without `-calendar`); reads `FL26_SET`/`--set` for the layout |
 | `deepen.py` | put one of your leagues below another as the next division down; `--deep-rank` for real ranks, `--retier` to renumber a chain built before the rank was widened |
 | `mkrankpatch.py` | regenerate `sider/experimental/fl26rank.lua` (it finds every site that reads or writes the league rank and emits the same-length rewrite); needs `capstone` |

@@ -52,6 +52,14 @@ ccup 319 ko=319 groups=0 entry=10:0,318:0 cid=132 fill=15 national=1 days=50,53,
 `regress018/recopa` builds it and passes the four build checks. It needs a free competition
 id, which a fresh world has and the test copy does not (255 of 255 used).
 
+### In a world with no free competition id
+
+The test copy has 255 of 255 ids used, so `tools/make_carabao.py` turns one of its Brazilian
+state cups (competition 235, regulation 266) into the Carabao Cup instead of adding a
+competition: the FA Cup's competition and regulation rows (region England, a knockout of 44,
+one match a round), the 44 entries (Premier League and Championship), the `ccup` line and the
+117-line uefa list with `uefa 266 0 2 17`.  `check_world` is clean after it.
+
 ## The title holders: the Conference League winner goes to the Europa League
 
 The three holder places are part of the UEFA access list the game ships, and of the module's
