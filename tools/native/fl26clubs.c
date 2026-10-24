@@ -101,6 +101,10 @@ static uint16_t* slot_count(void* self, unsigned s)
 { return (uint16_t*)((unsigned char*)self + g_cntoff + s * 2); }
 #define REG_CLUBS   0x170      /* regulation record: club handle list             */
 #define MAX_CLUBS   48         /* the game's own cap on that list                 */
+/* A served slot is answered as the game's own stored list first and ours after it, up to this
+   many: a group keeps the clubs the game put there and we only fill the rest. 48 is the size of
+   a regulation's club list, which is what the group can show. */
+#define MERGE_MAX   48
 #define HANDLE_SHIFT 14        /* handle = team_id << 14                          */
 
 #define MAX_CFG     16

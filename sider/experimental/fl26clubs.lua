@@ -114,7 +114,7 @@ end
 -- "other clubs" pool, with the switch byte each holds; a league there is pointed at the
 -- default case. Both are facts about the executable; which slots the world uses is not.
 local SERVED = { [0] = true, [1] = true, [2] = true, [3] = true,
-                 [69] = true, [72] = true, [73] = true, [75] = true, [76] = true, [77] = true, [80] = true }
+                 [69] = true, [72] = true, [70] = true, [73] = true, [75] = true, [76] = true, [77] = true, [80] = true }
 local POOL_CASE = { [26] = 3, [27] = 3, [28] = 3, [67] = 3, [74] = 3, [71] = 5 }
 local function from_world(world)
   local slots, remap = {}, {}

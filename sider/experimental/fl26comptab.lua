@@ -578,7 +578,7 @@ function m.init(ctx)
     -- goes to the hidden 123 instead, exactly as row 145 gives 112 away above, so the group is
     -- drawn with our league's clubs and the heading the switch already has for that slot.
     do
-      local PARK = { [69] = true, [71] = true, [73] = true, [75] = true }
+      local PARK = { [5] = true, [6] = true, [69] = true, [70] = true, [71] = true, [73] = true, [75] = true }
       for i = 1, #rows do
         local id = row_u32(rows[i], OFF_ID)
         if ours[id] then
