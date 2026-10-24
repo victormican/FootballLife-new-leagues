@@ -34,8 +34,8 @@ the big-league calendar shifted by `id & 7`, without a per-id table entry. The s
 `fl26caps.lua` was regenerated with it; the stub is the only patch that changed. `fl26slots250`
 already allows slots to 249 and `fl26slot7` makes a league slot a whole byte.
 
-Past the slots the next wall is the **club and player tables**: `fl26caps` gives the game 2,400
-clubs and 61,905 players; a clean game has 749 clubs and 29,492 players, so 1,473 new clubs at 22
+Past the slots the next wall is the **player table**: the caps now double the teams, coaches and
+regulations to 4,800 / 6,800 / 1,200, but the players stay at 61,905; a clean game has 749 clubs and 29,492 players, so 1,473 new clubs at 22
 players fit. A 158-league world of 10 clubs needs 1,580 clubs and ~34,760 players, which is
 ~2,700 players over the cap; about 145 leagues of 10 fit. Raising the team array alone does not
 help while the player array is the wall.

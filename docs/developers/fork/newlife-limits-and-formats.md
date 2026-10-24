@@ -9,11 +9,11 @@ The 91-league test world (`_FL26MyWorld`) against the caps of a 0.2.4 build:
 
 | table | cap | used | free |
 |---|---|---|---|
-| teams | 2,400 | 2,199 | **201** |
+| teams | 4,800 | 2,199 | **2,601** |
 | players | 61,905 | 61,791 | **114** |
-| coaches | 3,400 | 405 | 2,995 |
+| coaches | 6,800 | 405 | 6,395 |
 | competitions | 255 | 183 | 72 |
-| regulations | 600 | 308 | 292 |
+| regulations | 1,200 | 308 | 892 |
 | Select Team slots | 158 | 91 | 67 |
 
 A new club takes 22-30 players. **114 players is five squads of 22**: the current world cannot
@@ -51,12 +51,10 @@ Taking the first league of each country in file order (the release lists them th
 - the new clubs need about **43,538 players** at 22 each.
 
 From the shipped game (749 clubs, 29,492 players) that is **2,722 teams** and **73,030 players**
-with the shipped squads. The team cap is **322 over** (2,400 -> about 2,750) and the player cap
-is **11,125 over** (61,905, with only 32,413 free). So the first divisions need **both caps
-raised**. The team cap is a relocation of the team array (the 750 -> 2,400 work); the player cap
-is at the player array's ceiling (the array starts at offset 0 and can grow to about 60,745, the
-season calendar), so going to 74,000 needs the calendar/upper arrays moved as well. That is a
-larger job than the team cap, not a constant.
+with the shipped squads. The doubled team cap (4,800) covers the teams; the **player cap is
+11,125 over** (61,905, with only 32,413 free). The player array starts at offset 0 and grows to
+about 60,745, the season calendar, so 74,000 needs the calendar/upper arrays moved as well. That
+is the wall.
 
 The current 2,400 world (2,199 teams) has no room for them at all: that world would have to be
 replaced, not extended.

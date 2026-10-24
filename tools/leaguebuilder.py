@@ -256,7 +256,7 @@ CID_FROM = 130
 SQUAD, PLAYER_CAP = 30, 61905            # a new club's squad, and the player records of the lim2400 layout
 SQUAD_FIT = 22                           # only a world with more new clubs than 30 each leave room for takes
                                          # fewer, down to this (0.2.2/0.2.3 gave every world 22: not agreed, 14.10.2026)
-TEAM_CAP = 2400                          # clubs in all, shipped ones included (1536 up to 0.2.1)
+TEAM_CAP = 4800                          # clubs in all, shipped ones included (1536 up to 0.2.1)
 MAX_SPLITS = 2                           # split seasons tested so far: two at a time (191..196)
 # national cups to copy, by the clubs the game puts in them: the top division alone, or the top
 # division and the one below. European ones only -- a new country plays the European calendar,
