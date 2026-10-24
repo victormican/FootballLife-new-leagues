@@ -229,3 +229,15 @@ league 197 cid=92 region=25 country=200 conf=5 slot=123 serve=75 tier=1 ... club
 no Select Team row), and **`serve=75`** tells `fl26clubs` to answer slot 75 from regulation 197.
 `fl26slotnames` leaves the shipped heading alone because no league of ours *sits* on 75, so the
 group is drawn with the exe's own name and our two clubs. `tools/mk_other_africa.py` builds it.
+
+### 2026-10-24, measured: `serve=` on a pool slot crashes the boot
+
+The `serve=75` above was tried in the 135x20 world and **the game crashed** at start-up:
+`FL_2026.exe+0x14d6aa0`, `0xc0000005`, inside the sorted insert that moves a slot's club list
+(the function at RVA `0x14d6961`, whose per-bucket starts and counts sit at `+0x1d4c0` and
+`+0x1d4e8`). `fl26clubs` replaces the two readers but not that insert, so a slot answered from
+our regulation (2 clubs) and then written by the exe mixes two counts. The key is therefore
+**not** safe on a slot the game itself fills; the line was removed and the world boots again.
+
+If the Africa group is wanted, the insert has to be replaced as well (or the group served from a
+slot the exe never writes), not just the readers.
