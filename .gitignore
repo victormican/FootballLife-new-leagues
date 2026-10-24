@@ -5,3 +5,6 @@ out/
 # graphify
 graphify-out/
 .graphify/
+
+# the agent's own folder
+.opencode/
