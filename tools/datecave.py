@@ -83,7 +83,7 @@ def build(offsets):
         b = bytearray()
         b += bytes.fromhex("0fb7c7")                            # movzx eax, di      (id)
         b += b"=" + struct.pack("<I", TABLE_SIZE)               # cmp eax, 256
-        b += b"s" + rel8(at("empty"), len(b) + 2)               # jae empty
+        b += b"s" + rel8(at("big"), len(b) + 2)                 # jae big (ids 256+)
         b += bytes.fromhex("488d0d") + rel32(at("table") + CAVE, CAVE + len(b) + 7)
         b += bytes.fromhex("0fb60401")                          # movzx eax, byte [rcx + rax]
         b += b"<" + bytes([NO_CALENDAR])                        # cmp al, 0xff
@@ -95,6 +95,14 @@ def build(offsets):
         b += bytes.fromhex("4c8d4520")                          # lea r8, [rbp + 0x20]
         b += bytes.fromhex("a8") + bytes([CUP_BIT])             # test al, 0x10
         b += b"u" + rel8(at("cup"), len(b) + 2)                 # jnz cup
+        b += b"\xe8" + rel32(CASE5, CAVE + len(b) + 5)          # call the league calendar
+        b += b"\xeb" + rel8(at("after"), len(b) + 2)            # jmp after
+        # ids above 255 have no table entry: the big-league calendar shifted by id & 7.
+        lab["big"] = len(b)
+        b += bytes.fromhex("8bf8")                              # mov edi, eax (the id)
+        b += bytes.fromhex("83e7") + bytes([SHIFT_MASK])        # and edi, 7
+        b += bytes.fromhex("488bd3")                            # mov rdx, rbx
+        b += bytes.fromhex("4c8d4520")                          # lea r8, [rbp + 0x20]
         b += b"\xe8" + rel32(CASE5, CAVE + len(b) + 5)          # call the league calendar
         b += b"\xeb" + rel8(at("after"), len(b) + 2)            # jmp after
         lab["cup"] = len(b)

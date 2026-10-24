@@ -131,10 +131,18 @@ EXTRA_SLOT = {r: 124 + i for i, r in enumerate(EXTRA_IDS)}      # 254 -> 124 ...
 # groups (174, 176, 179, 180) or had no slot at all (183, 184, 185). They are dated by the
 # shipped caps set and their slots are past 128, which fl26slot7 makes safe for a league. With
 # them the pool slots 69, 71, 73 and 75 are never taken, so the game's four "other clubs"
-# groups stay in Select Team and every league of the world is listed.
+# groups stay in Select Team and every league of the world is listed.  The second limits step
+# below adds slots 189..249 on ids 256..316.
 SPARE_SLOT = {183: 182, 184: 183, 185: 184, 174: 185, 176: 186, 179: 187, 180: 188}
+# The limits branch, second step: slots 189..249 (61) on regulation ids 256..316.  The ids are
+# above the date stub's 256-byte table; datecave.py now gives every id above 255 the big-league
+# calendar shifted by id & 7, so no per-id date key is needed.  fl26slots250 already allows the
+# slots, and fl26slot7 makes a league slot a whole byte.
+MORE_IDS = tuple(range(256, 317))
+MORE_SLOT = {r: 189 + i for i, r in enumerate(MORE_IDS)}       # 256 -> 189 ... 316 -> 249
 DEFAULT_SLOT.update(EXTRA_SLOT)
 DEFAULT_SLOT.update(SPARE_SLOT)
+DEFAULT_SLOT.update(MORE_SLOT)
 
 
 def id_rank(r):
@@ -148,6 +156,8 @@ def id_rank(r):
         return (0, 1)           # after the shipped slots, before any id that hides a group
     if r in SPARE_SLOT:
         return (0, 2)           # and before any pool slot: the game's four groups stay
+    if r in MORE_SLOT:
+        return (0, 3)           # the second limits step, slots 189..249
     if s in POOL_BEFORE_HIDDEN:
         return (1, POOL_BEFORE_HIDDEN.index(s))
     if s in POOL_AFTER_HIDDEN:

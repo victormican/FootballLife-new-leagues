@@ -16,8 +16,9 @@ The builder hands out regulation ids in this order (`leaguebuilder.plan` + `fl26
 |---|---|---|---|
 | shipped ids with their own slot | 11, 49, 60, ... 190 | 22, 28, 29, 40, ... 113 | 32 (145 and 190 share slot 112) |
 | limits branch | 254 down to 197 | 124..181 | 58 |
-| seven spares (new) | 174, 176, 179, 180, 183, 184, 185 | 185..188 and 182..184 | 7 |
-| total | | | **97** |
+| seven spares | 174, 176, 179, 180, 183, 184, 185 | 185..188 and 182..184 | 7 |
+| second limits step (new) | 256..316 | 189..249 | 61 |
+| total | | | **158** |
 
 The four ids that used to borrow the game's "other clubs" groups now take slots 182..188:
 174 -> 185, 176 -> 186, 179 -> 187, 180 -> 188, 183 -> 182, 184 -> 183, 185 -> 184. **Slots 69,
@@ -26,12 +27,18 @@ Teams" and "Other Clubs (Africa)" stay in Select Team. Slots 4, 5 and 6 stay pro
 Asia-Oceania national teams and the two Classic Teams entries.
 
 The world in `D:\SP Football Life 2026 - copia - copia` has 91 leagues, so every one of them is
-listed and no group is hidden. The 97 is the ceiling of this layout.
+listed and no group is hidden. The 158 is the ceiling of this layout.
 
-Past 98 the next wall is not the slot list but the **club table**: `fl26caps` gives the game
-2,400 clubs (750 shipped); the test world already uses 2,199. The remaining room is about 200
-clubs, i.e. eight 24-club leagues or twenty 10-club leagues. Raising it further means moving the
-array again, not editing a constant.
+The second step needs a date for ids above 255: `datecave.py` now sends every id from 256 up to
+the big-league calendar shifted by `id & 7`, without a per-id table entry. The shipped
+`fl26caps.lua` was regenerated with it; the stub is the only patch that changed. `fl26slots250`
+already allows slots to 249 and `fl26slot7` makes a league slot a whole byte.
+
+Past the slots the next wall is the **club and player tables**: `fl26caps` gives the game 2,400
+clubs and 61,905 players; a clean game has 749 clubs and 29,492 players, so 1,473 new clubs at 22
+players fit. A 158-league world of 10 clubs needs 1,580 clubs and ~34,760 players, which is
+~2,700 players over the cap; about 145 leagues of 10 fit. Raising the team array alone does not
+help while the player array is the wall.
 
 ## Club sizes
 
