@@ -14,7 +14,7 @@ The 91-league test world (`_FL26MyWorld`) against the caps of a 0.2.4 build:
 | coaches | 3,400 | 405 | 2,995 |
 | competitions | 255 | 183 | 72 |
 | regulations | 600 | 308 | 292 |
-| Select Team slots | 97 | 91 | 6 |
+| Select Team slots | 158 | 91 | 67 |
 
 A new club takes 22-30 players. **114 players is five squads of 22**: the current world cannot
 take another 20-club league (20 teams and 440 players), let alone a division. The player cap is
