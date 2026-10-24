@@ -103,7 +103,7 @@ def main():
         print("dry run: nothing written")
         return 0
 
-    root = os.path.dirname(os.path.dirname(base))
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(base))))
     r = subprocess.run(
         [
             sys.executable,
@@ -132,6 +132,8 @@ def main():
     if not line:
         print("mkccup wrote no ccup line")
         return 1
+    if "cid=" not in line:
+        line = line + " cid=%d" % cid
     lines = [
         l
         for l in io.open(wf, encoding="utf-8", errors="replace").read().splitlines()
