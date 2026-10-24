@@ -1,6 +1,7 @@
 r"""python leaguebuilder.py plan  <recipe.json> [--base <pesdb dir>]
    python leaguebuilder.py build <recipe.json> [--base <pesdb dir>] [--game <dir>] [--replace]
    python leaguebuilder.py on    <world name> [--game <dir>]
+   python leaguebuilder.py modules [--game <dir>]
    python leaguebuilder.py check [--game <dir>]
 
 The league builder's core: one recipe in, one finished world out. The window (stage C,
@@ -6450,16 +6451,55 @@ def check(game, log=print):
     return ok
 
 
+def install_own_modules(game, log=print):
+    """copy this checkout's Lua modules into SiderAddons\\modules.
+
+    `on` switches the world but it has never installed the modules, and the module the game
+    keeps running is the copy in `modules`, not the one in `sider/experimental`: 2026-10-24 a
+    world showed one league instead of 135 because `fl26comptab.lua` had grown its 255-row cap
+    to 400 in the repository and the installed copy still aborted.  The Studio's own button is
+    "Install the modules" and copies the module pack; this is the same job for the sources in
+    this checkout, so a command line build cannot leave the two apart.  DLLs are not touched:
+    tools/native/build-*.sh builds them and the pack installs them.
+    """
+    sider = siderdir.find(game)
+    dst = os.path.join(sider, "modules")
+    if not os.path.isdir(dst):
+        raise BuildError("no %s -- is Sider installed in this game folder?" % dst)
+    repo = os.path.dirname(HERE)
+    changed, same = [], 0
+    for sub in ("sider", os.path.join("sider", "experimental")):
+        src = os.path.join(repo, sub)
+        if not os.path.isdir(src):
+            continue
+        for f in sorted(os.listdir(src)):
+            if not f.endswith(".lua"):
+                continue
+            a, b = os.path.join(src, f), os.path.join(dst, f)
+            if os.path.exists(b) and open(a, "rb").read() == open(b, "rb").read():
+                same += 1
+                continue
+            shutil.copy2(a, b)
+            changed.append(f)
+    log("modules: %d copied, %d already there" % (len(changed), same))
+    if changed:
+        log("  " + ", ".join(changed))
+    return changed
+
+
 def main():
     a = sys.argv[1:]
     get = lambda k: a[a.index(k) + 1] if k in a else None
-    if not a or a[0] not in ("plan", "build", "on", "check"):
+    if not a or a[0] not in ("plan", "build", "on", "modules", "check"):
         print(__doc__)
         return 1
     game = get("--game") or GAME
     try:
         if a[0] == "check":
             return 0 if check(game) else 2
+        if a[0] == "modules":
+            install_own_modules(game)
+            return 0
         if a[0] == "on":
             switch_on(a[1], game)
             return 0
