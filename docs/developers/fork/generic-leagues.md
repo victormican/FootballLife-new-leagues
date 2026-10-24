@@ -13,8 +13,10 @@ Select Team list can be filled and the slots measured. The test copy has **62**:
 - **13,640 players** cloned with generic names and the country as nationality.
 - Competition rows, regulations (ids 317..335 and 336..378), entries and the world file's `league`
   lines.
-- Slots **182, 189..249**. Slots 69/71/73/75 are never used, so "Other Clubs (Africa)" and the
-  other groups stay. **Five slots (183..187) remain free**: the competition cap is reached.
+- Slots **182, 183..187 and 189..249**: 183..187 are *twin* regulations (379..383) that copy
+the competition id and clubs of five generic leagues, added by `tools/add_twin_leagues.py`
+(no new competition id, no new club, no new player). Slots 69/71/73/75 are never used, so
+"Other Clubs (Africa)" and the other groups stay.
 
 The test world after the insertion:
 
@@ -24,16 +26,18 @@ The test world after the insertion:
 | national teams | 211 | 211 |
 | players | 63,332 | 76,972 |
 | competitions | 193 | **255** |
-| regulations | 336 | 398 |
-| leagues | 91 | 153 |
+| regulations | 336 | 403 |
+| leagues | 91 | **158** |
 
 ## The competition cap
 
 The world had 193 competitions. The first 19 took the free high ids 237..255. The next 43 took
 the free low ids: the 28 `CID_SAFE_LOW`, the 9 `CID_COSMETIC_LOW`, and the six the game never
-uses (6, 7, 48, 65, 91, 92) as the last six. That is **255 of 255 competitions**. Five slots
-(183..187) have no competition id left: the next step is the competition-id high byte (256..511),
-which is designed but not built.
+uses (6, 7, 48, 65, 91, 92) as the last six. That is **255 of 255 competitions**. The last five
+slots (183..187) reuse existing competition ids through twin regulations: the Select Team slot
+lives on the parameter row keyed by regulation id, not on the competition, so the slot fills
+without a new id. A genuinely new competition still needs the 16-bit id work of
+[docs/research/competition-id-16-bit.md](../../research/competition-id-16-bit.md).
 
 ## Test
 
