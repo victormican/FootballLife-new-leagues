@@ -172,3 +172,22 @@ test world has filled, so it now searches from 88 (free: 91, 92, 0, 6, 7, 48, 55
 3. If the panel opens as a club group, fall back to C and measure the range compares.
 
 No new players, no new Team.bin rows and no world rebuild are needed for the Oceania group.
+
+## 2026-10-24: a cup has no slot list -- Oceania is a league
+
+`fl26comptab` gave the "Oceania" row a free slot (22) and `sider.log` showed `id 196 asked for a
+free slot -- it gets slot 22`, but no group appeared. The reason is the regulation's **type**:
+every league of the world has `CompetitionRegulation.bin` `type` 4, the cup that
+`add_nations_cups.py` built had 3, and the game only fills a competition slot's team list for a
+league. A cup with a slot is a competition with an empty list, so the list builder skips it.
+
+`tools/mk_oceania.py` removes that cup (competition 91, regulation 196 and its entries) and adds
+it again through `mkleague.add_league`, which copies the shape of `ENGLAND_D1_LEAGUE`: `type` 4,
+`R_TEAMS` low six bits = 11, eleven `CompetitionEntry` rows with `order` 1..11, and the world
+line `league 196 cid=91 ... clubs=11 legs=1 name=Oceania`. That is the same shape the American
+groups the user pointed at have -- a league whose clubs are national teams -- so the slot list is
+filled by the game itself and no DLL work is needed.
+
+Eleven is odd, so one side rests each round (eleven rounds, `legs=1`). If the game refuses an odd
+field, the next step is ten (the same tool with a team left out) or a twelve-entry field with a
+bye.
