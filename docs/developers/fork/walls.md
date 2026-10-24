@@ -132,3 +132,24 @@ allocation immediates are 32-bit, so this one has room for years.
 2. Play the twins in a career: if two regulations on one cid work, leagues are no longer limited
    by competition ids.
 3. Then the competition id high byte, with the three sites above.
+
+## The player index: 30,000 entries, and a 40-cap lookup (2026-10-24)
+
+Two walls sit between 64,531 players (boots) and 67,369 (crashes), both found with Frida on
+the running game and the Windows minidumps:
+
+1. **A 30,000-dword index that the patch set does not grow.** The insert `0x1414d6940` starts
+   with `mov r13d,[rcx+0x1d510]` and `cmp r13d,0x7530`; the "full" branch at `0x1414d6b06` is
+   just `pop/pop/pop/ret`. `je` only catches exactly 30,000, so a world past it wrote over the
+   bucket starts/counts that follow the table and the next call read a garbage count (one dump:
+   `r13 = 0x13FF60037`) and walked to -1. `fl26playercap.lua` turns the `je` into `jae`
+   (`0x1414d695c`, `84` -> `83`): at 30,000 or past it the function returns instead.
+2. **A player lookup that returns null from index 40 on**: `0x141502e60` is
+   `base + 8 + index*0x17c` (the block's player array) but starts with `cmp edx,0x28` /
+   `jge -> null`. Removing that branch is **not** the fix: the caller then passes the sentinel
+   **255** and dereferences whatever comes back (crash moves to `0x141502e72`, reading
+   `base + 255*0x17c`). The 40 is the guard for an index the game itself sends as "no player",
+   so the caller -- a menu that builds a line-up -- is what has to learn to skip it.
+
+What that means for a world: **64,531 players is the ceiling today**. Past it the menu hits the
+255 sentinel, which is not a capacity problem but a missing null check in the game's own code.
