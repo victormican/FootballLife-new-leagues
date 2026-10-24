@@ -573,6 +573,30 @@ function m.init(ctx)
         if sl ~= 123 then taken[sl] = id end
       end
     end
+    -- 2b0. a league of ours may take one of the "other clubs" slots the exe fills itself
+    -- (69, 71, 73, 75, the "Other ..." groups of Select Team).  The exe's own row on that slot
+    -- goes to the hidden 123 instead, exactly as row 145 gives 112 away above, so the group is
+    -- drawn with our league's clubs and the heading the switch already has for that slot.
+    do
+      local PARK = { [69] = true, [71] = true, [73] = true, [75] = true }
+      for i = 1, #rows do
+        local id = row_u32(rows[i], OFF_ID)
+        if ours[id] then
+          local sl = row_u32(rows[i], OFF_SLOT)
+          if PARK[sl] and taken[sl] then
+            for j = 1, #rows do
+              if row_u32(rows[j], OFF_ID) == taken[sl] and not ours[taken[sl]] then
+                rows[j] = row_set(rows[j], OFF_SLOT, u32le(123))
+                log(string.format("fl26comptab: slot %d freed for %d -- the exe's row %d goes to 123",
+                                  sl, id, taken[sl]))
+                taken[sl] = nil
+                break
+              end
+            end
+          end
+        end
+      end
+    end
     local mine = {}
     local clash = false
     for i = 1, #rows do

@@ -26,6 +26,13 @@ Install:
   2. sider.ini: lua.module = "fl26playercap.lua" (next to fl26comptab.lua)
   3. start the game; sider.log says "fl26playercap: ... returns when it reaches 30000"
 
+Third fix, same day: the lookup 0x141502e60 returns NULL for any player index from 40 on, and a
+menu that builds a line-up hands it the sentinel 255 ("no player") and dereferences the answer.
+The limit cannot grow (it is an imm8, and the array behind it is the block's 123825 players),
+so the branch is replaced by a stub: below 40 the original code runs untouched, from 40 on the
+lookup answers with player 0's record instead of NULL, and the menu draws that instead of
+crashing.
+
 Requires sider.ini: luajit.ext.enabled = 1 (the global ffi and `memory`), like fl26comptab.
 --]]
 
@@ -38,6 +45,54 @@ local JE,  JE_BYTES  = 0x1414d695b, "0f84a50100"       -- je 0x1414d6b06
 
 local function hex(s)
   return (s:gsub(".", function(c) return string.format("%02x", c:byte()) end))
+end
+
+local LK, LK_BYTES = 0x141502e63, "83fa287d26"   -- cmp edx,0x28 ; jge -> null
+local LK_NEXT      = 0x141502e68                 -- movsxd rax,edx (the original path)
+
+local function hex2bin(h)
+  return (h:gsub("%x%x", function(b) return string.char(tonumber(b, 16)) end))
+end
+
+local function u32(v)
+  return string.char(v % 256, math.floor(v / 256) % 256, math.floor(v / 65536) % 256,
+                     math.floor(v / 16777216) % 256)
+end
+
+local function rel32(from_next, to)
+  local d = to - from_next
+  if d >= 0x80000000 or d < -0x80000000 then return nil end
+  if d < 0 then d = d + 0x100000000 end
+  return u32(d)
+end
+
+local function install_lookup(ctx)
+  local got = memory.read(LK, #LK_BYTES / 2)
+  if got == nil or hex(got) ~= LK_BYTES then
+    log("fl26playercap: lookup bytes are " .. tostring(got and hex(got)) .. " -- left alone")
+    return
+  end
+  if ffi == nil then log("fl26playercap: no ffi, the lookup stub needs it"); return end
+  ffi.cdef([[ void* VirtualAlloc(void*, unsigned long, unsigned long, unsigned long); ]])
+  local cave
+  for _, pref in ipairs({ 0x15e000000, 0x15f000000, 0x161000000, 0x171000000 }) do
+    local p = ffi.C.VirtualAlloc(ffi.cast("void*", pref), 0x1000, 0x3000, 0x40)
+    if p ~= nil then cave = tonumber(ffi.cast("uint64_t", p)); break end
+  end
+  if not cave then log("fl26playercap: VirtualAlloc failed -- lookup left alone"); return end
+  local back = rel32(cave + 9, LK_NEXT)
+  if not back then log("fl26playercap: cave out of range"); return end
+  local stub = hex2bin("83fa28") .. hex2bin("0f8c") .. back .. hex2bin("498d4008c3")
+  memory.write(cave, stub)
+  local jmp = rel32(LK + 5, cave)
+  if not jmp then log("fl26playercap: cave out of jump range"); return end
+  memory.write(LK, "\233" .. jmp)
+  local now = memory.read(LK, 5)
+  if now == nil or now:byte(1) ~= 0xE9 then
+    log("fl26playercap: the lookup jump did not stick -- the 40 cap stays")
+    return
+  end
+  log("fl26playercap: the line-up lookup answers player 0 instead of NULL from index 40 on")
 end
 
 function m.init(ctx)
@@ -54,6 +109,7 @@ function m.init(ctx)
   end
   memory.write(JE + 1, string.char(0x83))
   log("fl26playercap: the player index returns when it reaches 30000 instead of writing past its table")
+  install_lookup(ctx)
 end
 
 return m
