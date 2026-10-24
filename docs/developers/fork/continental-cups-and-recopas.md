@@ -52,6 +52,33 @@ ccup 319 ko=319 groups=0 entry=10:0,318:0 cid=132 fill=15 national=1 days=50,53,
 `regress018/recopa` builds it and passes the four build checks. It needs a free competition
 id, which a fresh world has and the test copy does not (255 of 255 used).
 
+## A league cup's winner to Europe: the Carabao Cup
+
+A league cup built for a league of the game can send its winner to Europe.  In the recipe:
+
+```json
+"uecl": true,
+"game_cups": [{ "league": 17, "league_cup": true, "name": "Carabao Cup", "europe": 2 }]
+```
+
+`league` is the regulation of the game's top division (England 17), `league_cup` builds the cup
+(20 Premier League clubs and the 24 of the Championship, one match a round, the shipped cup
+shape), and `europe: 2` makes its winner take a place in competition 2, the Conference League.
+The builder writes the place after the cup exists, as a uefa line:
+
+```
+uefa <cup knockout> 0 2 17
+```
+
+Rank 0 is "the winner of competition <cup knockout>", and 17 is the league whose next free
+position takes the place if that winner is already qualified (`fl26swiss` ACCESS: "rank 0 = the
+winner of competition reg").  `uecl: true` is what builds the Conference League to take it.
+
+Because the place is a uefa line, the world gets the **whole access list** (the shipped places
+first, then the world's), so the other leagues' places are the game's own.  `regress018/carabao`
+builds it: the cup (44 clubs), the line `uefa 317 0 2 17` and 117 uefa lines in all, with the
+four build checks and `check_world` clean.
+
 ## What is missing for the two world competitions
 
 **The Intercontinental (annual).** It is a cup whose entries are the continental champions:

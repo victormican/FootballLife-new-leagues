@@ -2820,7 +2820,7 @@ def game_cups(recipe, regrow, region_of_cid, base, out):
             res.append({"name": (c.get("name") or "").strip() or league + " League Cup",
                         "code": "FL_G%03d_LCUP" % rid, "kind": "league", "logo": c.get("logo") or None,
                         "country": None, "conf": conf, "region": region, "groups": 0, "entry": field,
-                        "opts": opts})
+                        "league": rid, "europe": c.get("europe"), "opts": opts})
         if c.get("super_cup"):
             if home_supercup(regrow, region_of_cid, region):
                 raise BuildError("game cups: %s already has a super cup in the game" % league)
@@ -4277,6 +4277,14 @@ def build(pl, base, game, replace=False, log=print):
                                                        {e[1] for e in c["entry"] if e[0] == "cup"} if own_cup.get(r)]
     ccups = continental((pl.get("ccups") or []) + hc, tmp, db, log, alt_from(pl), pl.get("prev_cup_ids"),
                         pl.get("low_cids"))
+    # a game league cup whose winner goes to Europe (the Carabao Cup to the Conference League):
+    # its winner's place is a uefa line with rank 0 -- "the winner of competition reg" -- and the
+    # league in alt, the same shape a national cup's winner place has (fl26swiss ACCESS)
+    for c in hc:
+        if c.get("league") and c.get("europe") and c.get("ko"):
+            pl.setdefault("game_europe", []).append([c["ko"], 0, int(c["europe"]), c["league"]])
+            log("  %s: its winner takes a place in competition %d (uefa %d 0 %d %d)"
+                % (c["name"], int(c["europe"]), c["ko"], int(c["europe"]), c["league"]))
     for c in (pl.get("ccups") or []) + hc:
         pl.setdefault("cup_ids", {})["ccup:" + (c.get("code") or c["name"])] = {
             f: c[f] for f in ("cid", "reg", "ko", "pre_reg") if isinstance(c.get(f), int)}

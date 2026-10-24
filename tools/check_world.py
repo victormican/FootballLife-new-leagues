@@ -41,6 +41,7 @@ def u32(b, o):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     a = sys.argv[1:]
     get = lambda k, d=None: a[a.index(k) + 1] if k in a else d
     base, wf = get("--base"), get("--worldfile")
@@ -56,7 +57,14 @@ def main():
     def warn(m):
         warns.append(m)
 
-    read = lambda n: pesdb.wesys_unpack(open(os.path.join(base, n), "rb").read())
+    def read(n):
+        """a table of the world, or empty when the world never wrote it (a world of cups only
+        keeps no players)"""
+        path = os.path.join(base, n)
+        if not os.path.isfile(path):
+            warns.append("%s is not in this world; its checks are skipped" % n)
+            return b""
+        return pesdb.wesys_unpack(open(path, "rb").read())
     teams = read("Team.bin")
     players = read("Player.bin")
     assigns = read("PlayerAssignment.bin")
@@ -115,7 +123,7 @@ def main():
     # a club only needs a squad when it plays something: the game's classic/placeholder teams
     # (The Old Boys, World Selection) have none and are not entered anywhere
     playing = {u32(ents, i) for i in range(0, len(ents), M.ENT)} - {0}
-    for tid, name in tids.items():
+    for tid, name in (tids.items() if players else ()):
         n = len(per_team.get(tid, []))
         if tid in nats:
             if n == 0:

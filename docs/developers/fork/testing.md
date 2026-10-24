@@ -121,6 +121,7 @@ The recipes:
 | `regress018/others` | a league plus the "Other ..." groups (`others`) |
 | `regress018/big_league_38` | a league at the new 38-club cap, one leg (37 rounds on a 38-date calendar) |
 | `regress018/recopa` | a South American league with Sudamericana places, and the Recopa Sudamericana built from the two cups' winners |
+| `regress018/carabao` | the Carabao Cup for England and its winner's Conference League place (`uefa ... 0 2 17`) |
 
 It prints a summary table and exits 1 on any FAIL. Add a recipe there for every feature that
 changes what Build writes.
