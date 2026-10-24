@@ -52,6 +52,36 @@ ccup 319 ko=319 groups=0 entry=10:0,318:0 cid=132 fill=15 national=1 days=50,53,
 `regress018/recopa` builds it and passes the four build checks. It needs a free competition
 id, which a fresh world has and the test copy does not (255 of 255 used).
 
+## The title holders: the Conference League winner goes to the Europa League
+
+The three holder places are part of the UEFA access list the game ships, and of the module's
+compiled table (`ACCESS[]` in `fl26swiss.c`):
+
+```
+uefa 4   0 0 17     the Champions League winner  -> the Champions League
+uefa 6   0 0 19     the Europa League winner     -> the Champions League
+uefa 187 0 1 18     the Conference League winner  -> the Europa League
+```
+
+`rank 0` is "the winner of competition `<reg>`"; the fourth number is the league whose next
+free place takes it when that winner already has a place by its league (the holder's own
+league, or the one the shipped table names).
+
+So **winning the Conference League already qualifies for the Europa League**, in both modes:
+
+- a world with **no** `uefa` lines (the test copy) uses the module's compiled `ACCESS[]`,
+  which has `{UECL_KO,0,UEL,R_ITA}`;
+- a world that **writes** the list (any build with European places, the Carabao Cup included)
+  gets `SHIPPED_ACCESS` first, which carries `(187, 0, 1, 18)`.
+
+The Conference League knockout is regulation **187** (`UECL_KO`), the same id in the shipped
+world and in the one `mkuecl` builds.
+
+`tools/test_uecl_holder.py` checks the three places in both tables and that `uefa_places()`
+keeps them when a world adds a place of its own; `check_world.py` now warns when a world writes
+a `uefa` list without them (a list replaces the shipped table, so a list that forgets them
+loses the rule).
+
 ## A league cup's winner to Europe: the Carabao Cup
 
 A league cup built for a league of the game can send its winner to Europe.  In the recipe:

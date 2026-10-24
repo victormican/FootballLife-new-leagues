@@ -288,6 +288,17 @@ def main():
                 if x.isdigit() and int(x) not in tids:
                     err("line %d: nopool team %s is not in Team.bin" % (n, x))
 
+    # ---- the UEFA access list: a world that writes one must keep the holders' places
+    uefa = [(int(w[1]), int(w[2]), int(w[3])) for w in (l.split() for l in lines)
+            if len(w) >= 4 and w[0] == "uefa" and all(x.isdigit() for x in w[1:4])]
+    if uefa:
+        for reg, comp, what in ((4, 0, "the Champions League winner to the Champions League"),
+                                (6, 0, "the Europa League winner to the Champions League"),
+                                (187, 1, "the Conference League winner to the Europa League")):
+            if (reg, comp) not in {(a, c) for a, _b, c in uefa}:
+                warn("the uefa list has no place %d -> competition %d (%s); a world with a list "
+                     "loses the rule the shipped table has" % (reg, comp, what))
+
     # ---- the Other pools must not also play a league
     other = set()
     for rid, kv in leagues.items():
