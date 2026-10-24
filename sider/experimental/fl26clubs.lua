@@ -120,6 +120,11 @@ local function from_world(world)
   local slots, remap = {}, {}
   for _, L in ipairs(world) do
     if L.slot and SERVED[L.slot] then slots[#slots + 1] = { L.slot, L.id } end
+    -- `serve=75`: answer that slot from this regulation without asking fl26comptab for a
+    -- parameter row there. The pool slots (69..75) already carry a competition of the exe, so a
+    -- league put on one of them aborts the whole Select Team table; a group of ours fills them
+    -- from here instead (2026-10-24, "Other Clubs (Africa)").
+    if L.serve and SERVED[L.serve] then slots[#slots + 1] = { L.serve, L.id } end
     if L.slot and POOL_CASE[L.slot] then remap[#remap + 1] = { L.slot, POOL_CASE[L.slot] } end
   end
   return slots, remap

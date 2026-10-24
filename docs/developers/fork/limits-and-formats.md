@@ -205,3 +205,27 @@ check the four "other clubs" groups and the last league of the list. For the for
 of the recipes above into the copy with `--game "D:\SP Football Life 2026 - copia - copia"` and
 start a Master League career in that league: the split's phases, the group tables and the final
 are the things to watch.
+
+## Filling an "Other Clubs" group that the game never fills (2026-10-24)
+
+The heading of slot 75 is "Other Clubs (Africa)" (switch at `0x140ea08e0`), but its list is built
+by a filler the repository measured as *never filled* for a foreign club (`fl26clubs.c`, slots
+72/75/80). A club in no competition -- Wydad 9030, the only African one, plus Esperance 9033 --
+therefore showed under nothing at all.
+
+`fl26clubs.dll` already replaces the two readers of those lists (`0x1414d62c0`,
+`0x1414d6290`) and answers a slot from the regulation of the league the world names for it, so
+the group only needs a competition of its own. **A league cannot sit on slot 75**, though: the
+exe ships a competition there, and `fl26comptab` aborts the whole Select Team table when one of
+ours lands on an occupied slot (`slot 75 is already competition N -- not free`).
+
+The world file therefore has a second key:
+
+```
+league 197 cid=92 region=25 country=200 conf=5 slot=123 serve=75 tier=1 ... clubs=2 name=Other Clubs (Africa)
+```
+
+`slot=123` puts the parameter row on the hidden slot (the league plays, and counts, but asks for
+no Select Team row), and **`serve=75`** tells `fl26clubs` to answer slot 75 from regulation 197.
+`fl26slotnames` leaves the shipped heading alone because no league of ours *sits* on 75, so the
+group is drawn with the exe's own name and our two clubs. `tools/mk_other_africa.py` builds it.
