@@ -835,6 +835,8 @@ static void start_stage(void* started, uint16_t id)
 #define FINDREC_RVA 0x14bc860
 typedef void* (*findrec_fn)(void* blk, uint64_t id);
 static uint32_t club_of_id(uint32_t c);
+static unsigned char* team_array(uint32_t* n);
+static uint32_t team_at(const unsigned char* a, uint32_t i);
 /* Both callers hand over bare team ids from the world file. This used to take anything of
    16384 and up as a list value already; our clubs' ids run from 65536, so a pre-season cup
    of four new clubs got the first id back as a value (team 4) and turned the other three
@@ -858,6 +860,17 @@ static uint32_t club_of_id(uint32_t c)
       if ((v >> 14) == c) return v;
     }
   }
+  /* Not in any competition of this season: a national team the game has not entered anywhere
+     (the 67 an `add_nations.py` world adds), or a club of the "Other" pools. Its own team
+     record answers: the value is the id in the upper 18 bits and its row in the low 14, which
+     is what canon_club() keeps, so no competition has to hold it for a cup to invite it. */
+  uint32_t nt;
+  unsigned char* a = team_array(&nt);
+  if (a)
+    for (uint32_t i = 0; i < nt; i++) {
+      uint32_t v = team_at(a, i);
+      if ((v >> 14) == c && (v & 0x3fff) == i) return v;
+    }
   return 0;
 }
 

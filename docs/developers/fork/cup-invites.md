@@ -57,10 +57,11 @@ cups of the test world already use it with game clubs (`clubs=1247,137,...`).
 - **Exact count.** A cup of 8 takes 8 names; a group cup of 32 takes 32. Anything else is
   dropped with a log line ("%u invited clubs for a field of %u").
 - **The club must be known to the season.** `club_of_id` looks for the team id in the 600 live
-  competition records (leagues and cups). A club that is in *no* competition this season is
-  logged as "is not in any league of this season" and leaves a gap -- so an Other-pool club
-  that the game has not entered anywhere may still be dropped. Clubs that are in a league of
-  the game, or in one of ours, always resolve.
+  competition records (leagues and cups), and **falls back to the team record itself** when no
+  competition holds it (`fl26swiss.c`, 2026-10-23) -- so an Other-pool club and a national team
+  the game has not entered anywhere now resolve too. That fallback is in the source but **needs
+  the DLL rebuilt** (zig); until then, a club in no competition is still dropped with
+  "is not in any league of this season".
 - **Cups, not the Club World Cup.** The CWC (`cwc` line) fills its 32 from the ranking quotas
   inside `fl26swiss` and has no invite list; adding one is a DLL change.
 - A cup whose field is a league's clubs (`entry=<reg>:<position>`) stops following the league
