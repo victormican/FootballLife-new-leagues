@@ -181,6 +181,23 @@ def getf(rec, name):
     return (int.from_bytes(rec, "little") >> b & ((1 << w) - 1)) + add
 
 
+def free_ids(players, n, limit=262144):
+    """the first n ids no player in `players` (a raw Player.bin) holds, from 1 up to `limit`.
+
+    The game's own table is sparse: the 29,492 players it ships use 29,492 of the 184,461 ids
+    below its highest, so a world that gave its own players ids above that highest id left
+    ~150,000 ids unused and ran into the engine's 18-bit player id (262,144) with only 1,598
+    left. Taking the gaps keeps a world far from that wall."""
+    used = {int.from_bytes(players[i + P_ID:i + P_ID + 4], "little")
+            for i in range(0, len(players), P_REC)}
+    out, i = [], 1
+    while len(out) < n and i < limit:
+        if i not in used:
+            out.append(i)
+        i += 1
+    return out
+
+
 def setf(rec, name, val):
     b, w, add = FIELDS[name]
     v = int.from_bytes(rec, "little")

@@ -87,6 +87,15 @@ The entry key is **one packed 16-bit word**: `id << 8 | (order - 1)`. Ids 0..255
 The five "loader hooks" of `docs/research/limits.md` are items 1–3 above: one high-byte read
 per table, the map compare, the entry repack.
 
+## A third byte read, found 2026-10-24
+
+`0x141eee1c0` looks a regulation up **by competition id**: `rows(container, 8)`
+(CompetitionRegulation) and then, per row, `movzx edx, byte [rax + 8]` (`0x141eee27c`) compared
+with the dword in `[rbp + 0x77]`. It is the path the EDIT data and the competition set-up take.
+A cid of 256 reads as 0 there and matches competition 0, so it needs the high byte from
+`+0x910` and a code cave, like the entry read above. With the two census sites it makes three
+of the five hooks known.
+
 ## Meanwhile: the slots do not need a new competition id
 
 The Select Team slot is a field of the **parameter table row** (`0x1434fdf00`, 165 rows of
@@ -113,6 +122,7 @@ Read at the addresses below on 2026-10-23 (file offset = VA - 0x140000a00).
 | `0x1414f1534` | `3a 4b 20` | `cmp cl, byte [rbx+0x20]` | `39 4b 20` -- `cmp dword [rbx+0x20], ecx` | **yes**, same 3 |
 | `0x1414f1613` | `66 c1 e0 08` | `shl ax, 8` (entry key = id<<8\|order-1) | `66 c1 e0 06` (id<<6\|order-1; orders never reach 64) | **yes**, same 4 |
 | `0x1414f160f` | `0f b6 47 ff` | `movzx eax, byte [rdi-1]` (the entry's id) | needs id = `byte[+8] \| byte[+0xb]<<8` -- four instructions | **no**, code cave |
+| `0x141eee27c` | `0f b6 50 08` | `movzx edx, byte [rax+8]` -- **the regulation's id looked up by competition id** (`0x141eee1c0`: `rows(container, 8)`, then `cmp [rbp+0x77], edx`) | the high byte from `+0x910`; the compare is already a dword | **no**, code cave |
 
 The entry read is the one that does not fit. The bytes from `0x1414f1609` to `0x1414f161e` are
 the whole pack (`movzx ecx,[rdi]`, `dec cx`, `movzx eax,[rdi-1]`, `shl ax,8`, `or cx,ax`,

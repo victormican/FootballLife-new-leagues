@@ -59,6 +59,7 @@ def main():
         return 1
     count = int(get("--count", "67"))
     dry = "--dry" in a
+    ids_mode = get("--ids", "free")
     raw = bytearray(
         pesdb.wesys_unpack(open(os.path.join(base, "Team.bin"), "rb").read())
     )
@@ -139,6 +140,7 @@ def main():
         int.from_bytes(players[i + E.P_ID : i + E.P_ID + 4], "little")
         for i in range(0, len(players), E.P_REC)
     )
+    free = E.free_ids(players, count * len(squad)) if ids_mode == "free" else []
     eid_top = max(
         int.from_bytes(assigns[i + A_EID : i + A_EID + 4], "little")
         for i in range(0, len(assigns), A_REC)
@@ -166,7 +168,7 @@ def main():
         row[T_NATIONAL] |= 0x80
         raw += row
         for n, ai in enumerate(squad, 1):
-            pid = pid_top + 1 + made
+            pid = free[made] if free else pid_top + 1 + made
             e = bytearray(assigns[ai : ai + A_REC])
             e[A_EID : A_EID + 4] = (eid_top + 1 + made).to_bytes(4, "little")
             e[A_PID : A_PID + 4] = pid.to_bytes(4, "little")

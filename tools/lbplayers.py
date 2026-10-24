@@ -961,9 +961,9 @@ def new_face_lines(base, db, faces=(), portraits=(), per=64):
     if not os.path.exists(os.path.join(db, "Player.bin")):
         return face_app_lines(faces, per)
     shipped, players = load(base, "Player.bin"), load(db, "Player.bin")
-    top = max(u32(shipped, i * P_REC + P_ID) for i in range(len(shipped) // P_REC))
+    shipped_ids = {u32(shipped, i * P_REC + P_ID) for i in range(len(shipped) // P_REC)}
     own = {u32(players, i * P_REC + P_ID) for i in range(len(players) // P_REC)}
-    own = {pid for pid in own if pid > top}
+    own = {pid for pid in own if pid not in shipped_ids}
     own -= {pid for pid, _f in faces}
     keep = own & {pid for pid, _p in portraits}
     lines = []
@@ -1213,6 +1213,9 @@ def _keep_ids(prev, prev_names, changes, first, players, assigns, index, game_to
     return later
 
 
+FREE_PLAYER_IDS = os.environ.get("FL26_FREE_PLAYER_IDS") == "1"
+
+
 class FreeIds:
     """the world's free player ids, lowest first above the game's own: not one in `busy` (it
     grows with every id handed out) nor one in `retired` (the ids of players no longer in the
@@ -1220,7 +1223,10 @@ class FreeIds:
     NOTE in the log: a career started on an earlier Build shows that player as somebody else."""
 
     def __init__(self, game_top, busy, retired, log=None):
-        self.next, self.busy, self.retired = game_top + 1, busy, retired
+        # the game's own table is sparse (29,492 players over 184,461 ids): with the flag the
+        # gaps below the game's highest are fair game too, which keeps a world away from the
+        # engine's 18-bit player id (262,144)
+        self.next, self.busy, self.retired = (1 if FREE_PLAYER_IDS else game_top + 1), busy, retired
         self.log = log or (lambda *_a: None)
         self.reused = []
 
@@ -1361,7 +1367,7 @@ def apply(pl, base, db, cap, log=print, faces=None, lineups=None, ids=None, port
 
     def new_id(want, old=None):
         pid = int(want)
-        if pid <= game_top:
+        if pid <= game_top and not FREE_PLAYER_IDS:
             raise Error("player id %d: a new player's id has to be above the game's own (%d)" % (pid, game_top))
         if pid > PID_MAX:
             raise Error("player id %d: above %d" % (pid, PID_MAX))
@@ -1380,7 +1386,8 @@ def apply(pl, base, db, cap, log=print, faces=None, lineups=None, ids=None, port
 
     changed = added = removed = joined = 0
     reserved_ids = set(reserved.values())         # ids kept for later adds, never handed out here
-    next_pid = game_top + 1                      # fill the gaps above the game's own ids: from
+    next_pid = 1 if FREE_PLAYER_IDS else game_top + 1   # with the flag, from the gaps below too:
+                                                  # fill the gaps above the game's own ids: from
                                                   # max(index) + 1 a rebuilt world drifts upwards
                                                   # with every Build (220246 -> 288301 in three
                                                   # builds, 12.-14.10.2026) until it crosses PID_MAX
