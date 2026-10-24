@@ -9,7 +9,7 @@ entry's order.  See docs/research/competition-id-16-bit.md for the measurements.
 What this does, at boot, runtime only:
 
   in place (same instruction length, no jump moves):
-    0x1414f1500  0f b6 4f 05  ->  0f b7 4f 04   the id is a word at +4 (Competition.bin)
+    0x1414f1500  0f b6 4f 05  ->  0f b7 4f 20   the id is a word at +0x20 (free in every row)
     0x1414f1504  88 4d 68     ->  89 4d 68      the census key is stored as a dword
     0x1414f1518  38 48 20     ->  39 48 20      the map compares dwords
     0x1414f1534  3a 4b 20     ->  39 4b 20      the map compares dwords (the other side)
@@ -48,7 +48,9 @@ local function rel32(from_next, to)
 end
 
 local INPLACE = {
-  { 0x1414f1500, "0fb64f05", "0fb74f04", "the competition id is a word at +4" },
+  -- +4 is NOT free: competitions 23..27 carry 27 there (their parent phase).  The word lives at
+  -- +0x20, four bytes that are zero in every row; tools/cid16_migrate.py fills them.
+  { 0x1414f1500, "0fb64f05", "0fb74f20", "the competition id is a word at +0x20" },
   { 0x1414f1504, "884d68",   "894d68",   "the census key is stored as a dword" },
   { 0x1414f1518, "384820",   "394820",   "the map compares dwords" },
   { 0x1414f1534, "3a4b20",   "394b20",   "the map compares dwords, other side" },
