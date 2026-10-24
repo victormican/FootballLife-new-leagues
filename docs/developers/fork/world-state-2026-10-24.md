@@ -99,3 +99,28 @@ sider/experimental/fl26playercap.lua muro de jugadores
 3. **Grupos**: subir el tope de 48 si se quieren los genéricos detrás de los del juego en Classic.
 4. **“Datos del usuario”** en el primer pintado de Select Team: es el placeholder del juego cuando
    aún no hay equipo resuelto; la sonda demostró que las listas ya vienen completas a la primera.
+
+## Copas del mundo (26)
+
+Las 20 que ya habia mas seis nuevas de `tools/add_world_cups.py`, que usa ids de competicion
+`66..71` (filas del juego que ninguna liga de este mundo usaba; se borran su competicion,
+regulaciones y entradas) y regulaciones `210..215`:
+
+| copa | cid | reg | formato | quien juega |
+|---|---|---|---|---|
+| FIFA World Cup | 66 | 210 | eliminatoria de 32 | 13 UEFA, 5 CAF, 4 AFC, 4 CONMEBOL, 4 CONCACAF, 2 OFC |
+| FIFA Club World Cup | 67 | 211 | eliminatoria de 32 | el 1.? de 14 ligas UEFA, 8 CONMEBOL, 6 AFC, 4 CAF |
+| UEFA EURO | 68 | 212 | eliminatoria de 24 (como la FA Cup) | 24 selecciones UEFA |
+| Copa America | 69 | 213 | eliminatoria de 16 | 10 CONMEBOL + 6 CONCACAF |
+| AFC Asian Cup | 70 | 214 | eliminatoria de 24 | 24 selecciones AFC |
+| CAF Africa Cup of Nations | 71 | 215 | eliminatoria de 24 | 24 selecciones CAF |
+
+Mas la **CAF Confederation Cup** (cid 65, reg 206/ko 207, 4 grupos de 4, 16 clubes) que ya
+estaba montada y ahora si se escribe: `mk_conf_cup.py` pasaba a `mkccup.py` un `--out`
+una carpeta por encima y las tablas caian en `_FL26All\common\common\etc\pesdb`.
+
+Las copas de naciones toman los equipos por id (`0:<teamid>`), no por puesto de liga: las
+selecciones no tienen liga en este mundo. `nations.py` da los 211 por confederacion
+(UEFA 55, CAF 54, AFC 46, CONCACAF 35, OFC 11, CONMEBOL 10).
+
+Ojo: **Cup mode solo pinta 13** entradas de su vector; con 26 copas el menu seguira cortando.
