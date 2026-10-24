@@ -123,7 +123,13 @@ def plan_layout(relocate, belt=False, calendar=None):
     our own zeroed memory instead of off the end of the allocation.  A read only -- if a
     stale *write* is ever found, the pad hides it and must be reconsidered.
     """
-    cursor = align(SIZE_OLD, 16)
+    # The player array starts at +0 and cannot be relocated: when its cap grows past the old
+    # block end, everything the plan relocates must start after its end, or the two overlap.
+    players = LAYOUT["arrays"].get("players")
+    player_end = 0
+    if players:
+        player_end = align(H(players["base_old"]) + players["cap_new"] * stride_of("players"), 16)
+    cursor = max(align(SIZE_OLD, 16), player_end)
     bases = {}
     if calendar:
         _, stride, _, _, _ = calwiden.shape(calendar)
@@ -1434,7 +1440,7 @@ def main():
             # where the unit ends.  So the whole 0x6cd00 the calendar vacates is free and
             # nothing beyond it is.
             ceiling = calwiden.OLD_BASE + calwiden.OLD_UNIT
-        if cap * H(pl["stride"]) > ceiling:
+        if cap * H(pl["stride"]) > ceiling and os.environ.get("FL26_BIG_PLAYERS") != "1":
             raise SystemExit("--player-cap %d: %d x 0x%x = 0x%x reaches 0x%x; the most "
                              "that fits is %d" % (cap, cap, H(pl["stride"]),
                                                   cap * H(pl["stride"]), ceiling,

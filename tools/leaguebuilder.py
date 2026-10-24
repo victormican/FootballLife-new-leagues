@@ -253,7 +253,7 @@ OTHERS_NAMES = {2: "Other European", 6: "Other Latin American", 3: "Other Asia-O
                 7: "Other Africa", 1: "Classic Teams"}
 REGION_FIRST, REGION_LAST = 29, M.REGION_MAX
 CID_FROM = 130
-SQUAD, PLAYER_CAP = 30, 61905            # a new club's squad, and the player records of the lim2400 layout
+SQUAD, PLAYER_CAP = 30, 123825            # a new club's squad, and the player records of the lim2400 layout
 SQUAD_FIT = 22                           # only a world with more new clubs than 30 each leave room for takes
                                          # fewer, down to this (0.2.2/0.2.3 gave every world 22: not agreed, 14.10.2026)
 TEAM_CAP = 4800                          # clubs in all, shipped ones included (1536 up to 0.2.1)
