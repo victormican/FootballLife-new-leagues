@@ -803,7 +803,7 @@ RECIPE_SETTINGS = ("game_europe", "uefa_seed", "uefa_rank", "europe_first", "gam
                    "ccup_names", "ccup_logos", "caf_super_cup", "caf_super_cup_logo", "cup_draw",
                    "country_order", "game_seasons", "saudi_august", "newlife_ids", "newlife_game",
                    "league_order", "packs", "club_world_cup", "continental_rank", "leagues_cup",
-                   "state_cups")
+                   "state_cups", "cup_clubs")
 
 
 def recipe_from_plan(pl, base):
@@ -5372,14 +5372,44 @@ def continental(cups, root, db, log=print, start=None, want=None, low=False):
 
 def home_cups(pl, confed):
     """the league and pre-season cups planned, ready for continental(): the country's
-    confederation, and the invited clubs' team ids now that build() has given them out"""
+    confederation, and the invited clubs' team ids now that build() has given them out.
+
+    `cup_clubs` in the recipe names the clubs of a cup's first round one by one (a team id of
+    the game, or "<league>/<place>" as in preseason_cups), in place of the league positions:
+    that is how a cup takes clubs of the "Other" groups and clubs the game already had.  The
+    list must be as long as the cup's field -- the module drops invitations that are not."""
     teams = {p["rid"]: p["teams"] for p in pl["leagues"]}
+    by_name = {str(p.get("name") or "").strip().lower(): p for p in pl.get("leagues") or []}
+    inv = {str(k).strip().lower(): v
+           for k, v in ((pl.get("settings") or {}).get("cup_clubs") or {}).items()}
     out = []
     for cup in pl.get("home_cups") or []:
         c = dict(cup, conf=cup["conf"] if cup.get("conf") else confed.get(cup["country"]),
                  opts=dict(cup["opts"]))
-        if cup.get("refs"):
-            c["opts"]["clubs"] = [r if isinstance(r, int) else teams[r[0]][r[1]] for r in cup["refs"]]
+        sel = inv.get(str(cup.get("name") or "").strip().lower()) or inv.get(
+            str(cup.get("code") or "").strip().lower())
+        if sel is not None:
+            refs = []
+            for x in sel:
+                s = str(x).strip()
+                if s.isdigit():
+                    refs.append(int(s))
+                    continue
+                lg, _sl, i = s.rpartition("/")
+                p = by_name.get(lg.strip().lower())
+                if p is None or not i.isdigit() or int(i) >= p["clubs"]:
+                    raise BuildError("%s: no club %r (a team id, or a league of the recipe and "
+                                     "its club, from 0)" % (cup["name"], s))
+                refs.append((p["rid"], int(i)))
+            if len(set(refs)) != len(refs):
+                raise BuildError("%s: a club is invited twice" % cup["name"])
+            if len(refs) != len(cup["entry"]):
+                raise BuildError("%s: %d invited clubs for a first round of %d -- the module "
+                                 "drops the list when they do not match"
+                                 % (cup["name"], len(refs), len(cup["entry"])))
+            c["refs"] = refs
+        if c.get("refs"):
+            c["opts"]["clubs"] = [r if isinstance(r, int) else teams[r[0]][r[1]] for r in c["refs"]]
         out.append(c)
     return out
 
