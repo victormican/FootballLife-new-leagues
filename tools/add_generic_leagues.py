@@ -50,6 +50,11 @@ def main():
     slot0 = int(get("--start-slot", "189"))
     cid0 = int(get("--start-cid", "237"))
     reg0 = int(get("--start-reg", "317"))
+    slots = [int(x) for x in get("--slots", "").split(",") if x.strip()]
+    cids = [int(x) for x in get("--cids", "").split(",") if x.strip()]
+    regs_in = [int(x) for x in get("--regs", "").split(",") if x.strip()]
+    if cids:
+        count = len(cids)
     nclub = int(get("--clubs", "10"))
     dry = "--dry" in a
     raw = bytearray(
@@ -102,6 +107,10 @@ def main():
         int.from_bytes(players[i + E.P_ID : i + E.P_ID + 4], "little")
         for i in range(0, len(players), E.P_REC)
     )
+    pid_off = {
+        int.from_bytes(players[i + E.P_ID : i + E.P_ID + 4], "little"): i
+        for i in range(0, len(players), E.P_REC)
+    }
     eid_top = max(
         int.from_bytes(assigns[i + A_EID : i + A_EID + 4], "little")
         for i in range(0, len(assigns), A_REC)
@@ -112,7 +121,9 @@ def main():
     )
     lines, made_clubs, made_players = [], 0, 0
     for k in range(count):
-        slot, cid, reg = slot0 + k, cid0 + k, reg0 + k
+        slot = slots[k] if slots else slot0 + k
+        cid = cids[k] if cids else cid0 + k
+        reg = regs_in[k] if regs_in else reg0 + k
         name = "Generic League %02d" % (k + 1)
         teams = []
         for j in range(nclub):
@@ -145,12 +156,7 @@ def main():
                 e[A_TID : A_TID + 4] = tid.to_bytes(4, "little")
                 assigns += e
                 tpid = int.from_bytes(assigns[ai + A_PID : ai + A_PID + 4], "little")
-                po = next(
-                    o
-                    for o in range(0, len(players), E.P_REC)
-                    if int.from_bytes(players[o + E.P_ID : o + E.P_ID + 4], "little")
-                    == tpid
-                )
+                po = pid_off[tpid]
                 pr = bytearray(players[po : po + E.P_REC])
                 pr[E.P_ID : E.P_ID + 4] = pid.to_bytes(4, "little")
                 pr[E.P_NAME : E.P_NAME + E.P_NAME_LEN * E.P_NAME_SLOTS] = E.name_slots(
