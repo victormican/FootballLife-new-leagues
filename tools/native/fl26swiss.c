@@ -8045,6 +8045,28 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
     unsigned char** cap = (unsigned char**)(self + 0xa0);
     size_t have = (size_t)(w - *pb) / 12;
     size_t room = (*cap && *cap > *pb) ? (size_t)(*cap - *pb) / 12 : have;
+    /* The menu reserves its list in an array of its own (13 items in this build).  If that
+       array lives inside the object -- which is what an 0xa0 less than a few KB from self
+       means -- it is not freed on destruction, so the list can be pointed at a bigger one.
+       A heap buffer is left alone: its destructor would free our pointer. */
+    if (g_ncupcid > 0 && room < have + (size_t)g_ncupcid) {
+      unsigned char* in_object = (unsigned char*)self;
+      if (*cap && *cap > in_object && *cap < in_object + 0x2000) {
+        size_t want = have + (size_t)g_ncupcid + 16;
+        unsigned char* big = (unsigned char*)VirtualAlloc(NULL, want * 12, 0x3000, 0x04);
+        if (big) {
+          memcpy(big, *pb, have * 12);
+          *pb = big;
+          *pe = big + have * 12;
+          *cap = big + want * 12;
+          w = *pe;
+          room = want;
+          logf("fl26swiss: Cup mode -- list enlarged from %u to %u entries", (unsigned)(have), (unsigned)want);
+        }
+      } else {
+        logf("fl26swiss: Cup mode -- the list is a heap vector, left alone (room %u)", (unsigned)room);
+      }
+    }
     int added = 0, short_ = 0;
     for (int i = 0; i < g_ncupcid; i++) {
       uint32_t cid = g_cupcid[i];
