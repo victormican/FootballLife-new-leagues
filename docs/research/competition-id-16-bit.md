@@ -140,3 +140,32 @@ The `Competition` row change also has a writer side: putting the id at `+4` as a
 other reader of `+5` in the code becomes wrong. Grepping the decoded code for `movzx ..., byte
 ptr [reg+5]` and `add reg, 0x24` in the same function finds `0x1414f1480` only, which is
 encouraging but not proof.
+
+## Correcci?n medida el 2026-10-24: +4 NO est? libre
+
+El plan de arriba pone el id como palabra en `Competition.bin` `+4` (con el byte bajo en `+5`).
+Medido en el mundo `_FL26All`: **cinco filas usan `+4`** -- las competiciones 23..27 llevan `27`
+ah? (`+4 = 0x1b`, `+5 = 28..32`). Leer una palabra en `+4` las convierte en 6940..6944 y deja
+sin casa a las regulaciones que las nombran (4.323 errores en `check_world`). El campo no es
+libre: es la competici?n **padre/fase** de esos cinco.
+
+Columnas que s? est?n a cero en **todas** las filas (medido):
+
+| tabla | filas | columnas a cero |
+|---|---|---|
+| Competition.bin | 249 | `+0x02`, `+0x07`, `+0x20`..`+0x23` |
+| CompetitionEntry.bin | 4.501 | `+0x03`, `+0x0b` |
+| CompetitionRegulation.bin | 473 | `+0x01`, `+0x05`, `+0x3b`.. (y `+0x910`) |
+
+Plan corregido, que hay que escribir antes de tocar el ejecutable:
+
+1. **Competition**: mover el id a la **palabra en `+0x20`** (cuatro bytes libres y contiguos), y
+   rellenar esa palabra en **todas** las filas con su id actual. El parche en sitio sigue siendo
+   de la misma longitud: `movzx ecx, word [rdi+0x20]` (`0f b7 4f 20`).
+2. **Entry**: byte bajo en `+8`, alto en `+0x0b` (libre), cueva como ya dec?a el documento.
+3. **Regulation**: byte bajo en `+8`, alto en `+0x910` (libre y cero en las 473 filas), cueva.
+4. `fl26join.c`, sus dos tablas de 256 por id de regulaci?n.
+
+`fl26cid16.lua` ya lleva los tres parches en sitio del mapa y las dos cuevas (entrada y
+regulaci?n) con verificaci?n de bytes; el de la competici?n queda pendiente de la migraci?n de
+`+0x20`, porque sin rellenar esa palabra todas las competiciones leer?an id 0.
