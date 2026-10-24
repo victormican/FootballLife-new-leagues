@@ -8250,9 +8250,14 @@ static void q_fill(int p)
 #define CAL_IDCAP  792
 #define CAL_COUNT  0x630
 #else
+/* the day size is a property of the patch set, not of one TODAY_OFF: a set that grows the
+   arrays moves the date and keeps the 792-id day (2026-10-24, the 135x30 world). Build with
+   -DCAL_STRIDE/-DCAL_IDCAP/-DCAL_COUNT for any other layout. */
+#ifndef CAL_IDCAP
 #define CAL_STRIDE 0x2c4
 #define CAL_IDCAP  280
 #define CAL_COUNT  0x230
+#endif
 #endif
 #define CAL_BASE   (TODAY_OFF - 365 * CAL_STRIDE)
 #define MREC_RVA   0x14bb280      /* (blk, u16 id) -> the match record, the scheduler's own lookup */

@@ -55,8 +55,8 @@
 
 #define OLD_SIZE     0xa7c860u
 #define INNER_SIZE   0xa7c858u          /* what goes to disk (0x50 header + 0xa7c808)         */
-#define TEAMS        2048
-#define MANAGERS     4096               /* the database has room for 3400 (fl26caps)          */
+#define TEAMS        4700
+#define MANAGERS     5200               /* the database has room for 3400 (fl26caps)          */
 #define NT           4
 
 #define EXT          OLD_SIZE           /* our block, from the old end of the object          */
