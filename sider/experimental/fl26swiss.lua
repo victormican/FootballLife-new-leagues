@@ -513,7 +513,9 @@ function m.init(ctx)
           log(string.format("fl26swiss: world file -- %d continental cup(s), %d accepted", #ccups, k))
           -- their competition ids, for Kick Off > Cup: the game's Cup list is the shipped one
           local ids = {}
-          for _, c in ipairs(ccups) do if c[6] and c[6] > 0 then ids[#ids + 1] = c[6] end end
+          -- the cup's competition id is the seventh field (1 reg, 2 ko, 3 groups, 4 entries, 5 and 6
+          -- spare); it used to be read from c[6], which is nil, so Cup mode never got an id
+          for _, c in ipairs(ccups) do if c[7] and c[7] > 0 then ids[#ids + 1] = c[7] end end
           if #ids > 0 then
             local pci = ffi.C.GetProcAddress(h, "fl26_swiss_cup_cids")
             if pci == nil then
