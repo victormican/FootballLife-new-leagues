@@ -64,6 +64,30 @@ Verified end to end on a fresh world of 211 national teams (UEFA 56, CONMEBOL 10
 AFC 45, CAF 53, OFC 12): five competitions (cids 131..135, regulations 176..180), 16/8/8/16/16
 entries, `buildcheck` and `check_world` clean.
 
+## The qualifying round in front of a cup (`--pre`)
+
+Without `--pre` each competition is one knockout. With it, the competition gets the
+**qualifying round** the user asked for, and both feed each other:
+
+```
+lpre 177 cup=176 fill=182 days=183,186 entry=<16 pairs> clubs=<16 national teams>
+ccup 176 ko=176 groups=0 entry=1201:0,2225:0,...,8369:0 cid=131 fill=188 national=1      days=190,193,196,199 like=23 draw=seeded name=CONCACAF Gold Cup
+```
+
+- the **pre-round** has N/2 two-legged ties (N national teams, invited by name with `clubs=`),
+  played on two days; `fl26_swiss_lpre` fills the ties and plays them;
+- the **cup** takes the **winner of each tie** (`<pre> + 1024 * (tie + 1)`:0, the module's
+  "the winner of that cup" entry) and plays a single-match knockout of N/2;
+- both are the same competition id, so **Kick Off > Cup** lists the competition and a Master
+  League season plays it from the pre-round; the cup's fixtures show the ties first.
+
+The invited clubs need `fl26_swiss_lpre_clubs`, the export added in this branch (per pre-round a
+record `{regulation, count, team ids}`; the fill uses them instead of league positions when the
+count is 2 x ties). A pre-round with no `clubs=` keeps working from `<reg>:<position>` as before.
+
+The days are chosen so the pre-round ends before the cup fills: the ties on day 183/186, the cup
+filled on 188 and playing 190+. For the other presets the same, two days before their cup.
+
 ## Why it could not be tested in the test copy
 
 The copy has **255 of 255 competition ids** used, so there is no id for a new competition.

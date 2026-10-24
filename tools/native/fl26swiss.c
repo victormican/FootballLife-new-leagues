@@ -3668,7 +3668,8 @@ static unsigned ccup_size(const ccup_t* c)
 #define MAX_LPRE 16
 #define LPRE_TIES 8
 typedef struct { uint16_t reg, ko, fill, ties; uint16_t days[2]; uint16_t ereg[2 * LPRE_TIES];
-                 uint8_t erank[2 * LPRE_TIES]; int filled_year; uint32_t club[2 * LPRE_TIES]; unsigned nclub; } lpre_t;
+                 uint8_t erank[2 * LPRE_TIES]; int filled_year; uint32_t club[2 * LPRE_TIES]; unsigned nclub;
+                 uint32_t iclub[2 * LPRE_TIES]; unsigned niclub;   /* invited by name, tie order */ } lpre_t;
 static lpre_t g_lpre[MAX_LPRE]; static int g_nlpre = 0;
 static int season_ord(int d);
 static uint16_t lpre_tie(const lpre_t* l, int k) { return (uint16_t)(l->reg + 1024 * (k + 1)); }
@@ -3729,6 +3730,40 @@ __declspec(dllexport) int fl26_swiss_lpre(const uint16_t* v, int n)
   }
   po_fill();                        /* the Match Results title: the pre-rounds are play-offs */
   return g_nlpre;
+}
+
+/* The teams a pre-round invites by name, in tie order: per pre-round a u32 record
+   {pre-round regulation, count, team id ...}.  A national pre-round has no league to take its
+   places from, so the world file names its clubs (clubs= on the `lpre` line) and this fills
+   them.  Called after fl26_swiss_lpre, which made the list. */
+__declspec(dllexport) int fl26_swiss_lpre_clubs(const uint32_t* v, int n)
+{
+  if ((!v && n) || n < 0) return -1;
+  int got = 0;
+  size_t p = 0;
+  for (int i = 0; v && i < n; i++) {
+    uint32_t reg = v[p], cnt = v[p + 1];
+    p += 2;
+    const uint32_t* clubs = v + p;
+    p += cnt;
+    lpre_t* l = 0;
+    for (int j = 0; j < g_nlpre; j++) if (g_lpre[j].reg == reg) l = &g_lpre[j];
+    if (!l) {
+      logf("fl26swiss: pre-round clubs for %u -- no such pre-round; left out", (unsigned)reg);
+      continue;
+    }
+    l->niclub = 0;
+    for (uint32_t j = 0; j < cnt && j < 2u * LPRE_TIES; j++)
+      if (clubs[j] && !(clubs[j] >> 18)) l->iclub[l->niclub++] = clubs[j];
+    if (l->niclub != 2u * l->ties) {
+      logf("fl26swiss: pre-round %u -- %u invited clubs for %u ties; the invitations are dropped",
+           (unsigned)reg, (unsigned)l->niclub, (unsigned)l->ties);
+      l->niclub = 0;
+    } else
+      logf("fl26swiss: pre-round %u -- %u clubs invited by name", (unsigned)reg, (unsigned)l->niclub);
+    got++;
+  }
+  return got;
 }
 
 /* the clubs pre-round l has this season: the ones it was filled with in this session, else the
@@ -3805,20 +3840,34 @@ static void lpre_fill(int i)
   unsigned n = 0;
   for (unsigned j = 0; j < 2u * l->ties; j++) {
     const char* how = ""; uint32_t club = 0;
-    for (int rank = l->erank[j]; rank >= 1 && rank <= FINAL_MAX; rank++) {
-      club = cwc_club(l->ereg[j], rank, &how);
-      if (!club) break;
-      if ((club >> 14) && !has_club(l->club, n, canon_club(club))) { club = canon_club(club); break; }
-      club = 0;
-    }
-    if (!club) {
-      logf("fl26swiss: pre-round %u -- reg %u position %u has no club to send; not filled", (unsigned)l->reg,
-           (unsigned)l->ereg[j], (unsigned)l->erank[j]);
-      return;
+    if (l->niclub == 2u * l->ties) {              /* invited by name (clubs= on the lpre line) */
+      club = canon_club(full_club(l->iclub[j]));
+      how = "invited";
+      if (!club || has_club(l->club, n, club)) {
+        logf("fl26swiss: pre-round %u -- invited team %u is not a club of this season; not filled",
+             (unsigned)l->reg, (unsigned)l->iclub[j]);
+        return;
+      }
+    } else {
+      for (int rank = l->erank[j]; rank >= 1 && rank <= FINAL_MAX; rank++) {
+        club = cwc_club(l->ereg[j], rank, &how);
+        if (!club) break;
+        if ((club >> 14) && !has_club(l->club, n, canon_club(club))) { club = canon_club(club); break; }
+        club = 0;
+      }
+      if (!club) {
+        logf("fl26swiss: pre-round %u -- reg %u position %u has no club to send; not filled", (unsigned)l->reg,
+             (unsigned)l->ereg[j], (unsigned)l->erank[j]);
+        return;
+      }
     }
     l->club[n++] = club;
-    logf("fl26swiss:   pre-round %u entry %2u: reg %u position %u -> %08x (%s)", (unsigned)l->reg, n,
-         (unsigned)l->ereg[j], (unsigned)l->erank[j], club, how);
+    if (l->niclub == 2u * l->ties)
+      logf("fl26swiss:   pre-round %u entry %2u: team %u -> %08x (invited)", (unsigned)l->reg, n,
+           (unsigned)l->iclub[j], club);
+    else
+      logf("fl26swiss:   pre-round %u entry %2u: reg %u position %u -> %08x (%s)", (unsigned)l->reg, n,
+           (unsigned)l->ereg[j], (unsigned)l->erank[j], club, how);
   }
   for (int k = 0; k < LPRE_TIES; k++)
     ((freetab_fn)(uintptr_t)(g_base + FREETAB_RVA))(0, lpre_tie(l, k));

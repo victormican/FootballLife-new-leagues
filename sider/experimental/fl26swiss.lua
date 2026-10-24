@@ -148,11 +148,12 @@ local function read_world(ctx)
   for line in f:lines() do
     local lr, lrest = line:match("^%s*lpre%s+(%d+)(.*)$")
     if lr then
-      local L = { tonumber(lr), tonumber(lrest:match("cup=(%d+)") or 0), tonumber(lrest:match("fill=(%d+)") or 0), {}, {} }
+      local L = { tonumber(lr), tonumber(lrest:match("cup=(%d+)") or 0), tonumber(lrest:match("fill=(%d+)") or 0), {}, {}, {} }
       for d in (lrest:match("days=([%d,]+)") or ""):gmatch("%d+") do L[4][#L[4] + 1] = tonumber(d) end
       for er, ep in (lrest:match("entry=([%d:,]+)") or ""):gmatch("(%d+):(%d+)") do
         L[5][#L[5] + 1] = { tonumber(er), tonumber(ep) }
       end
+      for t in (lrest:match("clubs=([%d,]+)") or ""):gmatch("%d+") do L[6][#L[6] + 1] = tonumber(t) end
       if L[2] > 0 and #L[4] == 2 and #L[5] >= 2 then lpres[#lpres + 1] = L end
     end
     local qc, qn, qr = line:match("^%s*qround%s+(%d+)%s+(%d+)%s+(%d+)")
@@ -570,6 +571,27 @@ function m.init(ctx)
               end
               local m = tonumber(ffi.cast("fl26_swiss_access_t", pl)(lbuf, #lpres))
               log(string.format("fl26swiss: world file -- %d league cup pre-round(s), %d taken", #lpres, m))
+              -- the pre-rounds whose clubs are invited by name (a national pre-round has no league)
+              local plc = ffi.C.GetProcAddress(h, "fl26_swiss_lpre_clubs")
+              local ncl = 0
+              for _, L in ipairs(lpres) do if #L[6] > 0 then ncl = ncl + 1 end end
+              if not plc then
+                if ncl > 0 then
+                  log("fl26swiss: this fl26swiss.dll cannot invite the pre-rounds' clubs (fl26_swiss_lpre_clubs); a national pre-round is left to its entries")
+                end
+              elseif ncl > 0 then
+                local clen = 0
+                for _, L in ipairs(lpres) do if #L[6] > 0 then clen = clen + 2 + #L[6] end end
+                local cbuf2, q2 = ffi.new("uint32_t[?]", clen), 0
+                for _, L in ipairs(lpres) do
+                  if #L[6] > 0 then
+                    cbuf2[q2], cbuf2[q2 + 1] = L[1], #L[6]; q2 = q2 + 2
+                    for _, t in ipairs(L[6]) do cbuf2[q2] = t; q2 = q2 + 1 end
+                  end
+                end
+                local mc = tonumber(ffi.cast("fl26_swiss_first_t", plc)(cbuf2, ncl))
+                log(string.format("fl26swiss: world file -- %d pre-round(s) with invited clubs, %d matched", ncl, mc))
+              end
             end
           end
         end

@@ -251,6 +251,27 @@ def main():
             for x in w[1:4]:
                 if x.isdigit() and int(x) not in rids:
                     err("line %d: cwc regulation %s is not in the tables" % (n, x))
+        elif kind == "lpre":
+            pre = int(w[1]) if len(w) > 1 and w[1].isdigit() else 0
+            kv = dict(x.split("=", 1) for x in w[2:] if "=" in x)
+            ko = int(kv.get("ko", 0) or kv.get("cup", 0) or 0)
+            pairs = len([p for p in (kv.get("entry") or "").split(",") if p])
+            if pre and pre not in rids:
+                err("line %d: lpre %d is not a regulation" % (n, pre))
+            if ko and ko not in rids:
+                err("line %d: lpre %d leads to cup %d, not a regulation" % (n, pre, ko))
+            for k in range(8):
+                if pre and pre + 1024 * (k + 1) not in rids:
+                    err("line %d: lpre %d has no tie regulation %d (the module wants all eight)"
+                        % (n, pre, pre + 1024 * (k + 1)))
+                    break
+            if "clubs" in kv:
+                cl = [int(x) for x in kv["clubs"].split(",") if x]
+                if pairs and len(cl) != pairs:
+                    err("line %d: %d invited clubs for %d tie places" % (n, len(cl), pairs))
+                for c in cl:
+                    if c not in tids:
+                        err("line %d: lpre team %d is not in Team.bin" % (n, c))
         elif kind == "cupdays":
             if int(w[1]) not in rids:
                 err("line %d: cupdays regulation %s is not in the tables" % (n, w[1]))
