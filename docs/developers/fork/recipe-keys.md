@@ -42,6 +42,7 @@ Rules that hold for every key:
 | `cup_clubs` | {"<cup name>": [team id or "League/3", ...]} | the clubs of a cup's first round, named one by one (Other groups and game clubs included); as many as the cup's field | `ccup ... clubs=` |
 | `ccup_names`, `ccup_logos` | {"6": ..., "7": ..., "0": ...} | names and pictures of the continental cups the world builds | `ccup ... name=` |
 | `caf_super_cup`, `caf_super_cup_logo` | bool (default true), picture | the CAF Super Cup when both CAF cups exist | `ccup` |
+| `recopa_sudamericana`, `recopa_logo` | bool (default false), picture | the Recopa Sudamericana (the Libertadores winner v the Sudamericana winner) when the world has a Sudamericana; filled in mid-January, played in late February | `ccup` |
 | `editable_kits` | bool | new clubs get plain kits of their own that Edit mode can paint, not lent licensed ones (#112) | tables |
 | `country_order` | `"az"` or a list of country names | League order in Select Team / Kick Off / Edit | `order`, `kickorder` |
 | `cup_draw` | `seeded` (default), `random`, `off` | how country cups are drawn | `cupdraw` |

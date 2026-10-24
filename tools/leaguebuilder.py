@@ -394,6 +394,11 @@ PRESEASON_DAYS = [186, 189, 192, 195, 198, 201, 205]
 # the last, the final, on 26 July -- after the pre-season cups, before the new season is built
 CAF_SUPER_DAYS = [187, 190, 193, 196, 199, 202, 207]
 CAF_CL, CAF_CC = 6, 7                    # fl26world.CCUPS numbers of the two cups it takes
+SUDAM = 9                                # fl26world.CCUPS number of the Copa Sudamericana
+LIB_KO = 10                              # the shipped Libertadores' knockout regulation (reg 10)
+RECOPA = 18                              # a cup number of our own, after the Leagues Cup (17)
+RECOPA_FILL = 15                         # filled in mid-January: the two cups' winners are known
+RECOPA_DAYS = [50, 53, 56]               # late February, where the real Recopa is played
 LEAGUE_CUP_SIZES = (16, 8, 4)
 # A league cup's clubs past its 16, 8 or 4 play a pre-round first: the last 2x places of the
 # field, the strongest v the weakest, home and away; the x winners take the knockout's last x
@@ -803,7 +808,7 @@ def game_others(base, leagues):
 # keeps them as the recipe had them ("settings"), so recipe_from_plan gives them back exactly and a
 # world made editable again builds the same (0.2.4, editing a ready world)
 RECIPE_SETTINGS = ("game_europe", "uefa_seed", "uefa_rank", "europe_first", "game_cups", "preseason_cups",
-                   "ccup_names", "ccup_logos", "caf_super_cup", "caf_super_cup_logo", "cup_draw",
+                   "ccup_names", "ccup_logos", "caf_super_cup", "caf_super_cup_logo", "recopa_sudamericana", "recopa_logo", "cup_draw",
                    "country_order", "game_seasons", "saudi_august", "newlife_ids", "newlife_game",
                    "league_order", "packs", "club_world_cup", "continental_rank", "leagues_cup",
                    "state_cups", "cup_clubs")
@@ -968,6 +973,7 @@ def settings_from_plan(pl, base):
         out["caf_super_cup"] = False
     default = {c: n for c, n, _code, _conf, _fill in fl26world.CCUPS}
     default[0] = caf_super_cup({})["name"]
+    default[RECOPA] = recopa({})["name"]
     names = {str(c["number"]): c["name"] for c in cups if c.get("number") in default
              and c.get("name") and c["name"] != default[c["number"]]}
     logos = {str(c["number"]): c["logo"] for c in cups if c.get("number") in default and c.get("logo")}
@@ -2206,6 +2212,11 @@ def plan(recipe, base, prev=None):
     home += [preseason_cup(c, k, by_name) for k, c in enumerate(recipe.get("preseason_cups") or [])]
     if recipe.get("caf_super_cup", True) and {CAF_CL, CAF_CC} <= {c["number"] for c in cups}:
         cups.append(caf_super_cup(recipe))
+    if recipe.get("recopa_sudamericana"):
+        if SUDAM in {c["number"] for c in cups}:
+            cups.append(recopa(recipe))
+        else:
+            notes.append("Recopa Sudamericana: no Copa Sudamericana in this world -- not built")
     for c in cups:
         k = str(c["number"])
         c["name"] = ((recipe.get("ccup_names") or {}).get(k) or "").strip() or c["name"]
@@ -2992,6 +3003,17 @@ def caf_super_cup(recipe):
             "kind": "super", "logo": recipe.get("caf_super_cup_logo") or None,
             "entry": [("ko", CAF_CL), ("ko", CAF_CC)],
             "opts": {"fill": PRESEASON_FILL, "national": 1, "days": CAF_SUPER_DAYS}}
+
+
+def recopa(recipe):
+    """the Recopa Sudamericana: the Libertadores winner v the Copa Sudamericana winner, one
+    match in February.  The Libertadores is the game's own, so its winner is the winner of its
+    knockout regulation (LIB_KO); the Sudamericana is the cup this build makes (number SUDAM),
+    which continental() resolves from ("ko", SUDAM) to its knockout id."""
+    return {"number": RECOPA, "name": "Recopa Sudamericana", "code": "FL_RECOPA", "conf": 4,
+            "groups": 0, "kind": "super", "logo": recipe.get("recopa_logo") or None,
+            "entry": [(LIB_KO, 0), ("ko", SUDAM)],
+            "opts": {"fill": RECOPA_FILL, "national": 1, "days": RECOPA_DAYS}}
 
 
 def cup_rounds(n):
