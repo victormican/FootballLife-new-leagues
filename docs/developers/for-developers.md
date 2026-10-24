@@ -174,6 +174,8 @@ players 0x17c, clubs 0x690, coaches 0x258, regulations 0x314, match records 0x25
 | `patchset.py` + `callindex.py`, `datecave.py`, `copyfields.py`, `impscan.py`, `calwiden.py`, `boundscan.py` | the patch set generator and its helpers (`calwiden.py` widens the calendar for the `-calendar` set; `calaudit.py`, `calstride.py`, `tailscan.py` find and check its sites) |
 | `flpaths.py` | where your game is; environment variables |
 | `livedump.py` | locate the running game and read its edit block; the reader the next tool needs |
+| `check_world.py` | check a built world against itself and against its world file, no game: ids, squads, competitions, regulations, entries, slots, ccup fields and invited clubs |
+| `cup_invites.py` | choose a cup's first-round clubs by team id or name (Other groups and game clubs included); the recipe key is `cup_clubs` |
 | `dayplan.py` | measure a running season and print the `--date-offsets` day-spread that clears the per-day ceiling (792, or 280 without `-calendar`); reads `FL26_SET`/`--set` for the layout |
 | `deepen.py` | put one of your leagues below another as the next division down; `--deep-rank` for real ranks, `--retier` to renumber a chain built before the rank was widened |
 | `mkrankpatch.py` | regenerate `sider/experimental/fl26rank.lua` (it finds every site that reads or writes the league rank and emits the same-length rewrite); needs `capstone` |
