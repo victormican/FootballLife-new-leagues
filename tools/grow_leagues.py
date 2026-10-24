@@ -46,6 +46,8 @@ def main():
     nbig = int(get("--big", "5"))
     big = int(get("--big-clubs", "30"))
     dry = "--dry" in a
+    limit = int(get("--limit", "0"))
+    squad_n = int(get("--squad", "0"))
 
     raw = bytearray(
         pesdb.wesys_unpack(open(os.path.join(base, "Team.bin"), "rb").read())
@@ -80,6 +82,8 @@ def main():
         return 1
     tt, toff = clubs[-1]
     squad = by_team[tt][:22]
+    if squad_n:
+        squad = squad[:squad_n]
 
     reg_of_cid = {}
     for i in range(0, len(regs), M.REG):
@@ -126,6 +130,8 @@ def main():
             continue
         if cid not in reg_of_cid:
             print("  league %d: cid %d has no regulation -- left alone" % (reg, cid))
+            continue
+        if limit and len(plan) >= limit:
             continue
         plan.append((n, reg, cid, have, target, kv.get("name", "")))
         need_clubs += target - have
