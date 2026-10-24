@@ -50,10 +50,26 @@ Taking the first league of each country in file order (the release lists them th
 - 106 countries have fewer than 10 clubs, 106 have 10-24, 1 has 25-30, 1 has more than 30;
 - the new clubs need about **43,538 players** at 22 each.
 
-That is **2,722 teams** from the shipped 743, which is **322 over the 2,400 cap**; the players
-fit inside 61,905. So **the first divisions of every country are one team-cap raise away** (to
-about 2,750), not a player-cap one. The current 2,400 cannot hold them, and the 91-league world
-(2,199 teams) has no room for them at all: that world would have to be replaced, not extended.
+From the shipped game (749 clubs, 29,492 players) that is **2,722 teams** and **73,030 players**
+with the shipped squads. The team cap is **322 over** (2,400 -> about 2,750) and the player cap
+is **11,125 over** (61,905, with only 32,413 free). So the first divisions need **both caps
+raised**. The team cap is a relocation of the team array (the 750 -> 2,400 work); the player cap
+is at the player array's ceiling (the array starts at offset 0 and can grow to about 60,745, the
+season calendar), so going to 74,000 needs the calendar/upper arrays moved as well. That is a
+larger job than the team cap, not a constant.
+
+The current 2,400 world (2,199 teams) has no room for them at all: that world would have to be
+replaced, not extended.
+
+## What fits today: NewLife Lite
+
+From the shipped game there are **1,651 team slots** and **32,413 player slots**. At 22 players
+a club that is **1,473 clubs** (about 70 leagues of 20, with a few players to spare). The team
+cap is then 2,222 of 2,400. This is the largest NewLife subset that builds and plays with the
+current caps; `tools/newlife_limits.py --world <base tables>` prints it as "1,473 squads of 22".
+
+A 20-club league fits today in a clean game (20 teams, 440 players). In the 91-league test world
+it does not: that world has 114 players free.
 
 The 106 countries under 10 clubs need either a smaller minimum than the builder's 10 (the engine
 plays 2-club leagues in cups, but league code has only been tested from 10) or game clubs to fill
@@ -110,11 +126,14 @@ progression (the best thirds), which no cup of ours has today.
 ## What to do with this
 
 1. **Full NewLife: no.** The arrays are 7-10x too small; this is not a Build problem.
-2. **First divisions: a team-cap raise to ~2,750.** The players fit (43,538 of 61,905); the
-   team array is the wall. That is a patch-set job like 750 -> 2,400, not a recipe.
-3. **211 national teams: fits after freeing players.** The data and the menu are the work; the
-   capacity is there (67 teams, 1,474 players).
-4. **A NewLife Lite world** of a handful of leagues fits today: 201 teams and five 22-man squads
-   in the current world, or a clean game with ~1,650 teams and ~30k players free.
+2. **First divisions: both caps.** ~2,750 teams and ~73,000 players. The team array is a
+   relocation like 750 -> 2,400; the player array is at its ceiling (~60,745) and needs the
+   calendar/upper arrays moved as well. Not a recipe, and not a small patch.
+3. **211 national teams: fits.** 67 teams and 1,474 players; in a clean game the 32,413 free
+   players cover them, and in the full 91-league world about 1,360 players have to be freed.
+4. **A NewLife Lite world** of about 1,473 clubs (32,406 players) fits **today**, from the shipped
+   game: 2,222 of 2,400 teams. That is the build to test the pipeline with the current caps.
+5. **Full NewLife: no.** 16,542 new clubs and 639,329 players; the arrays would have to grow 7x
+   and 10x.
 
 `python tools/newlife_limits.py` prints all of it for the release and world in use.
