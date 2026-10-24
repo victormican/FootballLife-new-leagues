@@ -41,10 +41,25 @@ Select Team slots (158) and the competition ids (255) are now the walls: a 188-l
 
 ## Club sizes
 
-`leaguebuilder.CLUBS_MAX` was 24 ("the range seasons have been played with"). It is **30** now,
-because Argentina's Primera División has 30 clubs. 30 clubs on one round (29 rounds) fits the
-38-date league calendar; the build is verified, the season is not played yet. 31..63 would fit
-the record's six-bit club count but no calendar work has been done for them.
+`leaguebuilder.CLUBS_MAX` was 24 ("the range seasons have been played with"), then 30 for
+Argentina's 30-club Primera Division, and is **38** now. The number is the calendar, not the
+record: a league of ours plays on the big-league calendar, which has **38 dates**
+(`BIG_LEAGUE_DAYS`), so a single round-robin tops out at 38 clubs (37 rounds); 39 clubs would
+need 39. The record's own club count is six bits (63) and is not what binds.
+
+The builder now **refuses** a plain league whose rounds do not fit, instead of writing a league
+that is never dated and never plays:
+
+```
+Big 30x2: 30 clubs meeting 2 time(s) are 58 rounds, a season has 38 dates -- at most 20 clubs
+at 2 leg(s); legs: 1 is 29 rounds for 30 clubs
+```
+
+So 20 clubs twice (38) is the largest two-leg league, 12 clubs three times (33) the largest
+three-leg one, and `regress018/big_league_38` builds and checks a 38-club single round. A split
+league is exempt: it has its own budget (`SPLIT_MAX_ROUNDS` 46, the Championship's calendar).
+The season of a 38-club league has not been played yet; the build and the dates are what is
+verified.
 
 ## The four formats (2025)
 
@@ -107,6 +122,42 @@ Builder today: **supported**. A split with a double round-robin and three groups
 
 It writes regular 16 (reg 191), groups 6, 6 and 4 (192, 193, 194), 30 + 10 + 10 + 6 rounds, and
 keeps the points (`carry` on by default). Verified with a build; not played in the game yet.
+
+## What is still missing in the formats, and the cheapest way in
+
+Written 2026-10-23, after raising the plain-league cap to 38 clubs. These are the three shapes
+of the four above that the builder cannot write yet, with the piece that would carry each.
+
+**Argentina: two zones of 15 plus a round of 16.** A zone is a table of its own, so it is a
+regulation of its own: two regulations on the *same* competition id, 15 clubs each, one leg
+(14 rounds) -- the same relationship the five twin leagues of the test world have, but with
+disjoint clubs. The pieces that do not exist yet: (a) the two interzonal matches, which make
+the zone calendars touch, so both regulations need the same dates and two shared days; (b) the
+round of 16 fed by the top eight of *both* zones, which is a `ccup` whose entries are positions
+of two regulations -- `entry=` already takes `<reg>:<position>` pairs, so the cup side may
+already be there; (c) what Master League does with two regulations on one competition id (the
+same open question as the twins). **Cheapest experiment:** build a world with two 15-club
+regulations on one cid and one ccup of 16, and look at the two tables and the cup in a career
+before writing any builder key for it.
+
+**Colombia: eight into two groups of four.** The `split` takes *every* club of the league into
+its groups; Colombia takes only the top eight, and the other twelve stop. A split cannot cut,
+and the knockout is a knockout, not two groups. The shape that would carry it is a `ccup` of 8
+with `groups=2` (the group machinery is the Club World Cup's), fed by positions 1..8 of the
+league, with its two winners into a two-leg final. The gate is the same as the Intermedio below:
+a cup of two groups of four, mid-season, on dates the league leaves free.
+
+**Uruguay: the Intermedio.** Two groups of eight (7 rounds) between the Apertura and the
+Clausura, then a final. The ccup code already draws groups (`groups=8` for the CWC, the
+`ccup_rep` replicas at `<reg> + 1024 * (g + 1)`), so two groups of eight is a smaller case of
+something that works. What is missing is the *window*: the ccup dates are its own
+(`CCUP_GROUP_DAYS`), fixed late November to mid February, and the Intermedio sits in the middle
+of an August-May season. A `days=` list on the ccup line already moves a knockout's rounds
+(`fl26_swiss_ccup_opts`), so a group cup with its own days is the first thing to try.
+
+None of the three needs new record formats: they need a second regulation on a competition, a
+group cup with its own days, or both. The 38-club cap and the date check above are the part
+that is done.
 
 ## Continental cups by confederation ranking (opt-in)
 

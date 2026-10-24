@@ -119,6 +119,7 @@ The recipes:
 | `regress018/game_cups` | `game_cups`: league and super cups for countries of the game |
 | `regress018/hk_two_tiers` | two tiers under an AFC league of the game, with `edits`, `players`, `uecl` and `caf_super_cup` |
 | `regress018/others` | a league plus the "Other ..." groups (`others`) |
+| `regress018/big_league_38` | a league at the new 38-club cap, one leg (37 rounds on a 38-date calendar) |
 
 It prints a summary table and exits 1 on any FAIL. Add a recipe there for every feature that
 changes what Build writes.

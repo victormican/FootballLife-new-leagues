@@ -242,7 +242,10 @@ import flpaths
 GAME = os.environ.get("FL26_DIR", r"C:\Football Life 2026")
 R_ABOVE = 0x04
 LEGS_SHIFT, LEGS_MASK = 12, 7
-CLUBS_MIN, CLUBS_MAX, LEGS_MAX = 10, 30, 4
+CLUBS_MIN, CLUBS_MAX, LEGS_MAX = 10, 38, 4
+# 38 is the calendar, not the record: a league of ours plays on the big-league calendar, and that
+# has 38 dates (BIG_LEAGUE_DAYS). 38 clubs once is 37 rounds, 39 would be 39. The record's own
+# club count is six bits (63), so the dates are the first thing that runs out.
 # "others": the game's groups of clubs in no league, by the nibble at T_POOL of a club's record
 # (Team.bin: 1 Classic Teams, 2 Other European, 3 Other Asia-Oceania, 6 Other Latin American,
 # 7 Other Africa; 5 holds the three "ML Default" clubs). The Discord request of 2026-10-06:
@@ -1921,6 +1924,16 @@ def plan(recipe, base, prev=None):
             raise BuildError("%s: %d clubs -- a league has %d..%d" % (name, n, CLUBS_MIN, CLUBS_MAX))
         if not 1 <= legs <= LEGS_MAX:
             raise BuildError("%s: clubs meet 1..%d times, not %d" % (name, LEGS_MAX, legs))
+        if not L.get("split") and not L.get("apertura") and rounds_of(n) * legs > len(BIG_LEAGUE_DAYS):
+            # the rounds of a plain league are dated on the big-league calendar, resampled to them;
+            # past its 38 dates the league is left undated and never plays, which used to build
+            fit = max(k for k in range(CLUBS_MIN, CLUBS_MAX + 1)
+                      if rounds_of(k) * legs <= len(BIG_LEAGUE_DAYS))
+            raise BuildError(
+                "%s: %d clubs meeting %d time(s) are %d rounds, a season has %d dates -- at most %d "
+                "clubs at %d leg(s)%s"
+                % (name, n, legs, rounds_of(n) * legs, len(BIG_LEAGUE_DAYS), fit, legs,
+                   "; legs: 1 is %d rounds for %d clubs" % (rounds_of(n), n) if legs > 1 else ""))
         fid = mkflags.by_name(cty, L.get("country", ""))
         if fid is None:
             raise BuildError("%s: no country called %r in Country.bin" % (name, L.get("country")))
