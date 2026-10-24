@@ -67,6 +67,30 @@ Nothing has changed in the conclusion: ids above 255 need the three high-byte re
 key widened, and the entry key repacked. The list of exact byte patches is in
 `competition-id-16-bit.md`.
 
+## The modules are not installed by `leaguebuilder.py on`
+
+2026-10-24, measured on the test copy: a world looked like "one league instead of 134" for two
+whole rounds because the module that does the work was not the one being run. `tools/leaguebuilder.py
+on <world>` switches the world (cpk root, `modules\fl26world.txt`, the per-world region modules)
+but it does **not** copy `sider/` or `sider/experimental/*.lua` into `SiderAddons\modules`. That
+is the Studio's **Install the modules** button (`leaguebuilder.install_modules`), and it copies
+from the module pack (`tools/lbpack.py` -> `out/lbpack`), not from the source tree.
+
+So after changing a module of ours, check the copy the game runs:
+
+```
+python - <<'EOF'
+import hashlib, os
+repo = r"...\pes-2021\sider"
+game = r"...\SiderAddons\modules"
+...
+EOF
+```
+
+and copy the file by hand (or build the pack and run `install_modules`). The log of a stale
+`fl26comptab.lua` said `too many rows -- aborting` while the repository copy already had the 400
+cap: the module that aborted was 181 bytes shorter than the one in `sider/experimental`.
+
 ## The competition parameter table: 255 rows
 
 `fl26comptab` used to abort the whole list when the copy of the competition parameter table

@@ -115,6 +115,38 @@ So **211 national teams is not possible in this world yet**; the player cap leav
 players, not 1,541. The Oceania group with the existing New Zealand needs no new players and can
 be done now.
 
+## Measured 2026-10-24: the group is not a Team.bin nibble
+
+An earlier reading of `+0x4f` was wrong and cost a round of "Oceania does not show". Dumped on
+the test world's shipped 144 national teams, the **low** nibble of `+0x4f` is scattered across
+0..9 with no relation to the confederation (India 0, Morocco 2, Ireland 4, Portugal 6, Belgium
+8, Saudi Arabia 9), and the **high** nibble -- the one `leaguebuilder.T_POOL` uses for a club's
+"Other ..." group -- is 0 for all of them. So neither half of that byte files a national team
+into a Select Team region; the shipped grouping is built by the game, not read from the row.
+
+Consequence: moving the OFC sides' `+0x4f` (to 4, then to 8) changed nothing, and the world is
+back to the shipped value (high nibble 0) for every national team. Whatever groups the 211 is
+code, and the boot log / the menu is the way to find out where the 67 added teams landed.
+
+## The Oceania competition and slot 9
+
+2026-10-24: `tools/add_nations_cups.py --preset oceania` builds a real OFC competition named
+**Oceania** (cid 91, regulation 196, the 8 OFC sides it picks), on the pattern of the OFC
+Nations Cup. The world file also carries a league-shaped row for it:
+
+```
+league 196 cid=91 region=25 country=200 conf=7 slot=9 tier=1 promote=0 demote=0 clubs=8 legs=1 kickoff=166 name=Oceania
+```
+
+`fl26comptab` appends a parameter row for it on **slot 9**, and `0x140ea08e0` has no case for
+slot 9 (its jump table stops at 0x4b and slots 7, 8 and 9 fall to the default), so the caller
+falls back to the name of the competition on that slot -- "Oceania". Whether the menu draws a
+group for a *national* slot above 6 is the open question; slots 69/71/73/75 prove it draws named
+groups outside 0..6, but those hold clubs.
+
+The cid is the scarce resource: `add_nations_cups.free_ids` used to look for 130..255, which the
+test world has filled, so it now searches from 88 (free: 91, 92, 0, 6, 7, 48, 55, 57, 58, 64, 65).
+
 ## Test plan
 
 1. `python tools/nations.py` on the test world: expect 144, OFC 1 (New Zealand 1141).

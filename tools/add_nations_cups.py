@@ -58,6 +58,9 @@ PRESETS = {
         [183, 186],
     ),
     "ofc": ("OFC Nations Cup", 7, 8, 150, [155, 158, 161], "FL_OFCN", 148, [149, 152]),
+    # the heading the Select Team list needs for a group of its own: a slot with a name comes
+    # from the competition on it, and the OFC teams carry the slot in their own nibble
+    "oceania": ("Oceania", 7, 8, 166, [166, 169, 172], "FL_OCEA", 164, [165, 168]),
     "wc-ofc": (
         "OFC World Cup Qualifying",
         7,
@@ -99,7 +102,7 @@ def free_ids(base):
         int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little")
         for i in range(0, len(regs), M.REG)
     }
-    cids = [c for c in range(130, 256) if c not in used_c]
+    cids = [c for c in range(88, 256) if c not in used_c]
     rids = [r for r in range(176, 1024) if r not in used_r]
     return cids, rids
 
@@ -253,9 +256,7 @@ def main():
                     m["ko"],
                     m["pfill"],
                     ",".join(map(str, m["pdays"])),
-                    ",".join(
-                        "0:0" for _ in range(2 * m["size"])
-                    ),
+                    ",".join("0:0" for _ in range(2 * m["size"])),
                     ",".join(map(str, m["pick"])),
                 )
             )
