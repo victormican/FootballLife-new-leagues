@@ -101,3 +101,32 @@ python tools/add_twin_leagues.py --base <pesdb> --worldfile <fl26world.txt>
 which is what the test copy has (regulations 379..383, slots 183..187, five cids reused).
 That fills the grid to 158 leagues without breaking the 255-id budget; a genuinely new
 competition still needs the patch above.
+## The exact sites, and how far each one can be patched in place
+
+Read at the addresses below on 2026-10-23 (file offset = VA - 0x140000a00).
+
+| site | bytes now | what it does | what 256..511 needs | in place? |
+|---|---|---|---|---|
+| `0x1414f1500` | `0f b6 4f 05` | `movzx ecx, byte [rdi+5]` | `0f b7 4f 04` -- the id as a word at +4 | **yes**, same 4 bytes |
+| `0x1414f1504` | `88 4d 68` | `mov [rbp+0x68], cl` | `89 4d 68` -- store the dword (the slot is 8 bytes) | **yes**, same 3 |
+| `0x1414f1518` | `38 48 20` | `cmp byte [rax+0x20], cl` | `39 48 20` -- compare **dwords**; the key is zero-extended, so the order is the same and no jump moves | **yes**, same 3 |
+| `0x1414f1534` | `3a 4b 20` | `cmp cl, byte [rbx+0x20]` | `39 4b 20` -- `cmp dword [rbx+0x20], ecx` | **yes**, same 3 |
+| `0x1414f1613` | `66 c1 e0 08` | `shl ax, 8` (entry key = id<<8\|order-1) | `66 c1 e0 06` (id<<6\|order-1; orders never reach 64) | **yes**, same 4 |
+| `0x1414f160f` | `0f b6 47 ff` | `movzx eax, byte [rdi-1]` (the entry's id) | needs id = `byte[+8] \| byte[+0xb]<<8` -- four instructions | **no**, code cave |
+
+The entry read is the one that does not fit. The bytes from `0x1414f1609` to `0x1414f161e` are
+the whole pack (`movzx ecx,[rdi]`, `dec cx`, `movzx eax,[rdi-1]`, `shl ax,8`, `or cx,ax`,
+`mov [rsp+0x48],cx`); a `jmp rel32` at `0x1414f1609` can replace their start and the stub can
+do the pack with the two-byte id and land back on `0x1414f161f` (`lea rax,[rsp+0x40]`), which
+is a clean instruction boundary. The loop re-enters at `0x1414f1600`, before the jump, so the
+row pointer is stored first and the pack is the only part moved.
+
+Two things this table does **not** cover: where the same packed key is built or read outside
+`0x1414f1480` (a second lookup would have to agree on the shift), and the `fl26join.c` tables
+of 256 keyed on the regulation id. Both have to be found before a patch is worth playing.
+
+The `Competition` row change also has a writer side: putting the id at `+4` as a word means
+`Competition.bin` rows must be written little-endian there (`+4` low, `+5` high), and every
+other reader of `+5` in the code becomes wrong. Grepping the decoded code for `movzx ..., byte
+ptr [reg+5]` and `add reg, 0x24` in the same function finds `0x1414f1480` only, which is
+encouraging but not proof.
