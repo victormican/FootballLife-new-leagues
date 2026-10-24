@@ -26,12 +26,12 @@ sys.path.insert(0, HERE)
 import pesdb
 
 CAPS = {
-    "teams": 2400,
-    "players": 61905,
-    "coaches": 3400,
-    "regulations": 600,
+    "teams": 4800,
+    "players": 123825,
+    "coaches": 6800,
+    "regulations": 1200,
     "competitions": 255,
-    "slots": 97,
+    "slots": 158,
     "regions": 127 - 29 + 1,
 }
 DEFAULT_WORLD = (

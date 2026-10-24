@@ -10,7 +10,7 @@ The 91-league test world (`_FL26MyWorld`) against the caps of a 0.2.4 build:
 | table | cap | used | free |
 |---|---|---|---|
 | teams | 4,800 | 2,199 | **2,601** |
-| players | 61,905 | 61,791 | **114** |
+| players | 123,825 | 61,791 | **62,034** |
 | coaches | 6,800 | 405 | 6,395 |
 | competitions | 255 | 183 | 72 |
 | regulations | 1,200 | 308 | 892 |
@@ -38,8 +38,8 @@ Ten zips, `newlife-classics/out`:
 | Free agents | 0 | 262,484 | 0 |
 | **total** | **17,164** | **639,329** | **402** |
 
-Of the 17,164 clubs, **622 are already in the game; 16,542 are new**. The team cap is **6.9x**
-short and the player cap **10.3x** short. The full NewLife database does not fit, and no amount
+Of the 17,164 clubs, **622 are already in the game; 16,542 are new**. With the doubled caps the
+team cap is **3.4x** short and the player cap **5.2x** short. The full NewLife database does not fit, and no amount
 of Build options changes that: the arrays themselves are 7-10 times too small.
 
 ## The first divisions alone
@@ -51,10 +51,9 @@ Taking the first league of each country in file order (the release lists them th
 - the new clubs need about **43,538 players** at 22 each.
 
 From the shipped game (749 clubs, 29,492 players) that is **2,722 teams** and **73,030 players**
-with the shipped squads. The doubled team cap (4,800) covers the teams; the **player cap is
-11,125 over** (61,905, with only 32,413 free). The player array starts at offset 0 and grows to
-about 60,745, the season calendar, so 74,000 needs the calendar/upper arrays moved as well. That
-is the wall.
+with the shipped squads. The doubled caps (4,800 teams, 123,825 players) cover both: the first
+divisions now fit the **tables**. What still blocks them is **188 leagues against 158 Select Team
+slots** and **91 shipped competitions + 188 leagues = 279 against the 255 competition ids**.
 
 The current 2,400 world (2,199 teams) has no room for them at all: that world would have to be
 replaced, not extended.
@@ -124,14 +123,13 @@ progression (the best thirds), which no cup of ours has today.
 ## What to do with this
 
 1. **Full NewLife: no.** The arrays are 7-10x too small; this is not a Build problem.
-2. **First divisions: both caps.** ~2,750 teams and ~73,000 players. The team array is a
-   relocation like 750 -> 2,400; the player array is at its ceiling (~60,745) and needs the
-   calendar/upper arrays moved as well. Not a recipe, and not a small patch.
+2. **First divisions: the caps now fit** (4,800 teams, 123,825 players); the walls are the 158
+   Select Team slots (188 countries) and the 255 competition ids (91 shipped + 188).
 3. **211 national teams: fits.** 67 teams and 1,474 players; in a clean game the 32,413 free
    players cover them, and in the full 91-league world about 1,360 players have to be freed.
-4. **A NewLife Lite world** of about 1,473 clubs (32,406 players) fits **today**, from the shipped
-   game: 2,222 of 2,400 teams. That is the build to test the pipeline with the current caps.
-5. **Full NewLife: no.** 16,542 new clubs and 639,329 players; the arrays would have to grow 7x
-   and 10x.
+4. **A NewLife Lite world** of about 4,051 clubs (89,122 players) fits **today**, from the shipped
+   game: the team cap is the binding one, the player cap has 94,333 spaces.
+5. **Full NewLife: no.** 16,542 new clubs and 639,329 players; the arrays would have to grow 3.4x
+   and 5.2x.
 
 `python tools/newlife_limits.py` prints all of it for the release and world in use.
