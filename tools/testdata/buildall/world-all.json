@@ -1,0 +1,177 @@
+{
+ "world": "_FL26All",
+ "uecl": true,
+ "continental_rank": true,
+ "club_world_cup": {
+  "year": 2026,
+  "every": 1
+ },
+ "recopa_sudamericana": true,
+ "game_cups": [
+  {
+   "league": 17,
+   "league_cup": true,
+   "name": "Carabao Cup",
+   "europe": 2
+  }
+ ],
+ "state_cups": [
+  {
+   "name": "Campeonato Paulista",
+   "teams": [
+    1247,
+    137,
+    1255,
+    1254,
+    2459,
+    5767,
+    2465,
+    9030
+   ],
+   "groups": 0,
+   "fill": 20,
+   "days": [
+    20,
+    27,
+    34
+   ],
+   "region": 16,
+   "code": "FL_PAUL"
+  }
+ ],
+ "leagues": [
+  {
+   "name": "Liga Test UE",
+   "country": "Croatia",
+   "clubs": 16,
+   "legs": 2,
+   "europe": [
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     3,
+     2
+    ]
+   ],
+   "league_cup": true
+  },
+  {
+   "name": "Liga Test UE2",
+   "country": "Bosnia and Herzegovina",
+   "clubs": 12,
+   "legs": 2,
+   "europe": [
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Liga Test Sud",
+   "country": "Peru",
+   "clubs": 10,
+   "legs": 2,
+   "europe": [
+    [
+     1,
+     3
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     3,
+     9
+    ]
+   ],
+   "cup": true
+  },
+  {
+   "name": "Liga Test Ecuador",
+   "country": "Ecuador",
+   "clubs": 16,
+   "legs": 2,
+   "split": {
+    "legs": 2,
+    "groups": [
+     6,
+     6,
+     4
+    ],
+    "group_legs": 2
+   }
+  },
+  {
+   "name": "Liga Test CAF",
+   "country": "Egypt",
+   "clubs": 12,
+   "legs": 2,
+   "europe": [
+    [
+     1,
+     6
+    ],
+    [
+     2,
+     7
+    ]
+   ]
+  },
+  {
+   "name": "Liga Test AFC",
+   "country": "India",
+   "clubs": 12,
+   "legs": 2,
+   "europe": [
+    [
+     1,
+     5
+    ],
+    [
+     2,
+     8
+    ],
+    [
+     3,
+     15
+    ]
+   ]
+  },
+  {
+   "name": "Liga Test CCA",
+   "country": "Costa Rica",
+   "clubs": 10,
+   "legs": 2,
+   "europe": [
+    [
+     1,
+     13
+    ]
+   ]
+  },
+  {
+   "name": "Liga Test OFC",
+   "country": "Fiji",
+   "clubs": 10,
+   "legs": 1,
+   "europe": [
+    [
+     1,
+     14
+    ]
+   ]
+  }
+ ]
+}
