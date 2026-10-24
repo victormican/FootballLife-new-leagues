@@ -42,12 +42,38 @@ When the Champions League play-off progresses (`r == 2`), in a season the rule s
 
 Dates are borrowed from the World Cup's shapes and moved to `CWC_GROUP_DAYS` / `CWC_KO_DAYS`.
 
+## The confederations' champions come first
+
+The user's rule (2026-10-24): the places are defined by each confederation's competitions. With
+the world's own ranking (`fl26_swiss_cwc_access`) the quotas were filled from the leagues' final
+tables only; now the world names the cups whose winners take the first places of their
+confederation's quota:
+
+```
+cwcchamp 4:2,6:2,187:2,10:4,16:3,319:6,320:5,322:3,324:4,325:6,326:7,328:3
+```
+
+Pairs of `<knockout regulation>:<confederation>` (2 UEFA, 3 AFC, 4 CONMEBOL, 5 CAF, 6 CONCACAF,
+7 OFC). The shipped champions' knockouts are always there -- the Champions League (4), the
+Europa League (6), the Conference League (187), the Libertadores (10) and the AFC Champions
+League (16) -- and the Builder adds the continental cups it makes (CAF Champions League and
+Confederation Cup, AFC Champions League Two and Challenge League, Copa Sudamericana, CONCACAF
+Champions Cup, Copa Centroamericana, OFC Champions League). `leaguebuilder.cwc_champs` is what
+writes the line, and `fl26_swiss_cwc_champs` is the export that reads it.
+
+The fill adds, for each confederation and before any league place, `cup_winner(reg)` of its
+cups (the final of the season just ended), so a CAF Champions League winner is in the Cup even
+if its league placed it fifth. The quotas are unchanged: UEFA 12, CONMEBOL 6, AFC 4, CAF 4,
+CONCACAF 4, OFC 1, plus the host's one; a country never sends more than two clubs, and if a
+confederation has fewer champions than places the rest comes from the leagues as before.
+
 ## The four-year rule
 
 `cwc_season()` reads the game's calendar year (`season_year()`) and plays when
 `(year - year0) % every == 0`, 2026, 2030, 2034. `year=` is the first year; `every=` is the
 period (4 by default). `cycle=<season>` forces one season (testing) and `every=1` plays every
-season.
+season. The Builder writes `every=4` unless the recipe asks otherwise; the `_FL26All` test
+world asks `every: 1` so the format can be seen in the first career.
 
 ## The ranking
 

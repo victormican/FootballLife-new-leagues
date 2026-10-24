@@ -280,6 +280,16 @@ def main():
                 for c in cl:
                     if c not in tids:
                         err("line %d: lpre team %d is not in Team.bin" % (n, c))
+        elif kind == "cwcchamp":
+            for pair in (w[1] if len(w) > 1 else "").split(","):
+                r, _s, f = pair.partition(":")
+                if not r.isdigit() or not f.isdigit():
+                    err("line %d: cwcchamp %r is not <regulation>:<confederation>" % (n, pair))
+                    continue
+                if int(r) not in rids:
+                    err("line %d: cwcchamp regulation %s is not in the tables" % (n, r))
+                if not 2 <= int(f) <= 7:
+                    err("line %d: cwcchamp confederation %s -- use 2..7" % (n, f))
         elif kind == "cupdays":
             if int(w[1]) not in rids:
                 err("line %d: cupdays regulation %s is not in the tables" % (n, w[1]))

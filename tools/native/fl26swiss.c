@@ -2740,6 +2740,12 @@ static int g_cwc_host = 6;             /* the confederation with the host's extr
 typedef struct { uint16_t reg; uint8_t conf; } cwcacc2_t;
 static cwcacc2_t g_cwc_acc[CWC_ACC_MAX];
 static int g_cwc_nacc = 0;
+/* The confederation cups whose winners take the Cup's places first (a world file's `cwcchamp`
+   line): regulation and confederation, 2..7.  With a world ranking (`g_cwc_nacc`) the quotas
+   come from the leagues' final tables; the winners of these cups take their confederation's
+   places before any league place, which is what the real competition does. */
+static uint16_t g_cwc_ch_reg[32], g_cwc_ch_conf[32];
+static int g_cwc_nch = 0;
 /* The game's own top leagues, for the world file's table to sit beside: the five big ones and
  * the other shipped top flights, then South America, Asia and the United States.  The world
  * file lists only the leagues a world ADDS; without these a quota of 12 UEFA places would be
@@ -3163,6 +3169,21 @@ static char cwc_own_fill(void* started)
   return ok;
 }
 
+__declspec(dllexport) int fl26_swiss_cwc_champs(const uint16_t* v, int n)
+{
+  if ((!v && n) || n < 0) return -1;
+  g_cwc_nch = 0;
+  for (int i = 0; i < n && g_cwc_nch < 32; i++) {
+    uint16_t reg = v[2 * i], conf = v[2 * i + 1];
+    if (!reg || conf < 2 || conf > 7) continue;
+    g_cwc_ch_reg[g_cwc_nch] = reg;
+    g_cwc_ch_conf[g_cwc_nch] = conf;
+    g_cwc_nch++;
+  }
+  logf("fl26swiss: Club World Cup -- %d confederation cup(s) send their winner first", g_cwc_nch);
+  return g_cwc_nch;
+}
+
 static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag)
 {
   unsigned char* rec = get_rec(cwc_reg());
@@ -3194,6 +3215,19 @@ static char cwc_setcl(uint64_t id, u32vec* list, uint64_t flag)
     }
     for (int ci = 0; ci < 6; ci++) {
       int conf = ci + 2, want = QUOTA[ci] + (conf == g_cwc_host);
+      /* the confederation's own cups first: their winners take the first places of the quota */
+      for (int k = 0; k < g_cwc_nch && want > 0; k++) {
+        if (g_cwc_ch_conf[k] != conf) continue;
+        uint32_t ch = cup_winner(g_cwc_ch_reg[k]);
+        if (!ch) continue;
+        ch = canon_club(ch);
+        if (!(ch >> 14) || has_club(g_cwc, n, ch)) continue;
+        if (cwc_add(&n, ch)) {
+          want--;
+          logf("fl26swiss:   Club World Cup %2u: conf %d winner of cup %u -> %08x (champion)",
+               n, conf, (unsigned)g_cwc_ch_reg[k], ch);
+        }
+      }
       for (int rank = 1; rank <= FINAL_MAX && want > 0; rank++) {
         for (int j = 0; j < na && want > 0; j++) {
           if (acc[j].conf != conf) continue;

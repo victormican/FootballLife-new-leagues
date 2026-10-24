@@ -2667,6 +2667,25 @@ def uefa_seed(recipe, out, regrow, region_of_cid):
     return seed
 
 
+# the shipped cups whose winners take the Club World Cup places first: the Champions League,
+# Europa League and Conference League knockouts, the Libertadores' and the AFC Champions League's
+CWC_CHAMPS = ((4, 2), (6, 2), (187, 2), (10, 4), (16, 3))
+
+
+def cwc_champs(pl):
+    """the cups whose winners take the Club World Cup places first: the shipped champions'
+    knockouts and the continental cups this build makes (their knockout id and confederation),
+    as (regulation, confederation) pairs for the world file's cwcchamp line"""
+    seen, out = set(), []
+    built = tuple((c["ko"], int(c["conf"])) for c in pl.get("ccups") or []
+                  if c.get("number") in (6, 7, 8, 9, 13, 14, 15, 16) and c.get("ko") and c.get("conf"))
+    for r, f in CWC_CHAMPS + built:
+        if (r, f) not in seen:
+            seen.add((r, f))
+            out.append((r, f))
+    return out
+
+
 def all_places(pl):
     """the world's European places, the new leagues' and game_europe's, as uefa_places takes them:
     in uefa_seed's order where the plan has one (a place's league: its regulation, or for a cup
@@ -4405,7 +4424,8 @@ def build(pl, base, game, replace=False, log=print):
                               % (cwc["reg"], cwc["ko"],
                                  int((pl.get("club_world_cup") or {}).get("year") or 2026),
                                  int((pl.get("club_world_cup") or {}).get("every") or 4),
-                                 int((pl.get("club_world_cup") or {}).get("host") or 6))]
+                                 int((pl.get("club_world_cup") or {}).get("host") or 6)),
+                              "cwcchamp " + ",".join("%d:%d" % p for p in cwc_champs(pl))]
                              if cwc else []),
                           qlines)
     pl.pop("prev_cup_ids", None)      # this Build's own are in cup_ids; the old ones must not pile up

@@ -135,6 +135,7 @@ end
 -- draw=byes|random|seeded|off (its cup draw, fl26_swiss_cupdraw; byes when not given).
 local confed = {}               -- read_world: the confed line, { flag, code } pairs
 local cwc = nil                 -- read_world: the cwc line, { group stage, knockout, cycle, every, from, year }
+local CWCCH = {}                -- read_world: the cwcchamp line, { {cup regulation, confederation} }
 local CUPDRAW = { all = 1 }     -- read_world: the cupdraw lines, a mode per cup and one for all (0 off, 1 seeded, 2 random, 3 byes)
 local DRAWMODE = { off = 0, seeded = 1, random = 2, byes = 3 }
 local function read_world(ctx)
@@ -144,6 +145,7 @@ local function read_world(ctx)
   if not f then return nil end
   local leagues, splits, uefa, ccups, dlike, qrounds, lpres = {}, {}, {}, {}, {}, {}, {}
   confed = {}
+  CWCCH = {}
   CUPDRAW = { all = 1 }
   for line in f:lines() do
     local lr, lrest = line:match("^%s*lpre%s+(%d+)(.*)$")
@@ -189,6 +191,12 @@ local function read_world(ctx)
       cwc = { tonumber(cr), tonumber(ck), tonumber(crest2:match("cycle=(%d+)") or 0),
               tonumber(crest2:match("every=(%d+)") or 0), tonumber(crest2:match("from=(%d+)") or 0),
               tonumber(crest2:match("year=(%d+)") or 0), tonumber(crest2:match("host=(%d+)") or 0) }
+    end
+    -- cwcchamp <cup regulation>:<confederation>,...: the cups whose winners take the Club World
+    -- Cup places first (fl26_swiss_cwc_champs); confederation 2..7
+    local cch = line:match("^%s*cwcchamp%s+([%d:,]+)")
+    if cch then
+      for r, f in cch:gmatch("(%d+):(%d+)") do CWCCH[#CWCCH + 1] = { tonumber(r), tonumber(f) } end
     end
     local cid, crest = line:match("^%s*ccup%s+(%d+)(.*)$")
     if cid then
@@ -645,6 +653,18 @@ function m.init(ctx)
                     or "every season"
           log(string.format("fl26swiss: world file -- Club World Cup, group stage regulation %d, knockout %d, %s (%d taken)",
                             cwc[1], cwc[2], when, w))
+          -- the confederation cups whose winners take the places first
+          local pch = ffi.C.GetProcAddress(h, "fl26_swiss_cwc_champs")
+          if #CWCCH > 0 then
+            if pch == nil then
+              log("fl26swiss: this fl26swiss.dll cannot take the confederation cups' winners first (fl26_swiss_cwc_champs)")
+            else
+              local chb = ffi.new("uint16_t[?]", 2 * #CWCCH)
+              for i, e in ipairs(CWCCH) do chb[2 * i - 2], chb[2 * i - 1] = e[1], e[2] end
+              local mc = tonumber(ffi.cast("fl26_swiss_access_t", pch)(chb, #CWCCH))
+              log(string.format("fl26swiss: world file -- Club World Cup champions from %d cup(s), %d taken", #CWCCH, mc))
+            end
+          end
         end
       end
       -- the country cups' draws: seeds against unseeded clubs (fl26_swiss_cupdraw). A cup of the
