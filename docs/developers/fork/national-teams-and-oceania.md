@@ -138,11 +138,24 @@ Nations Cup. The world file also carries a league-shaped row for it:
 league 196 cid=91 region=25 country=200 conf=7 slot=9 tier=1 promote=0 demote=0 clubs=8 legs=1 kickoff=166 name=Oceania
 ```
 
-`fl26comptab` appends a parameter row for it on **slot 9**, and `0x140ea08e0` has no case for
+`fl26comptab` appends a parameter row for it, and `0x140ea08e0` has no case for
 slot 9 (its jump table stops at 0x4b and slots 7, 8 and 9 fall to the default), so the caller
-falls back to the name of the competition on that slot -- "Oceania". Whether the menu draws a
-group for a *national* slot above 6 is the open question; slots 69/71/73/75 prove it draws named
-groups outside 0..6, but those hold clubs.
+falls back to the name of the competition on that slot -- "Oceania".
+
+**The number cannot be written in the world file.** The first attempt asked for slot 9 and the
+game answered, in sider.log:
+
+```
+fl26comptab: slot 9 is already competition 18, not free -- aborting
+```
+
+-- and one abort at that step means *nothing* of the list is applied (that is the "one league
+shows" symptom again). Which slots the exe fills is a fact of the running game, so since
+2026-10-24 a `league` line may say **`slot=-1`**: `fl26comptab` looks at the rows the exe
+built, skips our own and the hidden 123, and takes the first free slot from 7 to 122, logging
+which one it got ("id 196 asked for a free slot -- it gets slot N"). `check_world` accepts -1
+(the line is not range-checked and does not take part in the one-league-per-slot check).
+
 
 The cid is the scarce resource: `add_nations_cups.free_ids` used to look for 130..255, which the
 test world has filled, so it now searches from 88 (free: 91, 92, 0, 6, 7, 48, 55, 57, 58, 64, 65).

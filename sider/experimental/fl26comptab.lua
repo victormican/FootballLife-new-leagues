@@ -503,8 +503,34 @@ function m.init(ctx)
   local ours = {}
   for id in pairs(RESLOT) do ours[id] = true end
   for id in pairs(RESHAPE) do ours[id] = true end
+  -- The world file cannot know which competition slots the exe fills at startup -- the table is
+  -- built in memory -- and one of ours on an occupied slot aborts the whole list (GitHub #26).
+  -- A line with slot=-1 asks this module for the first free one instead: a shipped row of the
+  -- run that is not ours and is not on the hidden 123 keeps its slot out of the pool.
+  local free = {}
+  for i = 1, #rows do
+    local rid = row_u32(rows[i], OFF_ID)
+    if not ours[rid] then
+      local sl = row_u32(rows[i], OFF_SLOT)
+      if sl ~= 123 and sl >= 7 then free[sl] = rid end
+    end
+  end
+  local got = {}
   for _, a in ipairs(APPEND) do
     local id, slot = a[1], a[2]
+    if slot == -1 then
+      slot = nil
+      for s = 7, 122 do
+        if not free[s] and not got[s] then slot = s; break end
+      end
+      if not slot then
+        log("fl26comptab: id " .. id .. " asks for a free slot and there is none left -- aborting")
+        return
+      end
+      got[slot] = id
+      log(string.format("fl26comptab: id %d asked for a free slot -- it gets slot %d", id, slot))
+      APPEND[_] = { id, slot }
+    end
     if byid[id] and row_u32(rows[byid[id]], OFF_SLOT) == slot then
       -- the world file names every league's slot, also the ones the exe already puts there
       -- (a league on a shipped row that already has the slot): nothing to do, and the row

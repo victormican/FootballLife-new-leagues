@@ -217,7 +217,9 @@ def main():
                     % (n, rid, clubs, cid, ent_n[cid])
                 )
             slot = kv.get("slot")
-            if slot is not None and int(slot) != 123:
+            # -1 asks fl26comptab for the first slot the exe leaves free: the world cannot
+            # know which ones it fills at startup, so it is not a number to range-check
+            if slot is not None and int(slot) not in (123, -1):
                 s = int(slot)
                 if not 0 <= s <= SLOT_MAX:
                     err("line %d: league %d on slot %d (0..%d)" % (n, rid, s, SLOT_MAX))
