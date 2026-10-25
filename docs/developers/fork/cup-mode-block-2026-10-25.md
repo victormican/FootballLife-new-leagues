@@ -63,3 +63,32 @@ backups   : all-cid5 (155318), all-groups-merge (162320), punto-20261024-cups512
 3. **`fl26compcache`** puede dejar el menu en blanco: desactivado en este mundo.
 4. `check_world` lee el cid como byte: los errores de las ligas TEST con cid 256+ son suyos, no del
    world.
+
+## Ultimo hallazgo: la vtable no es el camino (25/10 09:00)
+
+Con 1 copa en el world y la sonda `CUPIN` en la entrada de `cupsel_handler`, el log de ese arranque
+trae `Cup mode list live` y `Cup mode: 1 competition(s) of the world to expose` y **ninguna linea
+`CUPIN` ni `CUPVEC`**: el handler parcheado en `CUPSEL_VT_RVA` **no se ejecuta**.
+
+Consecuencia: el menu de Cup de este build no pasa por esa vtable. Cuando el handler si corria
+(estado de las 22:00) la lista salia; cuando no, el juego se queda con una lista vacia y pinta
+blanco. El siguiente probe no va a la vtable sino al **constructor del vector**: enganchar
+`VirtualAlloc`/`operator new` durante el primer pintado, ver quien reserva el bloque de 13 items de
+12 bytes y parchear la capacidad.
+
+## Backlog ordenado (facil -> dificil)
+
+1. **Documentacion y vault al dia** (este documento, entradas 287-289).
+2. **Banderas reales de las 8 no FIFA** (hoy hay placeholder con el id; basta poner PNG encima).
+3. **Quitar/renombrar "Liga NN Clubes MM"** en el world: nombres reales por liga.
+4. **Copas del juego sin equipos** (Gold Cup 156, OFC Nations 157, Nations Leagues 159/160): darles
+   entradas con selecciones reales, como ASEAN/Caribe.
+5. **Other Europe (69) y Other Asia (70)**: pasar de `serve=` a slot directo y subir de 20 a 48.
+6. **check_world: duplicados 128/192/255** del juego (decidir si se limpian o se toleran).
+7. **`Country.bin` nuevo en el livecpk**: confirmar que el motor acepta filas; si no, dejar las 8
+   selecciones sin bandera desde el juego.
+8. **Hook de Cup mode** (el bloque de arriba): probe de `VirtualAlloc`, constructor, capacidad 64.
+9. **cid 262/263/304**: lectura por byte sin localizar en Select Team.
+10. **"Datos del usuario"**: falta saber si la fila sale arriba o dentro de un grupo.
+11. **48 clubes por regulacion / arrays de jugadores y equipos**: mudanza de offsets, fuera de PR.
+

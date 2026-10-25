@@ -8020,6 +8020,7 @@ __declspec(dllexport) int fl26_swiss_cup_cids(const uint16_t* v, int n)
 
 char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
 {
+  logf("fl26swiss: CUPIN handler self=%p a=%llx b=%llx c=%llx", (void*)self, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c);
   unsigned char** pb = (unsigned char**)(self + 0x90);
   unsigned char** pe = (unsigned char**)(self + 0x98);
   unsigned char* w = *pb;
