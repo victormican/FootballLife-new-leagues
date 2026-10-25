@@ -104,7 +104,7 @@ def free_ids(base):
         int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little")
         for i in range(0, len(regs), M.REG)
     }
-    cids = [c for c in range(88, 256) if c not in used_c]
+    cids = [c for c in range(48, 256) if c not in used_c]
     rids = [r for r in range(176, 1024) if r not in used_r]
     return cids, rids
 

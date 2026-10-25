@@ -154,7 +154,7 @@ def main():
         n = 4 * cup["groups"]
 
         c = bytearray(lib_comp[0])
-        c[M.CID_OFF] = cup["cid"]
+        c[M.CID_OFF:M.CID_OFF + 2] = cup["cid"].to_bytes(2, "little")
         M.put(c, M.CODE_OFF, cup["code"], M.COMP - M.CODE_OFF)
         if cup["conf"] is not None:
             c[M.FLAG_OFF] = (c[M.FLAG_OFF] & ~CONF_MASK) | cup["conf"]
@@ -166,7 +166,7 @@ def main():
         for r in (master + reps[:cup["groups"]] if cup["groups"] else []):
             g = bytearray(r)
             g[M.R_BELOW:M.R_BELOW + 2] = bytes(2)
-            g[M.R_CID] = cup["cid"]
+            g[M.R_CID:M.R_CID + 2] = cup["cid"].to_bytes(2, "little")
             grp = g[R_GROUP]
             g[M.R_ID:M.R_ID + 2] = (cup["reg"] if grp == NO_GROUP
                                     else cup["reg"] + (grp + 1) * REPLICA_STEP).to_bytes(2, "little")
@@ -186,7 +186,7 @@ def main():
             k = bytearray(ko_src[0])
         k[M.R_BELOW:M.R_BELOW + 2] = bytes(2)
         k[M.R_ID:M.R_ID + 2] = cup["ko"].to_bytes(2, "little")
-        k[M.R_CID] = cup["cid"]
+        k[M.R_CID:M.R_CID + 2] = cup["cid"].to_bytes(2, "little")
         nko = 2 * cup["groups"] if cup["groups"] else len(cup["entry"])
         k[M.R_TEAMS] = (k[M.R_TEAMS] & ~0x3f) | nko
         new.append(k)
@@ -211,7 +211,8 @@ def main():
             e[M.E_TEAM:M.E_TEAM + 4] = t.to_bytes(4, "little")
             eid += 1
             e[M.E_EID:M.E_EID + 4] = eid.to_bytes(4, "little")
-            e[M.E_CID], e[M.E_ORDER] = cup["cid"], i + 1
+            e[M.E_CID:M.E_CID + 2] = cup["cid"].to_bytes(2, "little")
+            e[M.E_ORDER] = i + 1
             E.append(e)
 
         if cup["groups"]:

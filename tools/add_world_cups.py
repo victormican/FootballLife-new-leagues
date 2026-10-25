@@ -26,7 +26,7 @@ sys.path.insert(0, HERE)
 import mkleague as M
 import nations as N
 
-CIDS = [66, 67, 68, 69, 70, 71]
+CIDS = [256, 257, 258, 259, 260, 261]
 REGS = [210, 211, 212, 213, 214, 215]
 
 

@@ -3033,7 +3033,7 @@ static uint32_t cwc_club(uint16_t reg, int rank, const char** how)
 #define CWC_AFRICA 9030u
 /* the team lookup reads a handle's lower 14 bits as the club's row in the team array, so a bare id finds row 0: canon_club gives it Wydad's own row */
 #define CWC_GAME_N 4u      /* the game's own cup: four clubs, whatever reg 1 still holds from last time */
-#define MAX_CCUP_FWD 256  /* MAX_CCUP, defined with the continental cups below */
+#define MAX_CCUP_FWD 512  /* MAX_CCUP, defined with the continental cups below */
 static int ccup_champions(uint32_t* out, int max, uint16_t* cup);
 static int caf_country(int f) { return (f >= 44 && f <= 95) || f == 98 || f == 312; }
 static uint8_t g_confed[512];   /* flag id -> confederation (2..7), from the world file */
@@ -3427,7 +3427,7 @@ static uint64_t cwc_dates(uint16_t id, uint64_t reg, void* vec)
  * live row is checked before any of it (ccup_like_ok): a career whose save still holds the old
  * two-legged copy of the Europa League knockout under the same id keeps the old way, with the
  * first entries that fit its bracket. */
-#define MAX_CCUP 256      /* 8 until 0.2.0: CONCACAF and OFC cups next to league and pre-season cups */
+#define MAX_CCUP 512      /* 8 until 0.2.0: CONCACAF and OFC cups next to league and pre-season cups */
 _Static_assert(MAX_CCUP == MAX_CCUP_FWD, "the Club World Cup sizes its list of champions by MAX_CCUP_FWD");
 #define CCUP_MAX_GROUPS 8
 #define CCUP_MAX_ENTRY 48     /* 32 until 0.2.0: a single-match league cup takes up to 44 */
