@@ -8045,6 +8045,9 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
     unsigned char** cap = (unsigned char**)(self + 0xa0);
     size_t have = (size_t)(w - *pb) / 12;
     size_t room = (*cap && *cap > *pb) ? (size_t)(*cap - *pb) / 12 : have;
+    logf("fl26swiss: CUPVEC self=%p begin=%p end=%p cap=%p have=%u room=%u caller=%p",
+         (void*)self, (void*)*pb, (void*)w, (void*)*cap, (unsigned)have, (unsigned)room,
+         __builtin_return_address(0));
     /* The menu reserves its list in an array of its own (13 items in this build).  If that
        array lives inside the object -- which is what an 0xa0 less than a few KB from self
        means -- it is not freed on destruction, so the list can be pointed at a bigger one.
