@@ -124,3 +124,30 @@ selecciones no tienen liga en este mundo. `nations.py` da los 211 por confederac
 (UEFA 55, CAF 54, AFC 46, CONCACAF 35, OFC 11, CONMEBOL 10).
 
 Ojo: **Cup mode solo pinta 13** entradas de su vector; con 26 copas el menu seguira cortando.
+
+## Liga de selecciones no FIFA (2026-10-24, pendiente de probar)
+
+`Country.bin` viaja ahora **en el livecpk** (`_FL26All\common\etc\pesdb\Country.bin`): el juego
+no lo traia ahi y sin filas nuevas no hay pais ni bandera para una seleccion no FIFA. Se anadieron
+8 filas en ids de bandera libres y `tools/add_nonfifa.py` creo sus equipos (plantilla de 11 clonada
+de Nueva Zelanda), 88 jugadores:
+
+| pais | country/flag | conf | equipo |
+|---|---|---|---|
+| Martinica | 96 | CONCACAF | 74739 |
+| Guadalupe | 97 | CONCACAF | 74740 |
+| Guayana Francesa | 99 | CONCACAF | 74741 |
+| San Martin | 100 | CONCACAF | 74742 |
+| Sint Maarten | 101 | CONCACAF | 74743 |
+| Bonaire | 102 | CONCACAF | 74744 |
+| Cataluna | 118 | UEFA | 74745 |
+| Padania | 123 | UEFA | 74746 |
+
+Liga `Non-FIFA Nations` (reg 216, cid 110, conf 6, slot -1, 8 equipos) -> 141 ligas.
+
+**Validado**: 222 filas en Country.bin, 219 selecciones = **211 FIFA + 8 no FIFA**; las tres filas
+sin equipo siguen siendo Palau, Monaco y "Others"; ninguna copa (Mundial, CWC, EURO, Copa America,
+Asian Cup, AFCON, resto) mete equipos no FIFA: el Mundial son 32 equipos FIFA, el CWC toma clubes.
+
+Sin arte: las banderas `flag_<id>.png` no estan en la carpeta del juego (viven en un cpk), asi que
+estos ocho salen sin bandera hasta que se suelten los PNG en `common/render/symbol/flag/`.
