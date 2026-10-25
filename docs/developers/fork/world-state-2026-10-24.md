@@ -151,3 +151,11 @@ Asian Cup, AFCON, resto) mete equipos no FIFA: el Mundial son 32 equipos FIFA, e
 
 Sin arte: las banderas `flag_<id>.png` no estan en la carpeta del juego (viven en un cpk), asi que
 estos ocho salen sin bandera hasta que se suelten los PNG en `common/render/symbol/flag/`.
+
+### Non-FIFA Nations: se queda bajo CONCACAF (C)
+
+Decision del 2026-10-24: la liga no FIFA se queda **como esta**, tipo 4 y conf 6, o sea que en los
+menus aparece bajo CONCACAF. Se descartaron `conf=0` (sin insignia) y dejarla sin slot (fuera de
+Select Team). El tipo de la regulacion es lo que marca "esto no es liga": 4 liga (Select Team),
+3 copa y 2 fase de grupos (Cup mode).
+
