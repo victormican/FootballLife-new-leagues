@@ -179,3 +179,22 @@ face pack (`FL26_REGEN_FACES`), are in [fork/building.md](fork/building.md).
 
 The FL Mod Studio Discord (the invite is in the README) has a forum for mods; forks are
 welcome there.
+
+## Flujo RE: usa REA, no pidas volcados a mano
+
+Para cualquier pregunta de ingenieria inversa de este repo (donde vive un array, que funcion
+recorre una lista con un tope fijo, que instruccion lee un campo de un byte), se usa **REA**:
+
+- Repositorio oficial: <https://github.com/morluto/rea>
+- Sitio oficial: <https://rea.tools> (guias paso a paso)
+- Instalacion y configuracion de agentes: <https://github.com/morluto/rea/blob/main/docs/installation.md>
+
+La guia de investigacion nativa de REA (instrucciones -> caller -> constantes -> C) es justo el
+camino que usamos en este fork para los muros: los topes de jugadores (123.825), clubes (750),
+equipos (4.800) y la lista de copas (13 entradas) son constantes en el codigo, no estado en
+memoria, asi que se localizan por analisis estatico del ejecutable.
+
+Un volcado de memoria o un "no se donde esta" no es un informe util: la pregunta se formula
+como una pregunta de RE (que funcion recorre la lista y con que tope) y se responde con
+evidencia.
+
