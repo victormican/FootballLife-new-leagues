@@ -35,3 +35,22 @@ tenga; ojo: hoy solo es fiable con `--reg`).
   juego: **no se tocan**) y los de 2-9 clubes reales.
 - Segundas divisiones con los reales que sobren.
 - Slots libres: 250 - 133 - 23 = **94** ligas mas.
+
+## Estado real (verificado en la tabla, no en el world)
+
+El nombre que ve el juego sale de la **regulacion**, no del world: `real_league.py` primero
+solo renombraba el world (fallo) y ahora escribe tambien los 20 slots de nombre de la
+regulacion y lo verifica releyendolo.
+
+Regla de clubes: se usan los reales **libres** del pais (los que no estan ya colocados en una
+competicion del juego: 924 clubes colocados) y, si no llegan, nuestros genericos hasta 10.
+
+18 ligas con nombre verificado en la tabla: Croacia, Bosnia, Egipto, Ecuador, India,
+Argentina, Peru, Japon, Colombia, Arabia Saudi, Paises Bajos, Alemania, Targeting,
+EE.UU., Rusia, China, Chile, Grecia.
+
+**Oceania**: slot 177, 11 selecciones OFC. **Non-FIFA Nations**: se perdio al restaurar las
+tablas viejas; se rehizo (8 selecciones, ids 74691..74698) pero **Edit mode -> Equipos**
+empez? a cerrar justo despues, asi que quedo fuera del world y sin `Country.bin` en el livecpk
+(copia en `%TEMP%\opencode\punto-20261024-cups512\Country.bin.quitado`).
+

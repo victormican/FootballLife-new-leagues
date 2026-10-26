@@ -8091,6 +8091,68 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
   return ((cupsel_fn)(uintptr_t)(g_base + CUPSEL_INIT_RVA))(self, a, b, c);
 }
 
+
+/* el log de la DLL se drena desde Lua y puede perderse: el escaner escribe ademas a un
+   fichero propio, junto al exe del juego, para no depender de ese pipe */
+static void arrays_log(const char* fmt, ...)
+{
+  char buf[512];
+  va_list ap;
+  va_start(ap, fmt);
+  int n = vsnprintf(buf, sizeof buf, fmt, ap);
+  va_end(ap);
+  if (n < 0) return;
+  HANDLE h = CreateFileA("C:/Users/viarm/AppData/Local/Temp/opencode/arrays.txt",
+                         GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+                         OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+  if (h == INVALID_HANDLE_VALUE) return;
+  SetFilePointer(h, 0, 0, FILE_END);
+  DWORD w = 0;
+  WriteFile(h, buf, (DWORD)n, &w, 0);
+  CloseHandle(h);
+}
+
+static void scan_players(void)
+{
+  logf("fl26swiss: ARRAY scan start");
+  arrays_log("ARRAY scan start\n");
+  unsigned char* p = 0;
+  MEMORY_BASIC_INFORMATION mbi;
+  int found = 0;
+  while (VirtualQuery(p, &mbi, sizeof mbi))
+  {
+    unsigned char* base = (unsigned char*)mbi.BaseAddress;
+    size_t size = mbi.RegionSize;
+    int ok = mbi.State == MEM_COMMIT && !(mbi.Protect & PAGE_GUARD) && size >= 16u * 1024 * 1024 &&
+             (mbi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE));
+    if (ok)
+    {
+      uint32_t* u = (uint32_t*)base;
+      size_t n = size / 4;
+      for (size_t i = 0; i + 128 < n; i++)
+      {
+        uint32_t a = u[i];
+        if (a < 1 || a > 500000) continue;
+        if (u[i + 32] == a + 1 && u[i + 64] == a + 2 && u[i + 96] == a + 3)
+        {
+          size_t k = 4;
+          while (i + (k + 1) * 32 < n && u[i + k * 32] == a + k) k++;
+          logf("fl26swiss: ARRAY players=%llx first=%u run=%u",
+               (unsigned long long)(uintptr_t)(base + i * 4), (unsigned)a, (unsigned)k);
+          arrays_log("ARRAY players=%llx first=%u run=%u\n",
+                     (unsigned long long)(uintptr_t)(base + i * 4), (unsigned)a, (unsigned)k);
+          found++;
+          i += k * 32;
+          if (found >= 6) return;
+        }
+      }
+    }
+    p = base + size;
+  }
+  if (!found) logf("fl26swiss: ARRAY no se encontro el array de jugadores");
+    arrays_log("ARRAY no se encontro el array de jugadores\n");
+}
+
 static int cupsel_install(uint64_t exe_base)
 {
   uint64_t* slot = (uint64_t*)(uintptr_t)(exe_base + CUPSEL_VT_RVA);
@@ -8857,7 +8919,8 @@ __declspec(dllexport) int fl26_swiss_install(uint64_t exe_base, const uint16_t* 
       logf("fl26swiss: Competition Info item per qualifying round NOT installed (signature)%s",
            g_tramp_cimenu ? " -- menu hooked, choice not: extra items open the native item's page" : "");
   }
-  u10_install();
+
+
   if (!cupsel_install(exe_base))
     logf("fl26swiss: Cup mode list live (no league phase of 36 in Kick Off > Cup)");
   else

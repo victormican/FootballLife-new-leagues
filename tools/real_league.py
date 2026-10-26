@@ -39,6 +39,12 @@ def main():
     country, want = int(cid_country), int(get("--teams", "10"))
     dry = "--dry" in a
 
+    shipped = os.path.join(os.environ.get("APPDATA", ""), "FL26ModStudio", "tables", "common", "etc", "pesdb")
+    try:
+        E0 = pesdb.wesys_unpack(open(os.path.join(shipped, "CompetitionEntry.bin"), "rb").read())
+        placed = {int.from_bytes(E0[i + 4:i + 8], "little") for i in range(0, len(E0), 16)}
+    except Exception:
+        placed = set()
     teams_raw = pesdb.wesys_unpack(open(os.path.join(base, "Team.bin"), "rb").read())
     real, generic = [], []
     for i in range(0, len(teams_raw), T_REC):
@@ -50,7 +56,11 @@ def main():
             (int.from_bytes(r[T_COUNTRY : T_COUNTRY + 2], "little") >> 2) & 0x1FF
         ) != country:
             continue
-        (real if tid < GAME_CLUB_MAX else generic).append(tid)
+        if tid < GAME_CLUB_MAX:
+            if tid not in placed:
+                real.append(tid)
+        else:
+            generic.append(tid)
     real.sort(), generic.sort()
     pick = (real + generic)[:want]
     if len(pick) < want:
@@ -129,7 +139,9 @@ def main():
         if int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little") != rid:
             continue
         regs[i + M.R_TEAMS] = (regs[i + M.R_TEAMS] & ~0x3F) | want
-        M.put_names(regs[i : i + M.REG], 0, name)
+        rc = bytearray(regs[i : i + M.REG])
+        M.put_names(rc, 0, name)
+        regs[i : i + M.REG] = rc
 
     open(os.path.join(base, "CompetitionEntry.bin"), "wb").write(
         pesdb.wesys_pack(bytes(ents))
