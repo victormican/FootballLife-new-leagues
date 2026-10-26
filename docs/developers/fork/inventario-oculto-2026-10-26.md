@@ -38,3 +38,31 @@
   (falta por aislar si es `Team.bin`, `Player.bin` o el `Country.bin`). Prueba pendiente: livecpk con solo
   `Competition*.bin` y despues anadir `Team.bin`.
 
+## Causa raiz del rotulo "Datos del usuario" (biseccion completa)
+
+Pruebas, una variable cada vez, con competiciones originales del juego y world vacio:
+
+| livecpk contiene | rotulo |
+|---|---|
+| nada (livecpk desactivado) | **no** |
+| Team.bin nuestro + Player/Assignment del juego | **no** |
+| Team.bin nuestro + Player.bin nuestro + Assignment del juego | **si** |
+| Team.bin + Player + Assignment nuestros | **si** |
+
+Conclusion: lo dispara **Player.bin nuestro** (120.666 jugadores; el del juego tiene ~30.000).
+Es el mismo muro ya documentado: la tabla de 30.000 entradas del bloque de edicion
+(`cmp ecx, 0x7530`); los jugadores por encima no estan en la tabla y Select Team cae al rotulo.
+
+### Arreglo
+
+- Realojo de la tabla a 123.015 entradas (reserva + copia + repunte + los cinco `cmp`).
+- Requiere capturar el bloque de edicion: la sonda `block_poll_thread` ya consulta
+  `owner_fn()` cada 500 ms y escribe en `%TEMP%\opencode\arrays.txt`; el bloque aparece al
+  entrar en **Master League** (no al menu ni al abrir Edit).
+- Mientras no se realoje: **el rotulo es el precio de tener mas de 30.000 jugadores**.
+
+### Otro defecto encontrado por el camino
+
+- 1.949 jugadores estaban en **dos o mas plantillas**. Corregido: `PlayerAssignment` de 112.538 a
+  110.589 filas (una por jugador).
+
