@@ -8153,6 +8153,26 @@ static void scan_players(void)
     arrays_log("ARRAY no se encontro el array de jugadores\n");
 }
 
+
+/* ---- tope de equipos ---------------------------------------------------------
+ * En la tabla de accesores de capacidad hay un `mov eax, 0x12C0 ; ret` (4.800) en
+ * RVA 0x235E55B, entre el de 3.600 y el que devuelve 0. Se reescribe el inmediato a
+ * 12.600 (0x3138) para que el motor acepte los equipos del mundo nuevo.
+ */
+#define TEAMCAP_RVA 0x235e55b
+static void patch_team_cap(uint64_t exe_base)
+{
+  unsigned char* p = (unsigned char*)(uintptr_t)(exe_base + TEAMCAP_RVA);
+  if (p[0] != 0xB8 || p[5] != 0xC3) { logf("fl26swiss: team cap NOT patched (bytes %02x %02x)", p[0], p[5]); return; }
+  uint32_t old = *(uint32_t*)(p + 1);
+  DWORD prot;
+  if (!VirtualProtect(p, 6, PAGE_EXECUTE_READWRITE, &prot)) { logf("fl26swiss: team cap VirtualProtect failed"); return; }
+  uint32_t now = 12600;
+  memcpy(p + 1, &now, 4);
+  VirtualProtect(p, 6, prot, &prot);
+  logf("fl26swiss: team cap %u -> %u", (unsigned)old, (unsigned)now);
+}
+
 static int cupsel_install(uint64_t exe_base)
 {
   uint64_t* slot = (uint64_t*)(uintptr_t)(exe_base + CUPSEL_VT_RVA);
