@@ -64,8 +64,8 @@ def main():
     real.sort(), generic.sort()
     pick = (real + generic)[:want]
     if len(pick) < want:
-        print("only %d club(s) for country %d" % (len(pick), country))
-        return 1
+        print("country %d: %d club(s) disponibles (pedidos %d); se usan los que hay" % (country, len(pick), want))
+        want = max(1, len(pick))
 
     ents = bytearray(M.load(base, "CompetitionEntry.bin"))
     regs = bytearray(M.load(base, "CompetitionRegulation.bin"))
