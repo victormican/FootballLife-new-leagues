@@ -31,7 +31,7 @@ def row(pos, level):
 def main():
     ok("the Players page and NewLife take the squad Build makes, 30", P.SQUAD == B.SQUAD == 30)
     ok("a world of the shipped tables gets 30 a club", B.squad_size(27927, 1100) == 30)
-    ok("only when 30 each would pass the player records, fewer", B.squad_size(27927, 1400) == (61905 - 27927) // 1400)
+    ok("only when 30 each would pass the player records, fewer", B.squad_size(120000, 1400) == max(B.SQUAD_FIT, min(B.SQUAD, (B.PLAYER_CAP - 120000) // 1400)))
     ok("never below 22", B.squad_size(27927, 5000) == B.SQUAD_FIT == 22)
     src = open(os.path.join(HERE, "leaguebuilder.py"), encoding="utf-8").read()
     sites = re.findall(r"(?m)^( +)import lbplayers\n(.*)\n", src)
