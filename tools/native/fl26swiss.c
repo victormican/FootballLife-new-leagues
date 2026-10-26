@@ -8173,6 +8173,37 @@ static void patch_team_cap(uint64_t exe_base)
   logf("fl26swiss: team cap %u -> %u", (unsigned)old, (unsigned)now);
 }
 
+
+/* ---- tabla de jugadores del Edit (solo diagnostico) --------------------------
+ * En 0xAF23B3 el juego hace  lea rax,[rcx+0xEE53D0]  (tabla dentro del bloque de
+ * edicion) y luego inicializa 0x7530 entradas.  Aqui NO se cambia nada: se engancha
+ * el sitio para escribir en sider.log el bloque, la tabla y el puntero guardado, que
+ * es lo que falta para realojarla a 123.015 entradas sin romper nada.
+ */
+#define PLAYER_TABLE_RVA 0xaf23b3
+static unsigned char* g_player_cave;
+static void player_table_probe(uint64_t exe_base)
+{
+  unsigned char* site = (unsigned char*)(uintptr_t)(exe_base + PLAYER_TABLE_RVA);
+  static const unsigned char want[7] = { 0x48, 0x8D, 0x81, 0xD0, 0x53, 0xEE, 0x00 };
+  for (int i = 0; i < 7; i++)
+    if (site[i] != want[i]) { logf("fl26swiss: player table probe NOT installed (byte %d = %02x)", i, site[i]); return; }
+  g_player_cave = (unsigned char*)VirtualAlloc(0, 256, 0x3000, 0x04);
+  if (!g_player_cave) { logf("fl26swiss: player table cave failed"); return; }
+  unsigned char* c = g_player_cave;
+  /* mov [rip+8], rcx   (guarda el bloque) ; mov rax,[rip+8] ; lea rax,[rax+0xEE53D0] ; jmp back */
+  *c++ = 0x48; *c++ = 0x89; *c++ = 0x0D; *(uint32_t*)c = 0; c += 4;
+  *c++ = 0x48; *c++ = 0x8B; *c++ = 0x05; *(uint32_t*)c = 0; c += 4;
+  *c++ = 0x48; *c++ = 0x8D; *c++ = 0x80; *(uint32_t*)c = 0xEE53D0; c += 4;
+  *c++ = 0xE9; *(uint32_t*)c = 0; c += 4;
+  DWORD prot;
+  if (!VirtualProtect(site, 8, PAGE_EXECUTE_READWRITE, &prot)) { logf("fl26swiss: player table prot failed"); return; }
+  site[0] = 0xE9; *(uint32_t*)(site + 1) = (uint32_t)((uintptr_t)g_player_cave - ((uintptr_t)site + 5));
+  for (int i = 5; i < 7; i++) site[i] = 0x90;
+  VirtualProtect(site, 8, prot, &prot);
+  logf("fl26swiss: player table probe live (cave %p)", (void*)g_player_cave);
+}
+
 static int cupsel_install(uint64_t exe_base)
 {
   uint64_t* slot = (uint64_t*)(uintptr_t)(exe_base + CUPSEL_VT_RVA);
