@@ -130,3 +130,25 @@ Por tanto esa ruta **no es la que mata**. El realojo no era el bug que bloquea E
 Breakpoint **filtrado a ids >= 0x11400** en `0x14D688B` para capturar quien pide el id que falta,
 con pila. Con la funcion concreta se ve el registro que lo produce y se rellena.
 
+## Correccion final (27/10): la tabla ya estaba realojada
+
+El inventario de las 12 rutas era correcto, pero la conclusion no: **no hay que realojar nada a
+mano**. `sider/fl26caps.lua` (generado por `tools/patchset.py` desde `patches/layout.json`) ya
+hace ese trabajo como parte del set de 3.533 parches:
+
+```
+bloque            0x1877068 -> 0x64D1D68
+tabla jugadores   +0xEE53D0 -> +0xFAD4D0   (123.824 entradas, 0x1E3B0)
+sitios            0x140af23b6, 0x140afd849, 0x1412e67ff, 0x140af23cf, 0x140afd8a1,
+                  0x140afd8bd, 0x140afd913, 0x140c4f242, 0x1414b88cb, 0x1414bbc8c,
+                  0x1414f3659, 0x1415106d0, 0x1420a9866, 0x1420a99d7 ...
+```
+
+El experimento de `fl26swiss.c` escribia un `jmp` en `0xAF23B3`, que **solapa los bytes de
+`0xAF23B6`** ? justo la instruccion que el set mueve. Quedaban dos tablas vivas: la de nuestro
+`VirtualAlloc` (rutas enganchadas) y la del bloque (las otras diez). De ahi el salto a datos
+`0x105EA0000 add [rax],al` que salia en `cdb`.
+
+Con la DLL del commit, sin ese parche, Edit y Select Team no se cierran. El mapa completo de
+topes y la receta para subirlos esta en `limites-escalables.md`.
+
