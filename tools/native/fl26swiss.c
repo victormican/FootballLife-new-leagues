@@ -8210,40 +8210,6 @@ static void player_table_probe(uint64_t exe_base)
 }
 
 
-/* Paso 1: solo realojo de la tabla de jugadores del Edit. Sin cueva de busqueda ni topes. */
-#define PT_INIT_RVA 0xaf23b3
-#define PT_ENTRIES  123015
-static unsigned char* g_pt_buf;
-
-static void probe_mark(const char* txt);
-static void probe_mark(const char* txt)
-{
-  HANDLE h = CreateFileA("C:/Users/viarm/AppData/Local/Temp/opencode/arrays.txt", GENERIC_WRITE,
-                         FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-  if (h == INVALID_HANDLE_VALUE) return;
-  SetFilePointer(h, 0, 0, FILE_END);
-  DWORD w; WriteFile(h, txt, (DWORD)strlen(txt), &w, 0);
-  CloseHandle(h);
-}
-
-static void relocate_player_table(uint64_t exe_base)
-{
-  unsigned char* site = (unsigned char*)(uintptr_t)(exe_base + PT_INIT_RVA);
-  if (site[0] != 0x48 || site[1] != 0x8D || site[2] != 0x81) { probe_mark("PT NOT relocated\n"); return; }
-  g_pt_buf = (unsigned char*)VirtualAlloc(0, (size_t)PT_ENTRIES * 8 + 64, 0x3000, 0x04);
-  unsigned char* cave = (unsigned char*)VirtualAlloc(0, 64, 0x3000, 0x04);
-  if (!g_pt_buf || !cave) { probe_mark("PT alloc failed\n"); return; }
-  unsigned char* c = cave;
-  *c++ = 0x48; *c++ = 0xB8; *(uint64_t*)c = (uint64_t)(uintptr_t)g_pt_buf; c += 8;
-  *c++ = 0xE9; *(uint32_t*)c = (uint32_t)((uintptr_t)(site + 7) - ((uintptr_t)c + 4)); c += 4;
-  DWORD prot;
-  if (!VirtualProtect(site, 8, PAGE_EXECUTE_READWRITE, &prot)) { probe_mark("PT prot failed\n"); return; }
-  site[0] = 0xE9; *(uint32_t*)(site + 1) = (uint32_t)((uintptr_t)cave - ((uintptr_t)site + 5));
-  for (int i = 5; i < 7; i++) site[i] = 0x90;
-  VirtualProtect(site, 8, prot, &prot);
-  probe_mark("PT relocated paso 1\n");
-  logf("fl26swiss: PT relocated to %p", (void*)g_pt_buf);
-}
 
 static int cupsel_install(uint64_t exe_base)
 {
@@ -9013,7 +8979,6 @@ __declspec(dllexport) int fl26_swiss_install(uint64_t exe_base, const uint16_t* 
   }
 
 
-  relocate_player_table(exe_base);
   if (!cupsel_install(exe_base))
     logf("fl26swiss: Cup mode list live (no league phase of 36 in Kick Off > Cup)");
   else
