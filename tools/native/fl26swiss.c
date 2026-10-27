@@ -8154,10 +8154,15 @@ static void scan_players(void)
 }
 
 
-/* ---- tope de equipos ---------------------------------------------------------
+/* ---- tope de equipos (NO SE LLAMA: se deja como aviso) -----------------------
  * En la tabla de accesores de capacidad hay un `mov eax, 0x12C0 ; ret` (4.800) en
- * RVA 0x235E55B, entre el de 3.600 y el que devuelve 0. Se reescribe el inmediato a
- * 12.600 (0x3138) para que el motor acepte los equipos del mundo nuevo.
+ * RVA 0x235E55B, entre el de 3.600 y el que devuelve 0.  Ponerlo en 12.600 aqui seria
+ * una mentira: el array de equipos del bloque mide lo que dice `patches/layout.json`
+ * (`arrays.teams.cap_new`, hoy 4.800) y `fl26caps.lua` ya sube a ese valor los ~50
+ * `cmp ...,0x2EE` que lo comprueban.  Un accesor que devuelve mas que el array hace que
+ * el juego recorra equipos que no existen -- registros basura, sin nombre, que es una de
+ * las formas en que sale "Datos del usuario".  Para subir el tope de verdad: cambiar
+ * `cap_new` en layout.json y regenerar el set (ver docs/developers/fork/limites-escalables.md).
  */
 #define TEAMCAP_RVA 0x235e55b
 static void patch_team_cap(uint64_t exe_base)
@@ -8202,6 +8207,42 @@ static void player_table_probe(uint64_t exe_base)
   for (int i = 5; i < 7; i++) site[i] = 0x90;
   VirtualProtect(site, 8, prot, &prot);
   logf("fl26swiss: player table probe live (cave %p)", (void*)g_player_cave);
+}
+
+
+/* Paso 1: solo realojo de la tabla de jugadores del Edit. Sin cueva de busqueda ni topes. */
+#define PT_INIT_RVA 0xaf23b3
+#define PT_ENTRIES  123015
+static unsigned char* g_pt_buf;
+
+static void probe_mark(const char* txt);
+static void probe_mark(const char* txt)
+{
+  HANDLE h = CreateFileA("C:/Users/viarm/AppData/Local/Temp/opencode/arrays.txt", GENERIC_WRITE,
+                         FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+  if (h == INVALID_HANDLE_VALUE) return;
+  SetFilePointer(h, 0, 0, FILE_END);
+  DWORD w; WriteFile(h, txt, (DWORD)strlen(txt), &w, 0);
+  CloseHandle(h);
+}
+
+static void relocate_player_table(uint64_t exe_base)
+{
+  unsigned char* site = (unsigned char*)(uintptr_t)(exe_base + PT_INIT_RVA);
+  if (site[0] != 0x48 || site[1] != 0x8D || site[2] != 0x81) { probe_mark("PT NOT relocated\n"); return; }
+  g_pt_buf = (unsigned char*)VirtualAlloc(0, (size_t)PT_ENTRIES * 8 + 64, 0x3000, 0x04);
+  unsigned char* cave = (unsigned char*)VirtualAlloc(0, 64, 0x3000, 0x04);
+  if (!g_pt_buf || !cave) { probe_mark("PT alloc failed\n"); return; }
+  unsigned char* c = cave;
+  *c++ = 0x48; *c++ = 0xB8; *(uint64_t*)c = (uint64_t)(uintptr_t)g_pt_buf; c += 8;
+  *c++ = 0xE9; *(uint32_t*)c = (uint32_t)((uintptr_t)(site + 7) - ((uintptr_t)c + 4)); c += 4;
+  DWORD prot;
+  if (!VirtualProtect(site, 8, PAGE_EXECUTE_READWRITE, &prot)) { probe_mark("PT prot failed\n"); return; }
+  site[0] = 0xE9; *(uint32_t*)(site + 1) = (uint32_t)((uintptr_t)cave - ((uintptr_t)site + 5));
+  for (int i = 5; i < 7; i++) site[i] = 0x90;
+  VirtualProtect(site, 8, prot, &prot);
+  probe_mark("PT relocated paso 1\n");
+  logf("fl26swiss: PT relocated to %p", (void*)g_pt_buf);
 }
 
 static int cupsel_install(uint64_t exe_base)
@@ -8972,6 +9013,7 @@ __declspec(dllexport) int fl26_swiss_install(uint64_t exe_base, const uint16_t* 
   }
 
 
+  relocate_player_table(exe_base);
   if (!cupsel_install(exe_base))
     logf("fl26swiss: Cup mode list live (no league phase of 36 in Kick Off > Cup)");
   else
