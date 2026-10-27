@@ -24,19 +24,23 @@ reaches the base once and then steps by the stride, and only the base has to be 
     --review   what was found, by value and by function
     out.json   the sites, in the shape calendar-sites.json uses
 """
+
 import sys, json, bisect, struct, collections
 from capstone import *
 from capstone.x86 import *
 import callindex
 
-TAIL_LO, TAIL_HI = 0x1642a1c, 0x16705a8
-CAL = 0x16038a8
-REC_BASE, REC_STRIDE, REC_COUNT = 0x1642a28, 0x16dc, 32
+TAIL_LO, TAIL_HI = 0x1642A1C, 0x16705A8
+_CAL_LO, _CAL_HI = TAIL_LO, TAIL_HI
+CAL = 0x16038A8
+REC_BASE, REC_STRIDE, REC_COUNT = 0x1642A28, 0x16DC, 32
 
 d, nm, sva, ro, rsz = callindex.code_section()
 off_of = lambda va: ro + (va - sva)
 FS = sorted(f for f in callindex.starts() if sva <= f < sva + rsz)
-md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True; md.skipdata = True
+md = Cs(CS_ARCH_X86, CS_MODE_64)
+md.detail = True
+md.skipdata = True
 
 
 def func_end(f):
@@ -45,12 +49,17 @@ def func_end(f):
 
 
 def const_offset(ins, value):
-    want = struct.pack("<I", value & 0xffffffff)
-    hits = [i for i in range(max(0, len(ins.bytes) - 3)) if bytes(ins.bytes[i:i + 4]) == want]
+    want = struct.pack("<I", value & 0xFFFFFFFF)
+    hits = [
+        i
+        for i in range(max(0, len(ins.bytes) - 3))
+        if bytes(ins.bytes[i : i + 4]) == want
+    ]
     return hits[-1] if hits else None
 
 
-HEAD_HI = 0x1642a34        # the four fields and the first record's first fields
+HEAD_HI = 0x1642A34  # the four fields and the first record's first fields
+TRACE_FILTER = True  # off for a range that only overlaps .trace by arithmetic
 
 
 def reject(ins, op, v):
@@ -60,14 +69,15 @@ def reject(ins, op, v):
         # above the head so far is one of two things, and neither is a block offset:
         if op.type == X86_OP_MEM and op.mem.index != 0 and op.mem.scale == 4:
             return "a jump table in .trace, reached as image base + rva + i*4"
-        return "a constant, not a displacement (%s)" % ins.mnemonic
+        if TRACE_FILTER:
+            return "a constant, not a displacement (%s)" % ins.mnemonic
     return None
 
 
 def scan():
     tail, strides, rejects = [], [], []
     for f in FS:
-        blob = d[off_of(f):off_of(func_end(f))]
+        blob = d[off_of(f) : off_of(func_end(f))]
         for ins in md.disasm(blob, f):
             if ins.id == 0:
                 continue
@@ -78,62 +88,109 @@ def scan():
                 # arithmetic and mean nothing here.
                 if op.type == X86_OP_IMM and TAIL_LO <= op.imm < TAIL_HI:
                     v = op.imm
-                elif op.type == X86_OP_MEM and op.mem.base != X86_REG_RIP                         and TAIL_LO <= op.mem.disp < TAIL_HI:
+                elif (
+                    op.type == X86_OP_MEM
+                    and op.mem.base != X86_REG_RIP
+                    and TAIL_LO <= op.mem.disp < TAIL_HI
+                ):
                     v = op.mem.disp
                 if v is None:
                     continue
                 at = const_offset(ins, v)
                 if at is None:
                     continue
-                rec = {"va": "0x%x" % ins.address, "at": at, "func": "0x%x" % f,
-                       "value": "0x%x" % v, "kind": "tail",
-                       "text": "%s %s" % (ins.mnemonic, ins.op_str)}
+                rec = {
+                    "va": "0x%x" % ins.address,
+                    "at": at,
+                    "func": "0x%x" % f,
+                    "value": "0x%x" % v,
+                    "kind": "tail",
+                    "text": "%s %s" % (ins.mnemonic, ins.op_str),
+                }
                 why = reject(ins, op, v)
                 if why:
                     rec["kind"], rec["why"] = "rejected", why
                     rejects.append(rec)
                 else:
                     tail.append(rec)
-            if ins.id == X86_INS_IMUL and len(ins.operands) == 3 \
-                    and ins.operands[2].type == X86_OP_IMM \
-                    and ins.operands[2].imm == REC_STRIDE:
+            if (
+                ins.id == X86_INS_IMUL
+                and len(ins.operands) == 3
+                and ins.operands[2].type == X86_OP_IMM
+                and ins.operands[2].imm == REC_STRIDE
+            ):
                 at = const_offset(ins, REC_STRIDE)
-                strides.append({"va": "0x%x" % ins.address, "at": at, "func": "0x%x" % f,
-                                "value": "0x%x" % REC_STRIDE, "kind": "rec_stride",
-                                "text": "%s %s" % (ins.mnemonic, ins.op_str)})
+                strides.append(
+                    {
+                        "va": "0x%x" % ins.address,
+                        "at": at,
+                        "func": "0x%x" % f,
+                        "value": "0x%x" % REC_STRIDE,
+                        "kind": "rec_stride",
+                        "text": "%s %s" % (ins.mnemonic, ins.op_str),
+                    }
+                )
     return tail, strides, rejects
 
 
 def main(argv):
+    global TAIL_LO, TAIL_HI, TRACE_FILTER
+    args = [a for a in argv[1:]]
+    for i, a in enumerate(args):
+        if a == "--lo" and i + 1 < len(args):
+            TAIL_LO = int(args[i + 1], 16)
+        elif a == "--hi" and i + 1 < len(args):
+            TAIL_HI = int(args[i + 1], 16)
+    TRACE_FILTER = (TAIL_LO, TAIL_HI) == (_CAL_LO, _CAL_HI)
     tail, strides, rejects = scan()
     if "--review" in argv:
-        print("  range  0x%x .. 0x%x   (the four fields, then %d records of 0x%x)"
-              % (TAIL_LO, TAIL_HI, REC_COUNT, REC_STRIDE))
-        print("  operand sites in range: %d, in %d function(s)"
-              % (len(tail), len(set(s["func"] for s in tail))))
+        print(
+            "  range  0x%x .. 0x%x   (the four fields, then %d records of 0x%x)"
+            % (TAIL_LO, TAIL_HI, REC_COUNT, REC_STRIDE)
+        )
+        print(
+            "  operand sites in range: %d, in %d function(s)"
+            % (len(tail), len(set(s["func"] for s in tail)))
+        )
         by = collections.Counter(s["value"] for s in tail)
         for v, n in sorted(by.items(), key=lambda kv: int(kv[0], 16)):
             print("    %-12s %d" % (v, n))
         print("")
         for s in tail:
-            print("  %-12s +%d  %-12s in %-12s %s"
-                  % (s["va"], s["at"], s["value"], s["func"], s["text"][:60]))
+            print(
+                "  %-12s +%d  %-12s in %-12s %s"
+                % (s["va"], s["at"], s["value"], s["func"], s["text"][:60])
+            )
         print("")
-        print("  imul ..., 0x%x sites: %d  (the stride does not change; these are here so a"
-              % (REC_STRIDE, len(strides)))
-        print("     reader can see the 32 records are walked, not addressed one by one)")
+        print(
+            "  imul ..., 0x%x sites: %d  (the stride does not change; these are here so a"
+            % (REC_STRIDE, len(strides))
+        )
+        print(
+            "     reader can see the 32 records are walked, not addressed one by one)"
+        )
         for s in strides:
             print("  %-12s in %-12s %s" % (s["va"], s["func"], s["text"][:60]))
         print("")
         print("  rejected: %d" % len(rejects))
         for s in rejects:
-            print("  %-12s %-12s %-46s %s"
-                  % (s["va"], s["value"], s["text"][:46], s["why"]))
+            print(
+                "  %-12s %-12s %-46s %s"
+                % (s["va"], s["value"], s["text"][:46], s["why"])
+            )
         return 0
-    out = {"_comment": "generated by tailscan.py -- the calendar's trailing neighbours",
-           "range": ["0x%x" % TAIL_LO, "0x%x" % TAIL_HI],
-           "sites": tail, "stride_walks": strides, "rejected": rejects}
-    dst = [a for a in argv[1:] if not a.startswith("--")]
+    out = {
+        "_comment": "generated by tailscan.py -- every real operand in the scanned range",
+        "range": ["0x%x" % TAIL_LO, "0x%x" % TAIL_HI],
+        "sites": tail,
+        "stride_walks": strides,
+        "rejected": rejects,
+    }
+    dst = [
+        a
+        for j, a in enumerate(args)
+        if not a.startswith("--") and (j == 0 or args[j - 1] not in ("--lo", "--hi"))
+    ]
     js = json.dumps(out, indent=1)
     if dst:
         open(dst[0], "w").write(js)
