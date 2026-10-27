@@ -112,3 +112,21 @@ barata y segura: **cambiar solo el campo de capacidad del objeto** si existe
    tocar las 12 rutas. Eso es un cambio de tamano, no de codigo.
 3. Si es constante en codigo: realojo con las 12 rutas, una por una, validando cada 2.
 
+## Correccion de la lectura de la tabla (27/10)
+
+Tras leer la funcion completa de `0xAE4C7E`, la tabla de jugadores **no es paginada**: es un array
+plano con inserto **protegido** (`cmp eax,0x7530; jae skip` -> si esta lleno no escribe).
+Por tanto esa ruta **no es la que mata**. El realojo no era el bug que bloquea Edit.
+
+### Lo que si esta probado
+
+- Realojo posible (`PT relocated`), pero **12 rutas** leen la tabla: parchear 2 deja punteros
+  invalidos en las demas (por eso crasheaba).
+- El crash de Edit es una **enumeracion de ids de texto** (0..0x114BB). La falla es el id que
+  falta, no la tabla de jugadores.
+
+### Siguiente paso concreto
+
+Breakpoint **filtrado a ids >= 0x11400** en `0x14D688B` para capturar quien pide el id que falta,
+con pila. Con la funcion concreta se ve el registro que lo produce y se rellena.
+
