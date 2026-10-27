@@ -66,3 +66,55 @@ Es el mismo muro ya documentado: la tabla de 30.000 entradas del bloque de edici
 - 1.949 jugadores estaban en **dos o mas plantillas**. Corregido: `PlayerAssignment` de 112.538 a
   110.589 filas (una por jugador).
 
+## Crash de Edit: causa encontrada con depurador en vivo (2026-10-26)
+
+### Herramienta
+
+`cdb` (Windows Kits) **elevado**, adjuntando al proceso (el juego corre elevado: sin elevacion da
+`Acceso denegado`). Script de comandos en fichero (`-cf`), no `-c` (el `-c` se parte).
+
+```
+sxd av                  ; ignora las excepciones de primera oportunidad
+sxd 80000003
+bp 0x140000000+0x14d688b ".echo ID:; r eax; gc"
+g
+```
+
+La base del exe es siempre **0x140000000** (confirmado en los dumps).
+
+### Lo que se ve
+
+- La instruccion del fallo es `0x14D688B  mov eax,[rcx+rax*4]`, dentro de una **busqueda hash**:
+  `0x14D6883 add eax,0x410001D4` / `0x14D6889 add eax,eax` / `0x14D688B mov eax,[rcx+rax*4]` / `ret`.
+- La llama `0x1F0C158 call 0x14D6870`, que devuelve un **id de texto** en `eax`.
+- Con el breakpoint puesto, se capturan **70.844 ids consecutivos**: 0, 1, 2, ... hasta
+  **0x114BB (70.843)**. El juego **enumera la tabla de textos** y se sale al pasar del ultimo id.
+
+Conclusion: **falta un id de texto** (se pide ~0x114BC). No es la tabla de jugadores.
+
+### Descartado por el camino (con pruebas)
+
+| hipotesis | prueba | resultado |
+|---|---|---|
+| tabla de 30.000 jugadores | realojo a 123.015 + busqueda + topes | `PT relocated` y `topes OK`, **el crash sigue** |
+| entrenadores ausentes | `mkcoaches`: 3.053/3.053 con manager valido | **el crash sigue** |
+| tacticas ausentes | `mktactics`: "club 71578 already has tactics" | descartado |
+| `.fl26x` no cargado | reetiquetado con el tag del EDIT + restaurado el EDIT de dataSP | sigue `749 clubs, 0 from .fl26x` |
+| `EDIT00000000` | renombrado y restaurado | sin efecto |
+
+### Pista del rotulo "Datos del usuario"
+
+Mismo origen: un **nombre/id de texto que no existe**. Por eso aparecen juntos el rotulo en
+Select Team y el cierre al entrar en Edit.
+
+### Siguiente paso (barato)
+
+Desactivar **solo** `fl26regnames.lua` y `fl26slotnames.lua` (los que a?aden nombres/cabeceras
+nuevas) y entrar a Edit. Si deja de cerrarse, el fallo es el rango de ids que escriben; si sigue,
+filtrar el breakpoint a ids >= 0x11400 para ver quien pide el que falta.
+
+### Vuelta atras aplicada
+
+`tools/native/fl26swiss.c` revertido a HEAD y DLL estable reinstalada (`AE768947`): el realojo y
+las cuevas quedan **documentados aqui** pero **fuera del juego**, que vuelve a estar estable.
+
