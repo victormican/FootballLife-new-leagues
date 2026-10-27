@@ -63,3 +63,52 @@ que la leen antes de realojar (un inventario completo de referencias, no solo 3)
   enumera ids 0..0x114BB (70.843) y se sale al pedir el siguiente.
 - El rotulo **Datos del usuario** tiene el mismo origen (nombre/id de texto inexistente).
 - Con la DLL estable (sin experimentos), el juego **no se cierra**: los cierres eran nuestros.
+
+## Patron completo de la tabla de jugadores (inventario 2026-10-27)
+
+Volcado completo en `referencias-tabla-jugadores.txt` (Capstone sobre el exe, 437 MB).
+
+### 12 rutas que leen la tabla
+
+| offset | RVAs | para que |
+|---|---|---|
+| `0xEE53D0` (tabla inline) | `0xAF23B6`, `0xAFD849`, `0x12E67FF` | inicializar, otro consumidor, metadato de tamano |
+| `0xEE53C8` (puntero) | `0xAF23BD`, `0xAF23D7` | guardar / leer |
+| `0xE63DE4` (base de busqueda) | `0xC4F246`, `0x14B88CE`, `0x14BBC8F`, `0x14F365C`, `0x15106D3`, `0x20A9869`, `0x20A99DA` | buscar por id y comparar contenido |
+
+`0xE63DE4` **es reescrita en runtime por `fl26caps`** (a `0x6475C08`), asi que la firma de bytes
+debe ir por **opcode** y no por el desplazamiento exacto.
+
+### Topes (offset exacto, no aproximado)
+
+```
+0xC4F255  cmp ecx, 0x7530      (antes lo escribi en 0xC4F253: 2 bytes desplazado)
+0xAFD915  cmp edi, 0x7530
+0xAE4C87  cmp eax, 0x7530
+0xAE4C90  imul rcx, r9, 0x7530      (dimensionado de bloque)
+0x8BDBCC  imul r8d, [rbx+0x18], 0x7530  (dimensionado de bloque)
+```
+
+### Por que el realojo fallo (causa completa)
+
+1. Hay **12 rutas**, no 3: repuntar 2 deja las demas leyendo memoria vieja.
+2. Los `cmp` se escribieron 2 bytes desplazados de su sitio real -> **corrupcion de instruccion**.
+3. Consecuencia: salto a datos (`0x105EA0000`), incluso con la tabla bien construida.
+
+### Decision de diseno
+
+**(A) Ampliar in situ NO es viable**: la tabla esta dentro de un objeto grande y hay otros arrays
+despues de ella (el offset 0xE63DE4 los indexa); no hay hueco contiguo garantizado.
+
+**(B) Realojo con las 12 rutas**: viable pero exige los 12 puntos de enganche. Alternativa mas
+barata y segura: **cambiar solo el campo de capacidad del objeto** si existe
+(`0x12E67FF mov [rdi+0x180], 0xEE53D0` parece el metadato de tamano del objeto, NO de la tabla).
+
+### Orden recomendado (ya con el inventario)
+
+1. Leer los 2 metadatos del objeto (`0x12E67FF` y `0xAE4C87`/`0xAE4C90` y `0x8BDBCC`) para saber
+   si el tamano se calcula de una constante o de un campo del objeto.
+2. Si es campo del objeto: cambiar **el campo** (un entero) y reasignar el objeto entero, sin
+   tocar las 12 rutas. Eso es un cambio de tamano, no de codigo.
+3. Si es constante en codigo: realojo con las 12 rutas, una por una, validando cada 2.
+
