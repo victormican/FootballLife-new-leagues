@@ -156,6 +156,45 @@ equipos del `layout.json`: los clubes sobran, lo que se acaba es el numero de co
 `Country.bin` menos los 214 de la base), asi que el "siguiente muro" que anuncia ya es el
 bueno y no los 898 clubes del Edit.
 
+## 4c. Regla: Oceania y Non-FIFA siempre presentes (2026-10-29)
+
+En **todo** mundo se reservan 2 competiciones fijas:
+
+- **Oceania** (conf 7, 12 equipos OFC) — liga aparte, no dentro de Asia.
+- **Non-FIFA Nations** (conf 6, 8 equipos: Martínique, Guadalupe, Guayana Francesa, San Martín, Sint Maarten, Bonaire, Cataluña, Padania) — con sus banderas en `flag_96..123.png`.
+
+Coste: **2 de las 255 competiciones**. Límite efectivo para ligas del usuario: **253**.
+
+### conf=6 (CONCACAF) en _FL26MyWorld: 12 ligas
+
+| # | Liga |
+|---|---|
+| 1 | Liga Dominicana de Fútbol |
+| 2 | Jamaican Premier League |
+| 3 | Primera División Nicaragüense |
+| 4 | El Salvador Primera División |
+| 5 | Liga Panameña de Fútbol |
+| 6 | Liga Nacional de Guatemala |
+| 7 | Liga Nacional de Honduras |
+| 8 | Primera División de Costa Rica |
+| 9 | Mexican First Division |
+| 10 | United States Soccer Leagues Division One |
+| 11 | OTROS CONCACAF |
+| 12 | Non-FIFA Nations |
+
+### Límites restantes (tras Oceania + Non-FIFA fijos)
+
+| Recurso | Límite | Usado (_FL26MyWorld) | Libre |
+|---|---|---|---|
+| Competiciones | 255 | 159 | 96 |
+| Efectivo para ligas de usuario | 253 | 159 | 94 |
+| Países nuevos | 99 | 0 (base 214) | 99 |
+| Jugadores | 123.825 | 120.666 | 3.159 |
+| Equipos | 4.800 | 3.802 | 998 |
+| Entrenadores | 6.800 | 1.078 | 5.722 |
+| Regulaciones | 1.200 | 214 | 986 |
+| Clubes del Edit | 4.700 | 3.802 | 898 |
+
 ## 5. Como se sube cada tope (receta)
 
 Todos los de `layout.json`:
