@@ -27,6 +27,14 @@ import pesdb
 
 DEFAULT_ROOT = r"D:\SP Football Life 2026 - copia - copia\SiderAddons\livecpk\_FL26All"
 
+# The two counters *My world* shows above the competition list, read off the screen on
+# 2026-10-28.  They are not in layout.json: they are the numbers the menu itself refuses
+# to go past, and they count competitions (every league, cup and super cup) and countries
+# added on top of the ones the base tables already carry.
+MYWORLD_COMPETITIONS = 255
+MYWORLD_COUNTRIES = 99
+BASE_COUNTRIES = 214  # pesdb/_base/Country.bin
+
 # Caps that do not live in layout.json, with the file that holds them.
 OTHER_CAPS = [
     ("clubes del Edit", 4700, "tools/native/fl26edit.c (TEAMS)"),
@@ -135,6 +143,27 @@ def main():
     w = world(a.root)
     rows.append(("ligas del world", w["leagues"], None, "fl26world.txt"))
     rows.append(("copas del world", w["cups"], None, "fl26world.txt"))
+    # What the *My world* screen counts at the top.  Measured in game (2026-10-28):
+    # 255 competitions and 99 new countries.  A competition is a league, a cup or a
+    # super cup -- they all spend one of the 255 --, so the two lines below are the
+    # real ceiling of a world, well before the 4800 teams of layout.json.
+    rows.append(
+        (
+            "competiciones (My world)",
+            w["leagues"] + w["cups"],
+            MYWORLD_COMPETITIONS,
+            "fl26world.txt (liga + copa + supercopa)",
+        )
+    )
+    countries = count(a.root, "Country.bin")
+    rows.append(
+        (
+            "paises nuevos",
+            None if countries is None else countries - BASE_COUNTRIES,
+            MYWORLD_COUNTRIES,
+            "Country.bin sobre los %d de la base" % BASE_COUNTRIES,
+        )
+    )
     rows.append(
         ("slots usados", len(w["slots"]) or None, 250, "fl26world.txt + fl26slots250")
     )

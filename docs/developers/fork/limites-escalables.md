@@ -151,6 +151,11 @@ Eso encaja con lo medido por otro lado (el id de competicion es un word y Select
 filas) y deja el techo real del mundo en **255 competiciones y 99 paises**, no en los 750
 equipos del `layout.json`: los clubes sobran, lo que se acaba es el numero de competiciones.
 
+`python tools/limits.py` imprime esos dos contadores en la misma tabla que los topes de
+`layout.json` (`competiciones (My world)` = ligas + copas del world, `paises nuevos` =
+`Country.bin` menos los 214 de la base), asi que el "siguiente muro" que anuncia ya es el
+bueno y no los 898 clubes del Edit.
+
 ## 5. Como se sube cada tope (receta)
 
 Todos los de `layout.json`:
