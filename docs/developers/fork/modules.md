@@ -257,6 +257,13 @@ to" line) and the four calendar-tail values (`module constants for this layout: 
 1304 ids (this set, `--player-cap 51729`) they are `REG_ARRAY_OFF` 0x1da7730, fl26swiss `TODAY_OFF` 0x196c9e4, fl26join
 `TODAY_OFF` 0x196c9ec, fl26ctlguard block+0x196c9f0 / +0x196c9f4.
 
+The set in the repository today (`...-upper-mlcopy-fixtures-calendar`, 3839 patches, lower tail
+included) prints different values again: `REG_ARRAY_OFF` 0x39675f0, fl26swiss `TODAY_OFF`
+0x2da4ce4, fl26join `TODAY_OFF` 0x2da4cec, fl26ctlguard block+0x2da4cf0 / +0x2da4cf4. The DLLs
+in the test copy are still built with the shipped 0x19115e4 / 0x19115ec, so their date reads
+point at the wrong address (`fl26join` at least recomputes `REG_ARRAY_OFF` from the patched
+`cmp` through `reg_off()`). Rebuild them with the printed values before trusting a Swiss draw.
+
 ## fl26caps: how a patch set is made
 
 Do not edit `fl26caps.lua` by hand. `tools/patchset.py <set> ...` disassembles the exe

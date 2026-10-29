@@ -65,6 +65,60 @@ que se veia en el depurador.
 Conclusion: **no hay que realojar nada**. La tabla ya esta realojada, y por eso con la DLL del
 commit (sin el experimento) el juego no se cierra.
 
+## 3b. La cola baja: lo que el array de jugadores se comia (2026-10-27)
+
+El array de jugadores empieza en `+0` y crece en sitio, asi que a partir de **66.918
+jugadores** (`0x184c3bc / 0x17c`) empieza a escribir por encima de las estructuras que el
+bloque guarda detras de el. Ese dia el cierre de Edit lo dejo claro:
+
+```
+0x1414d688b  mov eax, [rcx + rax*4]      ; c0000005, rax = 0x1324935
+```
+
+`0x1414d6870(obj, i, j)` devuelve `obj[base[i] + j]`, con `base[10]` en `+0x1d4c0` y
+`count[10]` en `+0x1d4e8`; el llamador hace `lea r12, [rbx + 0x184db1c]`. El indice salia de
+`base[]`, y `base[]` estaba en `bloque + 0x186afdc` — dentro del array de jugadores. Los
+valores del volcado (`0x6C502033`, `0x72657961`, `0x20455547`) son **texto de nombres de
+jugador** de `Player.bin`, no punteros.
+
+Lo que hay en esa franja, medido con `tools/tailscan.py --lo 0x184c3bc --hi 0x1877068`:
+
+| offset | que es | sitios |
+|---|---|---|
+| `0x184c3bc` | registro dummy de jugador (todo lookup fuera de rango cae aqui) | 105 |
+| `0x184c538` | tabla de 8 bytes por entrada, llenada por el constructor | 7 |
+| `0x184db1c` | conjunto de 10 grupos: `base[10]` y `count[10]`, total en `+0x1d510` | 41 |
+| `0x186b030` | objeto con constructor propio (`0x1464` bytes, memsets del ctor del bloque) | 11 |
+| `0x186c494` | objeto con constructor (`0x140b15630`) y destructor | 9 |
+| `0x186cec8..0x1877068` | resto de la cola, incluido el campo de 8 bytes final del bloque | 133 |
+
+`layout.json` ahora la declara como `block.lower_tail` y `tools/lowertail.py` genera la lista
+(`patches/lower-tail-sites.json`, **306 sitios**): decodifica cada funcion y solo cuenta
+operandos reales, porque una busqueda de bytes en esa franja da cientos de coincidencias
+contra ~300 esperadas por azar. Al comparar los operandos encontrados con las apariciones
+literales de cada valor en `.trace` salen exactamente iguales para los 20 valores mas
+frecuentes, que es la prueba de que no queda ninguno sin mover. Dos operandos de
+`0x141854f10` son falsos positivos y estan excluidos con su razon en el propio generador:
+una tabla de bytes de `.trace` alcanzada por la base de la imagen y una mascara
+(`and eax, 0x1870f98`).
+
+El generador la coloca **la primera**, justo donde acaba el array de jugadores, y mueve los
+306 operandos por **un solo delta** (`+0x1493704` en este set): la franja se traslada entera y
+su disposicion interna no cambia. `impscan.py` no encontro ninguna copia de esos offsets en
+`.impdata` (si que encuentra las de los arrays), asi que no hay nada virtualizado que se
+quede atras — el unico valor que aparece alli, `0x1877060`, es una coincidencia de tabla que
+el escaneo descarta porque ninguna puerta de `.impdata` decodifica hasta ella.
+
+Reglas que se derivan de esto:
+
+- la cola se mueve **sola** en cuanto `cap_new * 0x17c` pasa de `0x184c3bc`; no hay flag que
+  activar ni lista que mantener a mano;
+- cualquier set que suba el cap de jugadores por encima de 66.918 tiene que regenerarse
+  entero: mover el cap y no la cola es exactamente el cierre de arriba;
+- `python tools/setcheck.py` hace sin arrancar el juego la misma verificacion que el
+  aplicador (3839 parches, 0 discrepancias) y `python tools/lowertail.py --check` dice si la
+  lista de sitios sigue coincidiendo con el exe.
+
 ## 4. Muros duros (y por que lo son)
 
 | muro | valor | por que no se sube con un parche |
@@ -75,13 +129,27 @@ commit (sin el experimento) el juego no se cierra.
 | tabla de `upper2` | 30.000 | busqueda lineal de 8 bytes por entrada dentro del bloque; no crece sin sitio detras, asi que los jugadores por encima de 30.000 simplemente no estan (y eso es seguro) |
 | array de jugadores | 123.825 | empieza en `+0` (los accesos no llevan desplazamiento): **crece en sitio**, no se puede realojar. Su techo es el primer campo del bloque que no se mueve, `0x16705a8` (tabla de ranking de clubes) |
 | tabla de textos | ~70.844 ids | se enumera entera al entrar en Edit; un nombre con id mayor no existe y el hash se sale |
+| competiciones del mundo | **255** | lo dice el contador de *My world*; cuenta **todo** (liga, copa y supercopa). El modpack de la copia va por **210 / 255** |
+| paises nuevos | **99** | mismo contador; el `Country.bin` del juego ya trae 222 |
 
-El techo del array de jugadores merece numeros: `0x16705a8 / 0x17c = 61.918`, menos de la mitad
-del cap actual. El set esta en **123.825** porque se genero sin `--player-cap` (el guardia solo
-salta cuando se pasa el argumento): el bloque crece y lo que se recoloca **va despues** del
-array, de modo que el array puede pasar de largo por encima de esos campos. Funciona, pero es una
-zona donde el generador ya no avisa: si algun dia se sube mas, hay que mirar a mano que no quede
-nada sin recolocar en `0x16038a8..0x1877068`.
+El techo historico del array de jugadores merece numeros: `0x16705a8 / 0x17c = 61.918`, menos de
+la mitad del cap actual. El set esta en **123.825** porque se genero sin `--player-cap` (el
+guardia solo salta cuando se pasa el argumento): el bloque crece y lo que se recoloca **va
+despues** del array. Lo que hacia falta para que eso fuese seguro esta en el apartado 3b: la
+franja `0x184c3bc..0x1877068` (dummy de jugadores, conjunto de grupos y objetos del final del
+bloque) se traslada con ellos, asi que el array puede pasar de largo sin pisar nada suyo.
+
+## 4b. Lo que dice el contador de *My world* (medido en juego, 2026-10-28)
+
+La pantalla de *My world* lleva arriba su propio contador, y es la fuente mas directa porque
+cuenta lo que el juego acepta de verdad: **hasta 255 competiciones** y **hasta 99 paises
+nuevos**. En competiciones entra **todo** — cada liga, cada copa y cada supercopa —, asi que
+una supercopa nueva gasta una de las 255 igual que una liga de 20 clubes. El modpack instalado
+en la copia va por **210 / 255**: quedan unas decenas antes de chocar, no cientos.
+
+Eso encaja con lo medido por otro lado (el id de competicion es un word y Select Team tiene 255
+filas) y deja el techo real del mundo en **255 competiciones y 99 paises**, no en los 750
+equipos del `layout.json`: los clubes sobran, lo que se acaba es el numero de competiciones.
 
 ## 5. Como se sube cada tope (receta)
 
@@ -93,6 +161,7 @@ Todos los de `layout.json`:
 python tools/patchset.py teams-coaches-regs-players-dates-matches-upper-mlcopy-fixtures-calendar
 # 3. comprobar el diff y que el tamano del bloque es el esperado
 git diff --stat patches sider
+python tools/setcheck.py          # la misma verificacion que hace el aplicador, sin arrancar
 # 4. instalar y arrancar: el log dice "applied all N patches" o "MISMATCH ... nothing written"
 copy sider\fl26caps.lua "<juego>\SiderAddons\modules\fl26caps.lua"
 ```

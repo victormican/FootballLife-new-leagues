@@ -67,6 +67,14 @@
    "players_ceiling": "0x16038a8",
    "_ceiling_note": "the season calendar (stride 0x2c4) begins here; the shipped match table's last record runs into it, which is why rec596 has an extra end-pointer site"
   },
+  "lower_tail": {
+   "_comment": "Everything the block keeps above the shipped player array's last record and below its old end: the players' dummy at 0x184c3bc, the table at 0x184c538, the group set at 0x184db1c (0x1d514 bytes, its constructor memsets exactly that much), the object at 0x186b030, and the cluster that runs to 0x186cec8. The player array starts at +0 and grows in place, so every cap past 30001 records puts this span inside the array: the game then reads its own structures out of player bytes. On 2026-10-27 that killed Edit at 0x1414d688b, where `base[10]` of the group set at block+0x186afdc held `0x6c502033` -- a player's name. The span moves as one piece, by one delta, to the first place after the player array; tools/lowertail.py lists every operand that names an offset inside it.",
+   "start": "0x184c3bc",
+   "end": "0x1877068",
+   "sites_file": "patches/lower-tail-sites.json",
+   "_end_note": "'end' is the shipped block size, not the last offset found: what sits between 0x186cec8 and there is named by no operand the scan can see, so it is carried along rather than left behind as a hole the player array would write through.",
+   "_start_note": "the dummy record, not the group set: the dummy is 0x17c bytes at 0x184c3bc and every player lookup past the cap falls back to it, so it is inside the array too, and the 105 sites that name it are the bulk of this list."
+  },
   "tail_pad": "0x20000",
   "tail_pad_why": "spare room after the relocated arrays, holding nothing. Some references to a relocated array are virtualised into .impdata, where the attribution cannot see them, and still compute from the old base; one such read was measured on 2026-09-17 at block + 0x3060284 and killed the season twice. The pad makes such a read land inside our own allocation. Reads only."
  },
