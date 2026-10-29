@@ -107,8 +107,10 @@ function m.init(ctx)
                       JE, hex(a), hex(b), CMP_BYTES, JE_BYTES))
     return
   end
+  -- raise the index's capacity from 30000 to 123825 players (0x7530 -> 0x1e3b1)
+  memory.write(CMP + 3, string.char(0xb1, 0xe3, 0x01, 0x00))
   memory.write(JE + 1, string.char(0x83))
-  log("fl26playercap: the player index returns when it reaches 30000 instead of writing past its table")
+  log("fl26playercap: player index capacity raised to 123825 (0x7530 -> 0x1e3b1) and returns when full")
   install_lookup(ctx)
 end
 
