@@ -195,6 +195,39 @@ Coste: **2 de las 255 competiciones**. Límite efectivo para ligas del usuario: 
 | Regulaciones | 1.200 | 214 | 986 |
 | Clubes del Edit | 4.700 | 3.802 | 898 |
 
+## 4d. Regla de mundo: bloques obligatorios (2026-10-29)
+
+En **todo** mundo (nuevo o existente) se deben incluir estos bloques, sin borrar los del juego:
+
+| Bloque | Contenido | Clubs | Conf | Notas |
+|---|---|---|---|---|
+| **Oceania** | 11-12 selecciones OFC como liga aparte | 11-12 | 7 | Separado de Asia (no dentro de Asia-Oceania). Ya creado con `mk_oceania.py`. |
+| **Non-FIFA Nations** | 8 selecciones no-FIFA (Martínique, Guadalupe, Guayana Francesa, San Martín, Sint Maarten, Bonaire, Cataluña, Padania) | 8 | 6 | Con banderas en `flag_96..123.png`. Creado con `add_nonfifa.py`. |
+| **Otros África** | Clubes ocultos + genéricos hasta completar 48 | 48 | 5 | `Otros CAF`: clubes ocultos + genéricos. |
+| **Otros Concacaf** | 48 equipos | 48 | 6 | `OTROS CONCACAF`. |
+| **Otros Asia** | Clubes ocultos + genéricos | hasta 48 | 3 | Crear si no existe. |
+| **Classics** | Completar hasta 48 | 48 | — | `Classic Teams` del juego (no borrar). |
+
+**Coste fijo**: Oceania (1) + Non-FIFA (1) = **2 competiciones** descontadas del total de 255.
+Límite efectivo para ligas de usuario: **253**.
+
+### Estado actual (_FL26MyWorld)
+
+| Bloque | Estado | Clubs |
+|---|---|---|
+| Oceania | ✅ Creado (cid 91, slot 23) | 12 |
+| Non-FIFA Nations | ✅ Creado (cid 255, slot 24) | 8 |
+| Otros África (Otros CAF) | ✅ Existe (cid 165, slot 76) | 24 (falta completar a 48) |
+| Otros Concacaf (OTROS CONCACAF) | ✅ Existe (cid 221, slot 158) | 24 (falta completar a 48) |
+| Otros Asia | ❌ No existe | — |
+| Classics | ✅ Del juego (no borrar) | — |
+
+### Pendiente
+- Completar Otros África y Otros Concacaf a 48 clubes (requiere rebuild con `mkleague clubs=48`).
+- Crear Otros Asia.
+- Completar Classics a 48.
+- Verificar en juego que Oceania y Non-FIFA aparecen en Select Team.
+
 ## 5. Como se sube cada tope (receta)
 
 Todos los de `layout.json`:
