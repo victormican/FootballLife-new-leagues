@@ -169,8 +169,13 @@ class Install(Page):
             self.add_league_pack(path)
             return
         self.cleanup()
+        try:
+            work = I.work_dir(path, self.app.game.sider_dir)
+        except (OSError, ValueError) as e:
+            error(self, "Import your world", _("Could not read the mod:") + "\n\n" + str(e))
+            return
         self.src = path
-        self.work = tempfile.mkdtemp(prefix="fl26ms_")
+        self.work = work
         label = os.path.splitext(os.path.basename(path.rstrip("\\/")))[0]
         self.name.setText(label)
         self.what.setText(_("Looking inside %s ...") % os.path.basename(path))
@@ -393,6 +398,8 @@ class Install(Page):
             self.save_sw = save_switch(self, self.app, new, saves.in_game(self.app.game), title="Import your world")
             if self.save_sw is None:
                 return
+        import time
+        self.t_install = time.time()               # an Edit save older than this is the old world's (B197)
         self.app.busy(True, _("Installing %s") % name)
         self.go.setEnabled(False)
         log = []
@@ -409,12 +416,38 @@ class Install(Page):
         clock = self.ticking(_("Installing %s") % name)
 
         def job(progress):
+            import lbstadiums
+            picked = {}                           # Stadiums > Your world's clubs: the picks stay with a new version
             for w in older:                       # the older version out first, not copied over
+                old = os.path.join(self.app.game.livecpk_dir, w)
+                picked[w] = (lbstadiums.load_edits(old), lbstadiums.load_game(old))
                 progress(_("Taking out the older %s") % w)
                 I.replace_world(self.app.game, ini, w, log=log.append)
             inst = I.Installer(self.app.game, ini, name, log=log.append, replace_lines=repl, comps=comps,
                                progress=lambda d, n, b: progress("%d / %d %s · %s" % (d, n, _("files"), gb(b))))
-            return inst.run(self.parts, where)
+            rec = inst.run(self.parts, where)
+            for w, (edits, game) in picked.items():
+                root = os.path.join(self.app.game.livecpk_dir, w)
+                if not os.path.isdir(root) or os.path.exists(os.path.join(root, lbstadiums.EDITS)):
+                    continue
+                if edits:
+                    lbstadiums.save_edits(root, edits)
+                    log.append("%s: the %d home stadium(s) you picked are kept" % (w, len(edits)))
+                hand, auto_on = game
+                if hand or auto_on:
+                    import json, lbgamestadiums
+                    lbstadiums.save_game(root, hand, auto_on)
+                    db = os.path.join(root, "common", "etc", "pesdb")
+                    try:
+                        with open(os.path.join(root, "leaguebuilder-plan.json"), encoding="utf-8") as f:
+                            picks = lbgamestadiums.world_picks(
+                                json.load(f), lbgamestadiums.confed_of(db, getattr(self.app.project, "base", None)),
+                                hand, auto_on)
+                        n = lbgamestadiums.write_team_bin(os.path.join(db, "Team.bin"), picks)
+                        log.append("%s: the game stadiums you gave the clubs are kept (%d changed)" % (w, n))
+                    except (OSError, ValueError) as e:
+                        log.append("%s: the game stadiums you gave the clubs could not be put back: %s" % (w, e))
+            return rec
 
         def done(rec):
             clock.stop()
@@ -535,6 +568,32 @@ class Install(Page):
             info(self, _("Ready to play"), text + "\n\n" +
                  _("Press Start the game and start a NEW Master League (an old career does not get the new leagues). "
                    "No Build needed."))
+        self.edit_check(w)
+
+    def edit_check(self, w):
+        """B197 (22.10.): the world's save folder still has the Edit save of its older version. Its
+        squads list players this version no longer has: a new Master League on it crashed in the
+        season (0x141321d00) or played with a team that lost every match. Build's box says so after
+        a Build; a world zip said nothing"""
+        from .. import game as G
+        since = getattr(self, "t_install", None)
+        if not since or not G.old_edit(since - 5):
+            return
+        if not ask(self, "Move the Edit save aside",
+                   _("An Edit save from before this install is in the game's save folder. Made for an older "
+                     "version of the world, it can stop a new Master League in the season or leave a club "
+                     "without its players, and it hides the new squads in Exhibition and Edit mode.") + "\n\n" +
+                   _("Move the Edit save aside") + "?"):
+            return
+        try:
+            name = G.edit_aside(w)
+        except OSError as e:
+            if not denied(self, e):                   # a game under Program Files (B43)
+                error(self, "Move the Edit save aside", str(e))
+            return
+        info(self, "Move the Edit save aside",
+             _("The Edit save is now %s, in the same folder. The game makes a new one; to get the old one "
+               "back, rename it to EDIT00000000.") % name)
 
     def show_fix(self):
         error(self, _("Almost ready"), _("Fix these, then the world is ready to play:") + "\n\n" +

@@ -59,6 +59,10 @@ CPKs: it all goes in through Sider modules and data files, and comes out again.
 > (you were given a world, a modpack or a `.fl26pack`) · [make your own leagues and packs](guides/en/make-your-own-leagues.md)
 > (you pick the leagues). Other languages: [guides/](guides/README.md)
 >
+> **0.2.5** is out (2026-10-28): leagues of up to 28 clubs, the modern CONMEBOL competitions if you
+> want them, Undo/Redo, transfers from a CSV, up to 35 players a new club, and many fixes. Build your
+> 0.2.4 world once with 0.2.5 and your career carries on. What changed: [changelog-0.2.5](docs/changelog/changelog-0.2.5.md)
+>
 > **0.2.4** is out: a new look, worlds you switch with one click, ready Modpacks installed
 > straight from their zip, a quick tour and step-by-step guides in *Help*. Your 0.2.2 / 0.2.3 career
 > keeps working. Mod Studio is **still in development**: something can break; tell us on Discord
@@ -95,7 +99,7 @@ All of it, folder by folder: [docs/README.md](docs/README.md).
 
 **Leagues and countries**
 
-- **Many new leagues** in one world, **10 to 24 clubs** each, playing each other 1 to 4
+- **Many new leagues** in one world, **10 to 28 clubs** each, playing each other 1 to 4
   times with the real number of rounds (10 clubs four times = 36 rounds). Since 0.2.2 there
   is room for 2,400 clubs in all, and our test world plays 86 new leagues with 1,294 new
   clubs; Build stops with a message when regulation ids or club room run out. Every league
@@ -289,7 +293,8 @@ worst bugs here were found only because vmardonesdev played further than anyone 
   February-December league its national cup and super cup (`fl26swiss`, `fl26join`, the League
   Builder and a test of its own), in 0.2.2. And
   [#146](https://github.com/Matozanato/FootballLife-new-leagues/pull/146), with nissindiaz: the modern CONMEBOL cups (Libertadores qualifying in
-  phases, the pre-Sudamericana, the Recopa and the Sudamericana play-off), going into 0.2.5.
+  phases, the pre-Sudamericana, the Recopa and the Sudamericana play-off), in 0.2.5 (South American
+  places > Modern CONMEBOL competitions).
 - The night 0.2.2 came out: the traceback that showed why Build stopped for everyone whose game
   is not in `C:\Football Life 2026`, sent the moment it happened, and the fix tested and
   confirmed within minutes, so 0.2.3 could go out for everyone the same evening.
@@ -580,7 +585,7 @@ and other Latin American worlds and writes up every bug with screenshots:
   again) and `patchset.py --calendar-ids N` for another calendar day size, with the module
   constants it needs ([#136](https://github.com/Matozanato/FootballLife-new-leagues/pull/136)),
   both in 0.2.2; the Copa do Nordeste and, with vmardonesdev, the modern South American cups
-  ([#146](https://github.com/Matozanato/FootballLife-new-leagues/pull/146), going into 0.2.5); and Master League removing clubs it took for
+  ([#146](https://github.com/Matozanato/FootballLife-new-leagues/pull/146), in 0.2.5); and Master League removing clubs it took for
   duplicates.
 - **Julio** (juliorivera10, Discord): players imported with a Spanish foot column all came out
   right-footed; Import players reads "Pie", "Zurdo", "Diestro" ... since 0.2.2.
@@ -623,6 +628,8 @@ and other Latin American worlds and writes up every bug with screenshots:
 - **diablofumao** (Discord): an exhibition with modpack clubs that never started, with logs.
 - **gxldemorci** (Discord): a best eleven of only defenders after a faces update.
 - **General Kreutaa** (Discord): the scoreboard of another country's league in the modpack.
+- **monkusgigus** (Discord): the national team you manage left without its friendlies and EURO matches, and the league title won on the last day with no celebration.
+- **papijonn** (Discord): the port to vanilla PES 2021.
 
 Reports are welcome from anyone: open an
 [issue](https://github.com/Matozanato/FootballLife-new-leagues/issues) with what you
@@ -709,7 +716,7 @@ Contributors, and what each of them did, are listed in
 [The people who made this better](#the-people-who-made-this-better) near the top: above all
 **vmardonesdev** and **Alikhaled_727**, **vector360** and **jibibi**, and **Stagnant09**, **pioup38**, **bobzera**,
 **spursfan07**, **Amir**, **victormican**, **Alby17**, **jyanj083-dotcom**, **Gabyyy2008**, **alexfe87**,
-**ThanosMJ**, **NudnyNick999**, **bnaanana**, **dannydecai**, **astyleUZ**, **Zega_1991**, **daemonkf-a11y**, **alby171994**, **Jabo9**, **Xxspedd**, **n1ne**, **LaraCroft**, **AlexRufolo**, **DavidBDJ**, **B2Y26Arabia**, **rwee**, **Risto**, **Yanis**, **LumpierTheGunner**, **Bon Kirk**, **wishfulshot**, **beny609o**, **Nickdaw**, **the_pelado**, **capital030**, **novarama** (moderator), **rickydicky4444**, **MIQABARI**, **nissindiaz**, **Julio**, **Uncle Lanscilo**, **vmican**, **GiorgiM**, **bythezl19**, **quicksite**, **fjchivvdub**, **ZeDosCaes21**, **ELBastos**, **Konkubent**, **beni_93**, **jojofiaz**, **Tysonche35**, **diwwanmago**, **bikolunar42**, **lmazot**, **Erax**, **juanjose6124**, **antoniodias_pt**, **bruce_wayne**, **Sasukidas**, **diablofumao**, **gxldemorci** and **General Kreutaa**.
+**ThanosMJ**, **NudnyNick999**, **bnaanana**, **dannydecai**, **astyleUZ**, **Zega_1991**, **daemonkf-a11y**, **alby171994**, **Jabo9**, **Xxspedd**, **n1ne**, **LaraCroft**, **AlexRufolo**, **DavidBDJ**, **B2Y26Arabia**, **rwee**, **Risto**, **Yanis**, **LumpierTheGunner**, **Bon Kirk**, **wishfulshot**, **beny609o**, **Nickdaw**, **the_pelado**, **capital030**, **novarama** (moderator), **rickydicky4444**, **MIQABARI**, **nissindiaz**, **Julio**, **Uncle Lanscilo**, **vmican**, **GiorgiM**, **bythezl19**, **quicksite**, **fjchivvdub**, **ZeDosCaes21**, **ELBastos**, **Konkubent**, **beni_93**, **jojofiaz**, **Tysonche35**, **diwwanmago**, **bikolunar42**, **lmazot**, **Erax**, **juanjose6124**, **antoniodias_pt**, **bruce_wayne**, **Sasukidas**, **diablofumao**, **gxldemorci**, **General Kreutaa**, **monkusgigus** and **papijonn**.
 
 The licence asks nothing of you. I do: **if you use these findings, addresses, patch sets
 or tools in a mod, credit this work and link back** — see

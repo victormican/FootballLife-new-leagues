@@ -4,7 +4,7 @@ The recipe is the same JSON leaguebuilder.py builds from.  The tables are the ga
 Team/Competition/Player tables, unpacked once from the person's game into
 %APPDATA%\\FL26ModStudio\\tables (Settings > Unpack the game's tables).
 """
-import json, os, shutil, zlib
+import copy, json, os, shutil, time, zlib
 
 from PySide6.QtCore import QObject, Signal
 
@@ -28,6 +28,9 @@ class Project(QObject):
         self.recipe = blank()
         self.path = None
         self.dirty = False
+        # 0.2.5: Undo and Redo of the whole world (mato 16.10.): a copy of the recipe before each
+        # change, up to 30 back; touches within a third of a second are one step
+        self._undo, self._redo, self._snap, self._snap_at = [], [], copy.deepcopy(self.recipe), 0.0
         self.base = None
         self.overlay = 0            # files of the chosen tables folder laid over the game's (0: a full set)
         self.tables_error = ""
@@ -39,6 +42,9 @@ class Project(QObject):
         self.parent_tiers = {}
         self._squads = None
         self._names = None
+        # 0.2.5: World options > Players per new club -- the world's squad is the one every page and
+        # Build count new clubs' places with (connected first, so it is set before a page reads it)
+        self.changed.connect(lambda: B.use_squad(self.recipe))
 
     # ---- tables ----
     def tables_dir(self):
@@ -90,6 +96,8 @@ class Project(QObject):
 
     def load_tables(self, where=None):
         where = where or self.app.settings.get("tables") or None
+        # B218: a whole database mod as the tables has no kits file beside it; the game's unpacked one then
+        B.KITS_FALLBACK[:] = [os.path.join(self.tables_dir(), B.UNIPAR.replace("/", os.sep))]
         self.overlay, self.tables_error = 0, ""
         try:
             self.base = B.base_dir(self._tables_of(where)) if where else B.base_dir(self._default_tables())
@@ -244,9 +252,63 @@ class Project(QObject):
 
     # ---- recipe ----
     def touch(self):
+        self._remember()
         self.dirty = True
         self.changed.emit()
         self._autosave_soon()
+
+    def mark(self):
+        """a change the page shows by itself (Players): kept and saved like touch(), without the
+        changed signal that fills the pages again. Players set dirty alone, so nothing saved it
+        and closing asked about changes while the status bar said the world was saved"""
+        self._remember()
+        self.dirty = True
+        self._autosave_soon()
+
+    # ---- undo ----
+    def _remember(self):
+        """keep the recipe as it was before this change (one step for touches close together)"""
+        if self.recipe == self._snap:
+            return
+        now = time.monotonic()
+        if now - self._snap_at > 0.3:
+            self._undo.append(self._snap)
+            del self._undo[:-30]
+        self._redo.clear()
+        self._snap, self._snap_at = copy.deepcopy(self.recipe), now
+
+    def _forget(self):
+        self._undo, self._redo, self._snap, self._snap_at = [], [], copy.deepcopy(self.recipe), 0.0
+
+    def can_undo(self):
+        return bool(self._undo)
+
+    def can_redo(self):
+        return bool(self._redo)
+
+    def _restore(self, state):
+        """the recipe becomes `state` in place: the pages keep their references to the dict"""
+        self.recipe.clear()
+        self.recipe.update(copy.deepcopy(state))
+        self._snap, self._snap_at = copy.deepcopy(state), 0.0
+        self.dirty = True
+        self.changed.emit()
+        self._autosave_soon()
+
+    def undo(self):
+        """back one change; True when there was one"""
+        if not self._undo:
+            return False
+        self._redo.append(copy.deepcopy(self.recipe))
+        self._restore(self._undo.pop())
+        return True
+
+    def redo(self):
+        if not self._redo:
+            return False
+        self._undo.append(copy.deepcopy(self.recipe))
+        self._restore(self._redo.pop())
+        return True
 
     def _autosave_soon(self):
         """0.2.4: your world keeps itself (no Save recipe to remember): a change is saved a moment
@@ -401,7 +463,7 @@ class Project(QObject):
         the club at place `at`: every list kept per place, the clubs of the game, the player
         changes and the pre-season cups that name its clubs by place move with it. A split
         league's last group takes the difference. Returns False when the league would leave
-        leaguebuilder's 10..24 clubs."""
+        leaguebuilder's CLUBS_MIN..CLUBS_MAX clubs."""
         L = self.league(name)
         if not L or delta not in (1, -1):
             return False
@@ -473,7 +535,22 @@ class Project(QObject):
 
     def new(self):
         self.recipe, self.path, self.dirty = blank(), None, False
+        self._forget()
+        self._open_next(None)
         self.changed.emit()
+
+    def _open_next(self, path):
+        """B107: the next start opens the world open now. New world and Open left last_recipe on the
+        world before, so a world deleted and replaced by a new, untouched one came back at the next
+        start"""
+        st = getattr(self.app, "settings", None)
+        if not isinstance(st, dict) or st.get("last_recipe") == path:
+            return
+        st["last_recipe"] = path
+        try:
+            self.app.save_settings()
+        except (AttributeError, OSError):
+            pass
 
     def open(self, path, copy=False):
         """load a recipe; copy=True for the copy Build keeps (keep_copy): Save then asks for a name"""
@@ -484,10 +561,21 @@ class Project(QObject):
         off the window's thread (the Modpack's is 132 MB, 1.4 s of json.load)"""
         if not str(r.get("world", "")).startswith("_FL26"):
             raise B.BuildError("the world name must start with _FL26")
+        if B.is_plan(r):
+            # B224: a world's leaguebuilder-plan.json opened as a world (a tester took the one in
+            # a downloaded world's folder, and every start then crashed counting its clubs). The
+            # recipe it was built from, read back as My world does; Save asks for a name, so the
+            # world's own plan is never written over
+            if not self.base:
+                raise B.BuildError("this is the plan of a built world, not a world file: "
+                                   "put the world in the game and open it in My world")
+            r, copy = B.recipe_from_plan(r, self.base), True
         r.setdefault("leagues", [])
         r.setdefault("edits", {})
         r.setdefault("players", {})
         self.recipe, self.path, self.dirty = r, None if copy else path, False
+        self._forget()
+        self._open_next(path)
         self.changed.emit()
 
     def save(self, path=None):

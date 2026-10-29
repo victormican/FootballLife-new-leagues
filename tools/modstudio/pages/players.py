@@ -13,7 +13,7 @@ import lbplayers as P
 import leaguebuilder as B
 import playeredit as E
 from .. import theme
-from ..i18n import _
+from ..i18n import _, tr
 from ..ui import hint, row, ask, error, info, section
 from .builder import BuilderPage
 
@@ -43,7 +43,11 @@ class Players(BuilderPage):
                     "database -- becomes this club's squad"),
                    None,
                    ("Import CSV...", self.import_csv),
-                   ("Export CSV...", self.export_csv)])
+                   ("Export CSV...", self.export_csv),
+                   None,
+                   ("Import transfers...", self.import_transfers,
+                    "A CSV of transfers (player, to, and from if two players share a name) moves every "
+                    "player of it to his new club at Build")])
 
         pick = QHBoxLayout()
         pick.addWidget(QLabel(_("League")))
@@ -499,7 +503,7 @@ class Players(BuilderPage):
             L.pop("club_ids", None)
         self.say(_("Club id %s: kits, crests and the squad of this club are made for it at Build.") % text
                  if text else "", "ok" if text else None)
-        self.project.dirty = True
+        self.project.mark()
 
     def is_national(self, key=None):
         key = self.club if key is None else key
@@ -1000,8 +1004,12 @@ class Players(BuilderPage):
         orig = self.original(self.cur)
         if key == "name" and not val and not self.club.isdigit():
             val = ""
+        rebased = None
         if self.cur.startswith(NEW):
             a = self.changes(True).setdefault("add", [])[int(self.cur[1:])]
+            if key == "Registered Position" and val != a.get(key, orig.get(key)):
+                v0 = self.current_view()
+                rebased = P.new_position(a, val, self.rows, P.rating(v0[1]) if v0 else None)
             a[key] = val
         else:
             ed = self.changes(True).setdefault("edits", {})
@@ -1014,6 +1022,10 @@ class Players(BuilderPage):
                 p = E.POSITIONS.index(val) if val in E.POSITIONS else None
                 if p is not None and ch.get(val, orig.get(val)) != "2":
                     ch[val] = "2"             # a new position is a natural one, as playeredit does
+                if p is not None and P.keeper_side(orig.get(key), val):
+                    for q in E.POSITIONS:     # over the keeper line: none of the old side's (B201)
+                        if P.keeper_side(q, val) and str(orig.get(q, "0")) != "0":
+                            ch[q] = "0"
             if not ch:
                 ed.pop(self.cur, None)
         err = P.check_edit({key: val}) if val != "" else []
@@ -1021,10 +1033,16 @@ class Players(BuilderPage):
             self.say(err[0], "err")
         else:
             self.say("")
-        self.project.dirty = True
+        self.project.mark()
         self._mark(key, val != str(orig.get(key, "")))
         if key in ("name", "shirt", "order", "Registered Position", "Age", "Stronger Foot") or key in E.FIELDS:
             self.update_row()
+        if key == "Registered Position" and self.cur.startswith(NEW):
+            self.fill_squad()                 # his positions (and abilities) changed with it
+            self.inspect()
+            if rebased:
+                self.say(_("Abilities taken from %s (%s), at the same rating.")
+                         % (rebased.get("name") or rebased["player"], rebased.get("Registered Position", "")), "ok")
 
     def id_problem(self, val):
         """why a player id cannot be taken, or None"""
@@ -1076,13 +1094,13 @@ class Players(BuilderPage):
     def undo_player(self):
         if self.cur and not self.cur.startswith(NEW):
             (self.changes().get("edits") or {}).pop(self.cur, None)
-            self.project.dirty = True
+            self.project.mark()
             self.fill_squad()
 
     def undo_club(self):
         if self.club and self.changes() and ask(self, "Players", _("Forget every change to this club's players?")):
             self.project.players().pop(self.club, None)
-            self.project.dirty = True
+            self.project.mark()
             self.fill_squad()
 
     def set_orders(self, orders):
@@ -1112,7 +1130,7 @@ class Players(BuilderPage):
                 forms += [""] * (int(k) + 1 - len(forms))
                 forms[int(k)] = auto["label"]
                 L["club_formations"] = forms
-        self.project.dirty = True
+        self.project.mark()
         self.fill_squad()
 
     def shift(self, d):
@@ -1155,7 +1173,7 @@ class Players(BuilderPage):
                     target[n] = str(v)
             if not k.startswith(NEW) and not target:
                 ed.pop(k, None)
-        self.project.dirty = True
+        self.project.mark()
         self.fill_squad()
         d, top, e = P.move(t)
         if top:
@@ -1170,7 +1188,7 @@ class Players(BuilderPage):
         like = self.cur if not self.cur.startswith(NEW) else \
             str((self.changes().get("add") or [])[int(self.cur[1:])].get("like"))
         self.changes(True).setdefault("add", []).append({"like": like, "name": ""})
-        self.project.dirty = True
+        self.project.mark()
         self.cur = NEW + str(len(self.changes()["add"]) - 1)
         self.fill_squad()
         self.ed["name"].setFocus()
@@ -1185,7 +1203,7 @@ class Players(BuilderPage):
             if not c["join"]:
                 c.pop("join")
             self.cur = None
-            self.project.dirty = True
+            self.project.mark()
             self.fill_squad()
             return
         dest = self.moves().get(self.ref_of(self.cur)) if not self.is_national() else None
@@ -1194,7 +1212,7 @@ class Players(BuilderPage):
             j.remove(self.ref_of(self.cur))
             if not j:
                 self.project.players()[dest].pop("join")
-            self.project.dirty = True
+            self.project.mark()
             self.fill_squad()
             self.say(_("The transfer to %s is called off.") % self.club_label(dest), "ok")
             return
@@ -1214,7 +1232,7 @@ class Players(BuilderPage):
                 gone.remove(self.cur)          # a second press takes it back
             else:
                 gone.append(self.cur)
-        self.project.dirty = True
+        self.project.mark()
         self.fill_squad()
 
     def sign_players(self):
@@ -1246,7 +1264,7 @@ class Players(BuilderPage):
                     self.project.players()[moves[r]].pop("join")
         refs = [r for r in refs if r not in back]
         if back:
-            self.project.dirty = True
+            self.project.mark()
         if not refs:
             self.fill_squad()
             return
@@ -1266,7 +1284,7 @@ class Players(BuilderPage):
                     self.project.players()[moves[r]].pop("join")
         j = self.changes(True).setdefault("join", [])
         j += [r for r in refs if r not in j]
-        self.project.dirty = True
+        self.project.mark()
         self.fill_squad()
         self.say((_("%d players called up; they stay at their clubs.") if national else
                   _("%d players join this club; their old clubs lose them.")) % len(refs), "ok")
@@ -1311,7 +1329,7 @@ class Players(BuilderPage):
         for cc in self.project.players().values():
             if "join" in cc and not cc["join"]:
                 cc.pop("join")
-        self.project.dirty = True
+        self.project.mark()
         self.fill_squad()
         self.say(_("%s moves to %s at Build.") % (name, self.club_label(dest)) if dest != home else
                  _("%s stays at %s.") % (name, self.club_label(dest)), "ok")
@@ -1325,7 +1343,7 @@ class Players(BuilderPage):
         if c.get("coach_portrait") and ask(self, "Players", _("The manager has the portrait %s. Take it away?")
                                            % os.path.basename(c["coach_portrait"])):
             c.pop("coach_portrait")
-            self.project.dirty = True
+            self.project.mark()
             self.fill_squad()
             return
         p, _f = QFileDialog.getOpenFileName(self, _("Manager portrait..."), self.app.settings.get("portrait_dir", ""),
@@ -1338,7 +1356,7 @@ class Players(BuilderPage):
             return
         self.app.settings["portrait_dir"] = os.path.dirname(p)
         self.changes(True)["coach_portrait"] = os.path.normpath(p)
-        self.project.dirty = True
+        self.project.mark()
         self.fill_squad()
         self.say(_("Build makes %s the portrait of this club's manager.") % os.path.basename(p), "ok")
 
@@ -1397,12 +1415,87 @@ class Players(BuilderPage):
                     cur[k] = v
             if not cur:
                 ed.pop(key, None)
-        self.project.dirty = True
+        self.project.mark()
         self.fill_squad()
         text = _("%d players changed.") % len(got)
         if joins:
             text += "\n" + _("%d players of other clubs join this one.") % len(joins)
         info(self, "Import CSV...", text)
+
+    def import_transfers(self):
+        """a CSV of transfers for the whole world (jibibi 23.10.; mato: the player makes the table,
+        off Transfermarkt or anywhere, Mod Studio reads it): each line's player joins its club as
+        Transfer to... does it"""
+        from .playerpick import candidates
+        title = _("Import transfers...")
+        if self.project.squads() is None:
+            return
+        p, _f = QFileDialog.getOpenFileName(self, title, self.app.settings.get("transfers_dir", ""),
+                                            "CSV (*.csv *.txt);;" + _("All files") + " (*.*)")
+        if not p:
+            return
+        self.app.settings["transfers_dir"] = os.path.dirname(p)
+        players = []
+        for r in candidates(self.project):
+            ref = str(r["player"])
+            src, _n = P.split_ref(ref)
+            home = [src] if src is not None else [str(t) for t in r.get("clubs") or []
+                                                  if not self.is_national(str(t))]
+            players.append({"player": ref, "name": r.get("name") or "", "home": home})
+        clubs = []
+        for L in self.project.recipe["leagues"]:
+            for k, n in enumerate(self.new_names(L)):
+                clubs.append((n, P.new_key(L["name"], k)))
+        teams = {t for r, c, n, ts in self.project.game_lgs for t in ts} | set(self.project.game_other)
+        for tid in sorted(teams):
+            if tid in self.project.game_cl:
+                clubs.append((self.game_name(tid), str(tid)))
+        try:
+            got, err = P.import_transfers(p, players, clubs)
+        except (P.Error, OSError, ValueError, UnicodeDecodeError) as e:
+            error(self, title, tr(str(e)) + "\n\n" + _("The first line names the columns: player (his name or id), "
+                                                  "to (the club he joins) and, if you like, from (his club now)."))
+            return
+        if not got:
+            error(self, title, _("Nothing imported:") + "\n\n" + "\n".join(tr(x) for x in err[:20]))
+            return
+        pl = self.project.players()
+        moved = stay = 0
+        for ref, dest, _line in got:
+            for club, cc in pl.items():                 # one club at a time
+                if not self.is_national(club) and ref in [str(r) for r in cc.get("join") or []]:
+                    cc["join"] = [r for r in cc["join"] if str(r) != ref]
+            if dest != self.home_of(ref):
+                pl.setdefault(dest, {}).setdefault("join", []).append(ref)
+                moved += 1
+            else:
+                stay += 1
+        for cc in pl.values():
+            if "join" in cc and not cc["join"]:
+                cc.pop("join")
+        full = []                                        # Build leaves out the last to come (B46)
+        moves, sq = self.moves(), self.project.squads()
+        for dest in sorted({d for _r, d, _l in got}):
+            c = pl.get(dest) or {}
+            n = len(sq.by_club.get(int(dest), [])) if dest.isdigit() else len(sq.proto())
+            n += len(c.get("join") or []) - len(c.get("remove") or [])
+            n -= sum(1 for r, d in moves.items() if d != dest and self.home_of(r) == dest)
+            if n > P.CLUB_MAX:
+                full.append("%s: %d" % (self.club_label(dest), n))
+        self.project.mark()
+        if self.club:
+            self.fill_squad()
+        text = _("%d players move to their new clubs at Build.") % moved
+        if stay:
+            text += "\n" + _("%d are at that club already (a transfer of theirs was called off).") % stay
+        if full:
+            text += "\n\n" + (_("More than %d players at these clubs: Build leaves out the last ones to come.")
+                              % P.CLUB_MAX) + "\n" + "\n".join(full[:15])
+        if err:
+            text += "\n\n" + _("%d lines left out:") % len(err) + "\n" + "\n".join(tr(x) for x in err[:20])
+            if len(err) > 20:
+                text += "\n..."
+        info(self, title, text)
 
     def import_table(self):
         """a squad from any table of players (squadimport.py). A row with the game's id of a player
@@ -1507,7 +1600,7 @@ class Players(BuilderPage):
             c["remove"] = gone
         if not ed:
             c.pop("edits", None)
-        self.project.dirty = True
+        self.project.mark()
         self.cur = None
         if new:
             self.fill_squad()                        # Build picks the best eleven of a new club

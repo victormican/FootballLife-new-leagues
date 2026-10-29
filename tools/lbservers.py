@@ -133,10 +133,34 @@ def wanted(pl):
     return kits, boards
 
 
+GAME = "Clubs of the game"          # the made kits of game clubs whose place went to another club
+
+
+def replaced_clubs(pl):
+    """{team id: (name, home words, own crest)} of the clubs of the game whose place the world gave
+    another club (NewLife's "Bring the game's leagues to this season": edits.clubs with "kit",
+    newlife.refresh_game_leagues, B57). The id stays the game's, so the game's kit for it -- and a
+    kit pack's Kit Server line for it (5009, "Bundesliga\\Heidenheim") -- is the kit of the club
+    that left: B176 (quicksite, NedimMM 20.10.), Europack eu4's Schalke 04 (5009), SC Paderborn
+    (4139) and SV Elversberg (232) in the Bundesliga wore Heidenheim's, St. Pauli's and
+    Wolfsburg's kits. Such a club gets a kit made from its colours and crest, as a new club does.
+    "replaced_kits": false (Vicentico12 23.10.) leaves them none: the game's kit, or the kit pack's
+    line for the id, stays"""
+    out = {}
+    if pl.get("replaced_kits") is False:
+        return out
+    for tid, v in ((pl.get("edits") or {}).get("clubs") or {}).items():
+        if isinstance(v, dict) and "kit" in v and str(tid).isdigit():
+            out[int(tid)] = (v.get("name") or "", v.get("kit") or "", bool(v.get("crest")))
+    return out
+
+
 def to_make(pl, root):
     """[(team id, league, place, home words, away words, crest picture)] of the new clubs that get a
     kit made (kitmaker): no Kit Server folder of their own, a shirt in words or a crest picture of
-    their own.  A club of the game keeps its kits; "make_kits": false makes none."""
+    their own.  A club of the game keeps its kits -- unless the world gave its place to another
+    club (replaced_clubs): that club's kit is made under GAME, its place the team id.
+    "make_kits": false makes none."""
     import kitmaker
     if pl.get("make_kits") is False:
         return []
@@ -160,6 +184,17 @@ def to_make(pl, root):
                     continue
             out.append((int(tid), p.get("name") or "Other clubs", k, words,
                         kitmaker.words(away[k] if k < len(away) else ""), crest))
+    have = {x[0] for x in out}
+    for tid, (_name, kit, own) in sorted(replaced_clubs(pl).items()):
+        crest = os.path.join(root, "common", "render", "symbol", "flag", "e_%06d_r_ll.png" % tid)
+        words = kitmaker.words(kit)
+        if tid in have or not os.path.isfile(crest) or not (words or own):
+            continue                          # no colours and a badge of initials: the game's kit stays
+        if not words:
+            words = kitmaker.crest_kit(crest)
+            if not words:
+                continue
+        out.append((tid, GAME, tid, words, None, crest))
     return out
 
 
@@ -178,24 +213,80 @@ def numbers_kit(lib, ours):
     return None
 
 
-def _stamps(words, away, crest, numbers, lib=None):
+LIGHT, DARK, LOOK = 0.6, 0.05, 40      # B214: numbers this light / this dark; kits looked at at most
+
+
+def numbers_kits(lib, ours):
+    """B214: the kits of the library to lend numbers from, [] when none has them: numbers_kit's
+    first, then the first by name whose numbers are light and the first whose are dark (when the
+    first's are not already), so every drawn kit finds numbers that stand out from its shirt.
+    One walk of the library, as numbers_kit's (a Switch on is timed, B104)"""
+    import kitpics
+    out, want, seen = [], {"light", "dark"}, 0
+    for d, subs, files in sorted(os.walk(lib)):
+        rel = os.path.relpath(d, lib)
+        if rel.split(os.sep)[0] == ours:
+            subs[:] = []
+            continue
+        if os.path.basename(d).lower() != "p1":
+            continue
+        names = [f.lower() for f in files]
+        if not all(any(n.endswith(s + ".ftex") for n in names) for s in ("_back", "_leg", "_name")):
+            continue
+        if not out:
+            out.append(os.path.dirname(d))
+        if not want or seen >= LOOK:
+            break
+        seen += 1
+        c = kitpics.ink(d)
+        lum = kitpics._lum(c) if c else None
+        kind = None if lum is None else "light" if lum >= LIGHT else "dark" if lum <= DARK else None
+        if kind in want:
+            want.discard(kind)
+            if os.path.dirname(d) not in out:
+                out.append(os.path.dirname(d))
+    return out
+
+
+# B213 (Dolokhov, 23.10.): how the kits are drawn. 0.2.4 turned the shorts crest a quarter (B138),
+# but a kit is drawn again only when its stamp changes, and the stamp held the colours and the
+# crest alone: every kit drawn before kept its crest lying on its side. The drawing is in the
+# stamp now; a Build draws a kit of an older drawing again, a Switch on keeps it (B104: every kit
+# of a world drawn at a Switch on is minutes with the window not answering).
+# 3 (B214): the numbers picked for each kit from a few numbers kits (numbers_kits)
+DRAWING = 3
+
+
+def _stamps(words, away, crest, numbers, lib=None, drawing=DRAWING):
     """the kitmaker.txt stamps that count as "made from these": the first is the one written now,
     with the numbers kit by its folder inside the kit library. B104: the stamp had the numbers
     kit's whole path, so on every other PC (and on this one with the other slash) every made kit
     of a world was drawn again at its first Switch on -- 728 for the Modpack, many minutes with
-    the window not answering. The others are the stamps written before, with this PC's path."""
+    the window not answering. The others are the stamps written before, with this PC's path.
+    drawing 1: the stamps of the drawing before B213, which did not name it. numbers: a folder,
+    or numbers_kits' list -- drawing 3 names them all, the drawings before it the first (B214)."""
     import hashlib, kitmaker
-    rel = numbers or ""
-    if numbers and lib:
-        try:
-            rel = os.path.relpath(numbers, lib).replace(os.sep, "/")
-        except ValueError:                    # on another drive: the path as it is
-            rel = numbers
+
+    def inside(k):
+        if k and lib:
+            try:
+                return os.path.relpath(k, lib).replace(os.sep, "/")
+            except ValueError:                # on another drive: the path as it is
+                pass
+        return k or ""
+    if isinstance(numbers, (list, tuple)) and drawing >= 3:
+        names = ["|".join(inside(k) for k in numbers)]
+    else:
+        if isinstance(numbers, (list, tuple)):
+            numbers = numbers[0] if numbers else None
+        names = [inside(numbers)] + ([numbers, numbers.replace("/", os.sep), numbers.replace(os.sep, "/")]
+                                     if numbers else [""])
     pic = open(crest, "rb").read()
     out = []
-    for n in [rel] + ([numbers, numbers.replace("/", os.sep), numbers.replace(os.sep, "/")] if numbers else [""]):
+    for n in names:
         h = hashlib.md5()
-        for x in (words, away or "", n or "", os.path.getsize(kitmaker.MASK)):
+        for x in (words, away or "", n or "", os.path.getsize(kitmaker.MASK)) + \
+                 (("drawing %d" % drawing,) if drawing > 1 else ()):
             h.update(str(x).encode("utf-8") + b"\0")
         h.update(pic)
         if h.hexdigest() not in out:
@@ -203,16 +294,27 @@ def _stamps(words, away, crest, numbers, lib=None):
     return out
 
 
-def _made(tid, words, away, crest, dst, numbers, log, lib=None, ready=False):
+def _made(tid, words, away, crest, dst, numbers, log, lib=None, ready=False, redraw=False):
     """the kit folder dst made from words and crest, unless it was made from the same ones.
     ready: the world came ready from a zip (Install mods) with its made kits in it -- a kit
-    folder with a stamp is kept as it came, whatever PC drew it (B104)"""
+    folder with a stamp is kept as it came, whatever PC drew it (B104). redraw (a Build): a kit
+    of an older drawing is drawn again; at a Switch on it is kept (B213)"""
     import kitmaker, kitpics, tempfile
     stamps = _stamps(words, away, crest, numbers, lib)
     stamp = os.path.join(dst, "kitmaker.txt")
     try:
         had = open(stamp, encoding="utf-8").read().strip()
         if had in stamps or (ready and had):
+            return False
+        if had and not redraw and any(had in _stamps(words, away, crest, numbers, lib, drawing=d)
+                                      for d in range(1, DRAWING)):
+            return False
+        # B166: a made kit whose files were changed after it was drawn (a kit put in its folder by
+        # hand) is the player's: never drawn over
+        made = int(os.path.getmtime(stamp))
+        if had and any(t > made + SLACK for _s, t in _files(dst).values()):
+            log("  kit of %s: its files were changed by you, kept (delete the folder to have it drawn "
+                "again)" % dst)
             return False
     except OSError:
         pass
@@ -229,23 +331,71 @@ def _made(tid, words, away, crest, dst, numbers, log, lib=None, ready=False):
     return True
 
 
-def _copy(src, dst):
-    """src's files into dst (dst made again only when they differ: a size or a time)"""
-    same = os.path.isdir(dst)
-    if same:
-        for d, _s, files in os.walk(src):
-            for f in files:
-                a = os.path.join(d, f)
-                b = os.path.join(dst, os.path.relpath(a, src))
-                if not os.path.exists(b) or os.path.getsize(a) != os.path.getsize(b):
-                    same = False
-                    break
-            if not same:
-                break
-    if not same:
-        if os.path.isdir(dst):
-            shutil.rmtree(dst)
-        shutil.copytree(src, dst)
+COPIED = "modstudio-copy.txt"       # in a copied kit folder: what Mod Studio put there, file by file
+SLACK = 30                          # seconds: a file this much newer than ours was changed after
+
+
+def _files(d):
+    """{path inside d: (size, whole seconds of its time)} of d's files, our own notes left out"""
+    out = {}
+    for x, _s, files in os.walk(d):
+        for f in files:
+            p = os.path.join(x, f)
+            r = os.path.relpath(p, d).replace(os.sep, "/")
+            if r not in (COPIED, "kitmaker.txt"):
+                st = os.stat(p)
+                out[r] = (st.st_size, int(st.st_mtime))
+    return out
+
+
+def _changed(have, was):
+    """True when the files have differ from the files was (what Mod Studio put there): one more,
+    one gone, another size or a time more than SLACK apart"""
+    return set(have) != set(was) or any(
+        have[r][0] != was[r][0] or abs(have[r][1] - was[r][1]) > SLACK for r in have)
+
+
+def _copy(src, dst, log=None):
+    """src's files into dst: dst made again only when they differ (a size), and only when dst is
+    still what Mod Studio copied there. B166 (LaraCroft 19.10.): SV Ried's kit, changed by hand in
+    its folder of the world, was put back to the package's at the next Build / Switch on (a size
+    differed: rmtree + copytree). Now a copy leaves COPIED in dst, and a folder whose files are no
+    longer those is the player's and stays; a copy from before COPIED counts as changed when one
+    of its files is newer than the package's (a copy keeps the package's times).
+    Returns "same", "copied" or "kept"."""
+    if os.path.isdir(dst):
+        want, have = _files(src), _files(dst)
+        if all(r in have and have[r][0] == want[r][0] for r in want):
+            return "same"
+        was = None
+        try:
+            with open(os.path.join(dst, COPIED), encoding="utf-8") as f:
+                was = {}
+                for l in f:
+                    r, _t, rest = l.rstrip("\n").partition("\t")
+                    size, _t, t = rest.partition("\t")
+                    if r and size.isdigit() and t.lstrip("-").isdigit():
+                        was[r] = (int(size), int(t))
+        except OSError:
+            pass
+        if was is not None:
+            mine = _changed(have, was)
+        else:
+            mine = any(r not in want or have[r][1] > want[r][1] + SLACK for r in have)
+        if mine:
+            if log:
+                log("  kit folder %s: changed by you, kept (the package's kit is not copied over it; "
+                    "delete the folder to have it again)" % dst)
+            return "kept"
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+    try:
+        with open(os.path.join(dst, COPIED), "w", encoding="utf-8") as f:
+            for r, (size, t) in sorted(_files(dst).items()):
+                f.write("%s\t%d\t%d\n" % (r, size, t))
+    except OSError:
+        pass
+    return "copied"
 
 
 def carried(l, world):
@@ -354,25 +504,54 @@ def _map(path, mine, log, what, world="", sider=None, keep=None):
     return len(mine)
 
 
-def _yours(sider, klib, world=""):
+# words of a club's name that do not tell which club it is
+GENERIC = set("""fc sc sv cf ac as afc cd ud sd fk nk hnk kf ks fks sk bk ik if ff vfl vfb tsg bsc rb
+    club clube clubul klub kulubu calcio football futbol futebol fussball sport sports sporting
+    sportif spor esporte esportes sportverein verein borussia united city town county athletic
+    athletico atletico atletica atletico real deportivo deportiva deportes union olympique
+    olympic racing inter dynamo dinamo lokomotiv spartak rapid stade wanderers rovers albion
+    universidad universitario estudiantes independiente nacional academica associacao
+    asociacion sociedad san santa saint the and de del la des der los las""".split())
+
+
+def name_words(name):
+    """the words of a club's (or a kit folder's) name that tell the club: lower case, no accents"""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode().lower()
+    return {w for w in re.split(r"[^a-z0-9]+", s) if len(w) > 2 and not w.isdigit() and w not in GENERIC}
+
+
+def _yours(sider, klib, world="", names=None):
     """team ids that have a kit line of your own in map.txt (one Build did not write), switched on
     or switched off by us, whose folder is in the library: a line to a kit that is not installed
     gives the club nothing, so ours goes in for it (22 clubs of the modpack world, 13.10.).  A
     kit the world carries from another pack (carried) counts as one of yours: no kit is made
-    over it"""
+    over it.  names {team id: name}: the clubs of the game whose place the world gave another
+    club (replaced_clubs) -- a line for one of them counts only when its folder names that club.
+    A kit pack's line for the id is the kit of the club that left (B176: 5009,
+    "Bundesliga\\Heidenheim" under Schalke 04), and is switched off for ours while the world is on"""
     out = set()
+    names = names or {}
     for l in lbstadiums.read(os.path.join(sider, klib, "map.txt"))[0]:
         if TAG in l and not (world and carried(l, world)):
             continue
         m = LINE.match(l[:-len(OFF)] if l.endswith(OFF) else l)
         if m and (not m.group(1) or l.endswith(OFF)) and m.group(3).strip() \
                 and os.path.isdir(os.path.join(sider, klib, m.group(3).strip())):
-            out.add(int(m.group(2)))
+            tid = int(m.group(2))
+            folder = m.group(3).strip().replace("/", "\\").rstrip("\\").rsplit("\\", 1)[-1]
+            if tid in names and not name_words(names[tid]) & name_words(folder):
+                continue
+            out.add(tid)
     return out
 
 
 def made_rel(pl, world, league, k):
-    """the kit library folder (world\\league\\club) of the kit made for place k of league"""
+    """the kit library folder (world\\league\\club) of the kit made for place k of league; for
+    GAME, k is the club's team id"""
+    if league == GAME:
+        name = (replaced_clubs(pl).get(k) or ("",))[0]
+        return "%s\\%s\\%s" % (world, safe(GAME), safe(name or "club %d" % k))
     cn = [p for p in (pl.get("leagues") or []) + (pl.get("others") or [])
           if (p.get("name") or "Other clubs") == league][0].get("club_names") or []
     return "%s\\%s\\%s" % (world, safe(league), safe(cn[k] if k < len(cn) and cn[k] else "club %d" % k))
@@ -390,7 +569,7 @@ def restamp(pl, sider, root, log=print):
     if not os.path.isdir(lib):
         return 0
     world = safe(pl.get("world") or "FL26 world")
-    numbers = numbers_kit(lib, world)
+    numbers = numbers_kits(lib, world)
     n = 0
     for tid, league, k, words, away, crest in to_make(pl, root):
         stamp = os.path.join(lib, made_rel(pl, world, league, k), "kitmaker.txt")
@@ -407,10 +586,162 @@ def restamp(pl, sider, root, log=print):
     return n
 
 
-def write(pl, sider, log=print, root=None):
+# B227 (antonimus, 24.10.): the Libertadores' phases 1 and 2 of a modern CONMEBOL world are a
+# competition of their own (leaguebuilder.libq, "Pre-Libertadores"), so the Scoreboard Server,
+# keyed by regulation id, gave their matches no board where the game's qualifying round has one.
+# They wear the board your map gives that round (regulation 8): a phase's regulation and its ties'
+# (reg + 1024 * k, mkeuropo.prerounds_single), each a line of ours, gone with the next Switch on.
+LIBQ_KEY, LIBQ_PARENT = "conmebol:FL_LIBQ", 8
+LIBQ_TIES = (("reg", 3), ("reg2", 8))          # leaguebuilder.libq: [(m1, 3), (m2, 8)]
+
+
+def helper_boards(pl, path, taken=()):
+    """[(regulation id, map line)] giving the Pre-Libertadores' regulations the folders the map at
+    path gives the game's Libertadores qualifying round -- every one of them, the server picks one
+    of a competition's boards at random -- or [] when the world has no such phases or the map no
+    line for that round; a regulation a line of yours (or taken) keys already is left out"""
+    ids = (pl.get("cup_ids") or {}).get(LIBQ_KEY) or {}
+    if not ids or not os.path.isfile(path):
+        return []
+    boards, have = [], set()                       # the round's folders; keys of your own lines
+    for l in lbstadiums.read(path)[0]:
+        m = LINE.match(l)
+        if not m or m.group(1) or TAG in l:
+            continue
+        have.add(int(m.group(2)))
+        f = m.group(3).strip()
+        if int(m.group(2)) == LIBQ_PARENT and f and f not in boards:
+            boards.append(f)
+    out = []
+    for field, ties in LIBQ_TIES if boards else ():
+        reg = ids.get(field)
+        if not isinstance(reg, int):
+            continue
+        for k in range(ties + 1):
+            key = reg + 1024 * k
+            if key not in taken and key not in have:
+                out += [(key, "%d, %s   %s Pre-Libertadores (as %d)" % (key, f, TAG, LIBQ_PARENT))
+                        for f in boards]
+    return out
+
+
+def libq_keys(pl):
+    """the Pre-Libertadores' regulation ids: each phase's and its ties' (reg + 1024 * k)"""
+    ids = (pl.get("cup_ids") or {}).get(LIBQ_KEY) or {}
+    return [ids[f] + 1024 * k for f, ties in LIBQ_TIES if isinstance(ids.get(f), int)
+            for k in range(ties + 1)]
+
+
+# B230 (antonimus 25.10.): the scoreboard alone was not enough -- Menu Server's themes, balls,
+# referees, referee kits, commentary and goal songs go by the competition id too, so the
+# Pre-Libertadores' matches got the generic menu where the game's qualifying round has the
+# Libertadores one. Every content\<server>\map_competitions.txt but the scoreboards' (helper_boards)
+# gives the phases what it gives regulation 8; Soundtrack Server's music, kept in folders named
+# by the id, gets a folder of the round's tracks for each (hard links, no copies of the music).
+HELPER_SKIP = {BOARDS.lower(), SPFL_BOARDS.lower()}
+SOUNDTRACK = os.path.join("content", "soundtrack-server")
+SOUND_SPECIFIC = ("4_Competitions_Specific", "6_Results_Specific", "8_Highlights_Specific")
+SOUND_PARENT = "CCL"                 # SoundtrackServer.lua: regulation 8 and its ties play the "CCL" folder
+SOUND_MARK = "made by FL26 Mod Studio.txt"
+REST = re.compile(r"^\s*(\d+)\s*,(.*?)\s*(#.*)?$")
+
+
+def helper_lines(pl, path, taken=()):
+    """[(regulation id, map line)] giving the Pre-Libertadores' regulations what the map at path
+    (any server's map_competitions.txt) gives the game's Libertadores qualifying round, every line
+    of it, or [] when the world has no such phases or the map no line for that round; a key a line
+    of yours (or taken) has already is left out"""
+    keys = libq_keys(pl)
+    if not keys or not os.path.isfile(path):
+        return []
+    rests, have = [], set()
+    for l in lbstadiums.read(path)[0]:
+        m = REST.match(l)
+        if not m or TAG in l:
+            continue
+        have.add(int(m.group(1)))
+        if int(m.group(1)) == LIBQ_PARENT and m.group(2).strip() and m.group(2) not in rests:
+            rests.append(m.group(2))
+    return [(key, "%d,%s   %s Pre-Libertadores (as %d)" % (key, r, TAG, LIBQ_PARENT))
+            for key in keys if key not in taken and key not in have for r in rests]
+
+
+HELPER_MARK = "Pre-Libertadores (as %d)" % LIBQ_PARENT
+
+
+def _helper_map(path, mine, log, what, sider=None):
+    """our Pre-Libertadores lines (helper_lines) into a server's map: the earlier ones out, the
+    rest of the file as it was -- other lines of ours (a world zip's menu themes) are menus()' and
+    the stadiums', and no line of yours is switched off (helper_lines leaves out a key you have)"""
+    lines, nl, bom, enc = lbstadiums.read(path)
+    rows = [l for l in lines if not (TAG in l and HELPER_MARK in l)]
+    if not mine and len(rows) == len(lines):
+        return 0
+    while rows and not rows[-1].strip():
+        rows.pop()
+    rows += [t for _k, t in mine]
+    lbstadiums.keep_before(path, "Switch on: %s map" % what, sider)
+    data = (nl.join(rows) + nl).encode(enc, "replace")
+    with open(path + ".tmp", "wb") as f:
+        f.write((b"\xef\xbb\xbf" if bom else b"") + data)
+    os.replace(path + ".tmp", path)
+    log("Pre-Libertadores (%s): %d line(s) as regulation %d" % (what, len(mine), LIBQ_PARENT))
+    return len(mine)
+
+
+def helper_servers(pl, sider, world, log=print):
+    """the Pre-Libertadores' lines into every other server's map_competitions.txt and their
+    music folders into Soundtrack Server's (helper_lines, B230); a world without the phases takes
+    ours out again. Returns the lines written"""
+    content = os.path.join(sider, "content")
+    n = 0
+    try:
+        dirs = sorted(os.listdir(content))
+    except OSError:
+        dirs = []
+    for d in dirs:
+        rel = os.path.join("content", d)
+        path = os.path.join(sider, rel, "map_competitions.txt")
+        if rel.lower() in HELPER_SKIP or not os.path.isfile(path):
+            continue
+        n += _helper_map(path, helper_lines(pl, path), log, d, sider)
+    keys = libq_keys(pl)
+    for sub in SOUND_SPECIFIC:
+        top = os.path.join(sider, SOUNDTRACK, sub)
+        if not os.path.isdir(top):
+            continue
+        src = os.path.join(top, SOUND_PARENT)
+        tracks = [f for f in os.listdir(src) if f.lower().endswith(".mp3")] if os.path.isdir(src) else []
+        made = 0
+        for name in os.listdir(top):
+            dst = os.path.join(top, name)
+            if os.path.isfile(os.path.join(dst, SOUND_MARK)) and (not tracks or not name.isdigit()
+                                                                  or int(name) not in keys):
+                shutil.rmtree(dst, ignore_errors=True)
+        for key in keys if tracks else ():
+            dst = os.path.join(top, str(key))
+            if os.path.isdir(dst) and not os.path.isfile(os.path.join(dst, SOUND_MARK)):
+                continue                        # a folder of your own for the id
+            os.makedirs(dst, exist_ok=True)
+            for f in tracks:
+                if not os.path.exists(os.path.join(dst, f)):
+                    try:
+                        os.link(os.path.join(src, f), os.path.join(dst, f))
+                    except OSError:
+                        shutil.copy2(os.path.join(src, f), os.path.join(dst, f))
+            with open(os.path.join(dst, SOUND_MARK), "w") as f:
+                f.write("Pre-Libertadores: the tracks of %s (regulation %d), for regulation %d\n"
+                        % (SOUND_PARENT, LIBQ_PARENT, key))
+            made += 1
+        if made:
+            log("Pre-Libertadores (soundtrack %s): %d folder(s) with the %s tracks" % (sub, made, SOUND_PARENT))
+    return n
+
+
+def write(pl, sider, log=print, root=None, redraw=False):
     """the plan's kits and scoreboards into Kit Server and Scoreboard Server, and a kit made for
     every other new club with colours or a crest (root: the world's folder, for the crests);
-    (kits, scoreboards) written"""
+    (kits, scoreboards) written. redraw: a Build's, kits of an older drawing drawn again (B213)"""
     kits, boards = wanted(pl)
     world = safe(pl.get("world") or "FL26 world")
     teams, comps = world_ids(pl, root)
@@ -418,12 +749,14 @@ def write(pl, sider, log=print, root=None):
     # B130: kserv.lua, when sider.ini loads it, stops at its start when content\kit-server has no
     # map_comp.txt, and the game then shows no kit of Kit Server at all (laracroft7826, 18.10.: his
     # kit-server folder held map.txt alone) -- an empty one is put there, as Kit Server's own
-    # download has it
-    comp = os.path.join(sider, KITS, "map_comp.txt")
-    if "kserv" in _live_modules(sider) and os.path.isdir(os.path.dirname(comp)) and not os.path.exists(comp):
+    # download has it. B265 (NedimMM 28.10.): SPFL26's common\kits.lua stops the same way in the
+    # folder it reads (his read content\kit-server, B165), so the check is made in the folder the
+    # live module reads, for either module
+    comp = os.path.join(sider, klib, "map_comp.txt")
+    if {"kserv", "kits"} & _live_modules(sider) and os.path.isdir(os.path.dirname(comp)) and not os.path.exists(comp):
         try:
             open(comp, "w").close()
-            log("kits: content\\kit-server had no map_comp.txt, which kserv.lua needs -- an empty one made")
+            log("kits: %s had no map_comp.txt, which Kit Server needs -- an empty one made" % klib)
         except OSError:
             pass
     make = to_make(pl, root) if root and os.path.isdir(os.path.join(sider, klib)) else []
@@ -433,7 +766,8 @@ def write(pl, sider, log=print, root=None):
     # a club with a kit line of your own keeps that kit: no kit made for it, and none of a league
     # package either (pepponeee98, 14.10.: his Serie C lines were switched off at every Build for
     # the package's kits, which went into a folder of the world again each time)
-    yours = _yours(sider, klib, world) if (make or kits) else set()
+    yours = _yours(sider, klib, world, {t: v[0] for t, v in replaced_clubs(pl).items()}) \
+        if (make or kits) else set()
     kept = sorted({x[0] for x in kits if x[0] in yours} | {x[0] for x in make if x[0] in yours})
     kits = [x for x in kits if x[0] not in yours]
     make = [x for x in make if x[0] not in yours]
@@ -449,6 +783,17 @@ def write(pl, sider, log=print, root=None):
             done.append(0)
             continue
         mine = []
+        # B259: the folder each id has under this world now, switched on or off (gianito9, 27.10.:
+        # the r12 Modpack made editable, its European leagues renamed -- Bulgarian First League to
+        # Efbet League -- and a Build left Bulgaria in the lent kits of Other Latin American teams:
+        # the source folders are on the PC that built the pack, and the zip's copies sit under the
+        # league's old name)
+        before = {}
+        for l in lbstadiums.read(os.path.join(root, file))[0]:
+            m = LINE.match(l)
+            f = m.group(3).strip() if m else ""
+            if f.lower().startswith(world.lower() + "\\") and os.path.isdir(os.path.join(root, f)):
+                before.setdefault(int(m.group(2)), f)
         for key, name, src in items:
             if what == "kits":
                 league, _s, k = name.rpartition("/")
@@ -460,7 +805,10 @@ def write(pl, sider, log=print, root=None):
                 rel = "%s\\%s" % (world, safe(name))
                 text = "%d, %s   %s %s" % (key, rel, TAG, name)
             if os.path.isdir(src):
-                _copy(src, os.path.join(root, rel))
+                _copy(src, os.path.join(root, rel), log)
+            elif not os.path.isdir(os.path.join(root, rel)) and before.get(key) \
+                    and before[key].lower() != rel.lower():
+                _copy(os.path.join(root, before[key]), os.path.join(root, rel), log)   # renamed: B259
             elif not os.path.isdir(os.path.join(root, rel)):
                 log("  %s of %s: no folder %s, skipped" % (what, name, src))
                 continue
@@ -468,13 +816,13 @@ def write(pl, sider, log=print, root=None):
             # the copy under <world>: the line stays (Install mods, whose Switch on dropped it)
             mine.append((key, text))
         if what == "kits" and make:
-            numbers = numbers_kit(root, world)
+            numbers = numbers_kits(root, world)
             new = 0
             for tid, league, k, words, away, crest in make:
                 rel = made_rel(pl, world, league, k)
                 try:
                     drawn = _made(tid, words, away, crest, os.path.join(root, rel), numbers, log,
-                                  lib=root, ready=ready)
+                                  lib=root, ready=ready, redraw=redraw)
                 except Exception as e:               # one bad crest picture must not stop the Build
                     log("  kit of %s: not made (%s)" % (rel, e))
                     continue
@@ -484,6 +832,8 @@ def write(pl, sider, log=print, root=None):
                 mine.append((tid, '%d, "%s"   %s %s/%d made' % (tid, rel, TAG, league, k)))
             log("kits made from colours and crests: %d (%d new or changed)%s" % (
                 len(make), new, "" if numbers else "; no kit in the library lends back numbers, so the game's own are used"))
+        if what == "scoreboards":
+            mine += helper_boards(pl, os.path.join(root, file), {k for k, _t in mine})
         done.append(_map(os.path.join(root, file), mine, log, what, world, sider,
                          teams if what == "kits" else comps))
     # B129: the other folder's map too (content\kits or content\kit-server, the one not picked
@@ -494,8 +844,12 @@ def write(pl, sider, log=print, root=None):
         for o in other:
             path = os.path.join(sider, o, file)
             if o != lib and os.path.isfile(path):
-                _map(path, [], log, what + " (" + o + ")", world, sider, teams if what == "kits" else comps)
+                # B230: with both scoreboard modules on, the Libertadores line may be in this one
+                # (antonimus: content\scoreboards), so the Pre-Libertadores goes by it here too
+                _map(path, helper_boards(pl, path) if what == "scoreboards" else [], log,
+                     what + " (" + o + ")", world, sider, teams if what == "kits" else comps)
     menus(sider, world, log)
+    helper_servers(pl, sider, world, log)
     return tuple(done)
 
 

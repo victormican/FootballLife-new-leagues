@@ -335,6 +335,12 @@ line in Stadium Server's `map_teams.txt` with the club's id when you switch the 
 have to look the id up. Before 0.1.7: the *Stadiums* page, **Home stadiums**, add a line; the club
 list there has the new clubs of a built world.
 
+Without a line of Stadium Server the club plays at a stadium of the game. Since 0.2.5 Build
+gives every new club one of the game's stadiums by its league's tier and country (before, all of
+them played at Stadio Nazionale); **Edit club** > **Game stadium** picks another one. For a world
+you imported (the Modpack): **Stadiums** > **Your world's clubs**, **Game stadiums automatically**
+or **Choose a game stadium...**, then Save and start a new Master League.
+
 ### My new country outside Europe has no clubs and no matches from the second season
 
 A world built before Mod Studio 0.1.4 keeps some leagues of a new country outside Europe under
@@ -405,6 +411,11 @@ mouse over a yellow line: the reason shows as a tooltip. The most common one is 
 the library": `map.txt` sends the club to a folder (such as `Premier League\Newcastle`) that is
 not in Kit Server's kits folder, so the game has nothing to show. The **Library** tab lists the
 folders that are really there. Point the line at one of them, or select it and press **Remove**.
+
+A club with two lines switched on wears the kit of the **last** one: Kit Server reads `map.txt`
+from top to bottom and each line for the club replaces the one before. Mod Studio marks the
+earlier line ("only the last one counts"), and adding or changing a club's line switches its other
+lines off.
 
 ### The stadium is completely black
 

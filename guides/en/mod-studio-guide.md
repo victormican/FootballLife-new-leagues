@@ -205,7 +205,10 @@ names**, **Players** and **Remove**; a league of the game gets its name, logo an
 8, "The game's leagues"). **Add league** makes a new one. **Places in Select Team** shows where
 the last Build put each of your leagues. **More ▾** has **Pre-season cups**, **Cups of our
 countries**, **Cups of the game's countries**, **European places of the game's leagues**,
-**First-season European clubs**, **UEFA ranking**, **South American places**, **Competition
+**First-season European clubs**, **UEFA ranking**, **South American places** (who goes to the
+Libertadores and the Copa Sudamericana; its **Modern CONMEBOL competitions** box adds the
+Libertadores phases, the Sudamericana's first stage and play-off and the Recopa, 0.2.5), **CONMEBOL
+countries without a league** (with the modern competitions), **Competition
 names**, **Competition IDs**, **League order**, **Seasons of the game's leagues** and **World
 name and file...**. That last one opens the page with the world's name and the list of your
 leagues (older guides call it *New leagues*).
@@ -424,7 +427,7 @@ country to the round nearest the league phase. Afterwards you can still change a
 places by hand (*Europe* on the league, *European places of the game's leagues*): Build takes
 the places, not the ranking.
 
-**South American places** (Leagues → More, 0.1.7, read only): for every South American league, the
+**South American places** (Leagues → More, 0.1.7): for every South American league, the
 game's four and yours, which positions go to the Copa Libertadores, its qualifying round and the
 Copa Sudamericana. The game's Libertadores places are its own (Brazil 1st-4th and the Copa do
 Brasil winner, qualifying 5th-6th, and so on -- the same the game's Competition Info shows); the
@@ -433,6 +436,19 @@ sends to it with your places in: your leagues first, then Brazil, Argentina, Chi
 one club each in turn until 32. A club already in the Libertadores or its qualifying gives way to
 the next one of its league. **Check the plan** prints the same list whenever the world has a
 Libertadores or Sudamericana place.
+
+**Modern CONMEBOL competitions** (a box in **South American places**, 0.2.5; vmardonesdev and
+nissindiaz, #146): the Libertadores' qualifying in three phases (phase 1: 6 clubs, phase 2: 13 clubs
+and the three phase-1 winners, phase 3: the eight phase-2 winners), a Copa Sudamericana with a first
+stage of 32 clubs and a play-off after the groups, and the Recopa Sudamericana in February. With it
+on, the League window lists **Libertadores phase 1**, **phase 2** and **Copa Sudamericana first
+stage** (and no longer the qualifying round), the game's South American leagues have only the places
+you give them in **European places of the game's leagues**, and **CONMEBOL countries without a
+league** gives places to the clubs of a country with no league in your world. The window counts the
+places against the field Build needs (26 Libertadores group places, 13 in phase 2, 6 in phase 1, 12
+Sudamericana group places, 32 in its first stage). Off, the default, a world builds the classic
+competitions exactly as before; switching it off takes out only the places the modern ones have,
+after asking.
 
 **Competition names** (Leagues → More, or My world → Cups): a new name and logo for the game's cups, super cups and continental competitions -- the FA Cup, the Champions League, the Libertadores ... -- and for the continental cups the world builds (CAF Champions League, Confederation Cup, AFC Champions League Two, Copa Sudamericana, CONCACAF Champions Cup, OFC Champions League, AFC Challenge League, CAF Super Cup). Every stage of a competition takes the name. Empty: the game's own. The game's leagues are renamed on *Leagues* (pick a league of the game).
 
@@ -461,6 +477,10 @@ next switch-on. A club with a Kit Server kit of its own, or only a numbered badg
 A kit line of your own in `map.txt` (one you set on the *Kits* tab, to a kit that is in the
 library) always wins: Build makes no kit for that club, puts no package kit on it and leaves your
 line switched on (0.2.4; 0.2.3 switched it off for a league package's kit at every Build).
+A club that took the place of a club of the game (NewLife's *Bring the game's leagues to this
+season*) gets kits made the same way, under the world's *Clubs of the game* (0.2.5); untick
+**Kits made for clubs in a game club's place** (Build tab, World options) and it keeps the game's
+kit, or your kit pack's, for that place.
 Names keep their letters (FK Željezničar); the three-letter short name has none, as in the game,
 so Č, Ž, Đ become C, Z, D there. A league's A-Z order in the game files Đakovo under D and
 Šibenik under S (0.2.4). After **Build**, the mouse over a club's name shows its id in
@@ -576,6 +596,24 @@ The club list also has **National teams** and **Other clubs (no league)**: the t
   transfer off. A club has at most 40 players. If a club ends up with more than 40 (a national
   team more than 26), Build keeps its first 40 and goes on, and the Build log names the club and
   the players left out; when the club is in your world twice, it names both leagues.
+- **Import transfers...** (in **More**): many transfers at once, for the whole world, from a CSV
+  (commas, semicolons or tabs). The first line names the columns:
+
+  ```
+  player,to,from
+  Kylian Mbappé,Real Madrid CF,
+  Lucas Hernández,Real Madrid CF,Paris Saint-Germain
+  12345,71590,
+  ```
+
+  `player` is his name (accents and capitals do not matter; "K. Mbappé" finds Kylian Mbappé)
+  or his Player ID; `to` is the club he joins, by its name in your world (with or without FC,
+  CF and such) or its Club ID; `from` (his club now) is only needed when two players share a
+  name. `name` and `club` / `new club` work as column names too. Each line is a Transfer to...;
+  a line to the club he is at calls off a transfer he had. A line that fits no player or no
+  club, or two of them, is left out and the message lists it; a player on two lines moves by
+  the first. Make the table by hand, in a spreadsheet, or with a tool off a website such as
+  Transfermarkt: Mod Studio reads only the file.
 - **Call up players...** (a national team: pick *National teams* in the league list): the list
   opens on the team's country. The players join the national squad **and stay at their clubs**,
   as in the game. **Remove from club** drops a player from the national squad (not from his
@@ -842,7 +880,10 @@ under 10 MB. Download only the parts you want.
   club leave. A player NewLife still has at this club stays, as long as the club has room (40
   at most; 0.2.4); the Build log names anyone it had no room for. Ratings are put on the game's
   scale, measured on the players both have, so a star lands where the game rates him (0.2.0;
-  before, the top end ran 2 to 4 higher). The leagues keep their number of
+  before, the top end ran 2 to 4 higher). Tick **Only the game's own players** at the bottom
+  (0.2.5) when Bring gives you the same player twice (NewLife names a few of the game's players
+  differently): the clubs that keep their place then get only the transfers and the ratings, no
+  new players, and nobody leaves; clubs that came up still get their whole squad. The leagues keep their number of
   clubs, their format and their cups. Clubs you already changed by hand (a swap, a rename, a
   club of a new league, player changes) stay as they are. Doing it again with a newer version
   replaces what the older one did; **More → Undo the game's leagues** takes it all back. Build and start

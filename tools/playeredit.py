@@ -157,8 +157,9 @@ def cstr(b):
 
 
 def _slot(s):
-    """s as one zero-padded name slot, cut on a whole UTF-8 letter"""
-    b = s.encode("utf-8")[:P_NAME_LEN - 1]
+    """s as one zero-padded name slot, cut on a whole UTF-8 letter, in letters the game's
+    fonts have (pesdb.game_text, B173)"""
+    b = pesdb.game_text(s).encode("utf-8")[:P_NAME_LEN - 1]
     return b.decode("utf-8", "ignore").encode("utf-8").ljust(P_NAME_LEN, b"\x00")
 
 
@@ -171,7 +172,7 @@ def name_slots(name):
     is the whole name as a family-first country's, and 431 such Croats were enough to give
     every Croatian regen a first name on his back.
     """
-    name = name.strip()
+    name = pesdb.game_text(name.strip())      # Mammadov, MAMMADOV on the shirt (B173)
     shirt = (name.split(" ", 1)[1] if " " in name else name).upper()
     return _slot(name) + _slot(shirt) * 2 + _slot(name)
 
@@ -205,13 +206,20 @@ def setf(rec, name, val):
     rec[:] = v.to_bytes(len(rec), "little")
 
 
-def natural(rec, before):
+def natural(rec, before, given=()):
     """a player moved to a new registered position is rated 2 (natural) there, as all but
     106 of the 51,327 players of the test world are at theirs; a player whose registered
-    position did not change is left alone"""
+    position did not change is left alone.  One moved over the keeper line (a midfielder made
+    a keeper, B201) plays none of the old side's positions any more: 0 there, but for those the
+    edit itself sets (given: the edited fields' names)"""
     reg = getf(rec, "Registered Position")
-    if reg != getf(before, "Registered Position") and reg < len(POSITIONS):
+    was = getf(before, "Registered Position")
+    if reg != was and reg < len(POSITIONS):
         setf(rec, POSITIONS[reg], 2)
+        if (reg == 0) != (was == 0):           # POSITIONS[0] is GK
+            for p in POSITIONS:
+                if (p == "GK") != (reg == 0) and p not in given:
+                    setf(rec, p, 0)
 
 
 def show(name, v):
@@ -407,7 +415,7 @@ def main():
         old = bytes(rec)
         for n, v in vals.items():
             setf(rec, n, v)
-        natural(rec, old)
+        natural(rec, old, given=set(vals))
         if name and name != cstr(rec[P_NAME:P_NAME + P_NAME_LEN]).strip():
             rec[P_NAME:P_NAME + P_NAME_LEN * P_NAME_SLOTS] = name_slots(name)
         players[o:o + P_REC] = rec

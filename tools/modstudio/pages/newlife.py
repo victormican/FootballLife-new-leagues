@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QHBoxLayout, QLabel
                                QWidget)
 
 import leaguebuilder as B
+import lbplayers as P
 from .. import newlife as N
 from ..i18n import _, tr
 from ..ui import hint, error, pick_dir, run_job
@@ -20,7 +21,7 @@ def key(L):
 class ClubPickDialog(Dialog):
     """clubs of the release to add to a league: a search over every club, with its league"""
 
-    def __init__(self, parent, rel, skip):
+    def __init__(self, parent, rel, skip, game=()):
         super().__init__(parent, "Add a club from another league")
         self.v.insertWidget(0, QLabel(_("Search a club or a league; tick one or more.")))
         self.search = QLineEdit()
@@ -32,6 +33,10 @@ class ClubPickDialog(Dialog):
         self.scroll.hide()
         self.all = sorted(((c["name"], c.get("league", ""), cid) for cid, c in rel.clubs.items()
                            if cid not in skip and c.get("league")), key=lambda x: (x[0].lower(), x[1]))
+        # B95 (vmican 17.10.): the release's clubs the game has (Envigado, its twin) are found too,
+        # greyed with the way in, not missing as if they did not exist
+        self.game = sorted(((rel.clubs[cid]["name"], rel.clubs[cid].get("league", ""), cid) for cid in game
+                            if cid in rel.clubs), key=lambda x: (x[0].lower(), x[1]))
         self.list.itemChanged.connect(self.toggled)
         # vmican (16.10., beta): tick a whole search at once -- e.g. search a league, tick all
         row = QWidget()
@@ -69,6 +74,14 @@ class ClubPickDialog(Dialog):
             self.list.addItem(it)
             if self.list.count() >= 500 and not q:
                 break
+        for name, league, cid in self.game if q else []:
+            if q not in name.lower() and q not in league.lower():
+                continue
+            it = QListWidgetItem("%s  (%s)  -- %s" % (name, league, _("a club of the game: Club of the game... puts it here")))
+            it.setFlags(it.flags() & ~(Qt.ItemIsSelectable | Qt.ItemIsEnabled))
+            it.setToolTip(_("The game has this club, with its team ID: in Clubs, Club of the game... puts it in this "
+                            "place, and moves it from another league of your world."))
+            self.list.addItem(it)
         self.list.blockSignals(False)
         self.b_all.setEnabled(bool(q))          # not 500 clubs of any league at once
         self.count()
@@ -88,6 +101,8 @@ class ClubPickDialog(Dialog):
         self.list.blockSignals(True)
         for i in range(self.list.count()):
             it = self.list.item(i)
+            if it.data(Qt.UserRole) is None:         # a club of the game, greyed (B95)
+                continue
             if on:
                 self.checked.add(it.data(Qt.UserRole))
             it.setCheckState(Qt.Checked if on else Qt.Unchecked)
@@ -100,6 +115,89 @@ class ClubPickDialog(Dialog):
     def ok(self):
         sel = [it.data(Qt.UserRole) for it in self.list.selectedItems()]
         self.picked = [cid for _n, _l, cid in self.all if cid in self.checked or cid in sel]
+        self.accept()
+
+
+class PlayerPickDialog(Dialog):
+    """the players of a NewLife club that go in its squad: the release's whole squad, the ones
+    the club gets now ticked (mato 27.10.2026: pick a club's players on the NewLife page)"""
+
+    def __init__(self, parent, rel, cid, chosen=None):
+        super().__init__(parent, "Choose the players")
+        self.v.insertWidget(0, QLabel(_("%s: tick the players the club gets, up to %d.")
+                                      % (rel.clubs[cid]["name"], P.SQUAD)))
+        self.list = QTreeWidget()
+        self.list.setRootIsDecorated(False)
+        self.list.setAlternatingRowColors(True)
+        self.list.setHeaderLabels([_("Player"), _("Position"), _("Age"), _("Rating")])
+        self.list.setColumnWidth(0, 240)
+        self.v.insertWidget(1, self.list, 1)
+        self.scroll.hide()
+        rows = sorted(rel.squads.get(cid, []), key=lambda r: -P.overall(r))
+        self.order = [str(r.get("newlife_id", "")).strip() for r in rows]
+        self.best = {str(r.get("newlife_id", "")).strip() for r in rel.squad(cid)}
+        mine = {str(i) for i in chosen or []} & set(self.order)
+        self.ticked = mine or set(self.best)
+        self.gk = {i for i, r in zip(self.order, rows) if r.get("Registered Position") == "GK"}
+        for i, r in zip(self.order, rows):
+            it = QTreeWidgetItem([r.get("name", ""), r.get("Registered Position", ""), str(r.get("Age", "")),
+                                  str(P.overall(r))])
+            it.setData(0, Qt.UserRole, i)
+            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
+            it.setCheckState(0, Qt.Checked if i in self.ticked else Qt.Unchecked)
+            self.list.addTopLevelItem(it)
+        self.list.itemChanged.connect(self.toggled)
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        b = QPushButton(_("The best ones"))
+        b.setToolTip(_("Ticks the players the club gets when nobody chooses: its best %d, three goalkeepers at most")
+                     % P.SQUAD)
+        b.clicked.connect(self.reset)
+        h.addWidget(b)
+        h.addStretch(1)
+        self.v.insertWidget(2, row)
+        self.n = QLabel("")
+        self.n.setWordWrap(True)
+        self.v.insertWidget(3, self.n)
+        self.picked = None
+        self.count()
+        self.setMinimumSize(560, 520)
+
+    def toggled(self, it):
+        i = it.data(0, Qt.UserRole)
+        if it.checkState(0) == Qt.Checked:
+            self.ticked.add(i)
+        else:
+            self.ticked.discard(i)
+        self.count()
+
+    def reset(self):
+        self.ticked = set(self.best)
+        self.list.blockSignals(True)
+        for n in range(self.list.topLevelItemCount()):
+            it = self.list.topLevelItem(n)
+            it.setCheckState(0, Qt.Checked if it.data(0, Qt.UserRole) in self.ticked else Qt.Unchecked)
+        self.list.blockSignals(False)
+        self.count()
+
+    def count(self):
+        n = len(self.ticked)
+        lines = [_("%d of %d players ticked; a club takes up to %d.") % (n, len(self.order), P.SQUAD)]
+        if n > P.SQUAD:
+            lines.append(_("Untick %d: a club takes up to %d players.") % (n - P.SQUAD, P.SQUAD))
+        elif n == 0:
+            lines.append(_("Tick at least one player."))
+        elif n < P.MIN_SQUAD:
+            lines.append(_("The club gets stand-in players up to %d.") % P.MIN_SQUAD)
+        if n and not self.ticked & self.gk:
+            lines.append(_("No goalkeeper ticked."))
+        self.n.setText("\n".join(lines))
+
+    def ok(self):
+        if not 1 <= len(self.ticked) <= P.SQUAD:
+            return
+        self.picked = None if self.ticked == self.best else [i for i in self.order if i in self.ticked]
         self.accept()
 
 
@@ -172,6 +270,11 @@ class GameLeaguesDialog(Dialog):
             lines += [_("%s goes to %s's league") % (name(a), name(b)) for a, b in p["swaps"]]
             lines += [_("%s becomes %s") % (name(t), rel.clubs[c]["name"]) for t, c in p["replace"]]
             lines += [tr(n) for n in p["notes"]]
+            for t in p.get("stay") or []:            # B137
+                lines.append(_("%s stays in %s: the game's league has more places than this season's. A NewLife "
+                               "league that has it too (Ligue 3 after Ligue 2) cannot take it: there, use Club "
+                               "of the game and give it a new club in its place, or leave it out.")
+                             % (name(t), p["name"]))
             text = QLabel("\n".join(lines))
             text.setWordWrap(True)
             w = QWidget()
@@ -181,10 +284,19 @@ class GameLeaguesDialog(Dialog):
             h.addWidget(text)
             self.form.addRow(w)
             self.boxes.append((p["cid"], box))
-        self.cids = []
+        # Aleperfe87 22.10.: the release names some of the game's players otherwise, and Bring made
+        # them twice (a new copy at the club, the game's own one a free agent)
+        self.only = QCheckBox(_("Only the game's own players"))
+        self.only.setToolTip(_("The clubs that keep their place get only the transfers between the game's "
+                               "players and the new ratings: no new players, nobody let go. Clubs that came up "
+                               "still get their whole squad."))
+        self.form.addRow(self.only)
+        self.form.addRow(hint(_("Tick it if Bring gives you the same player twice.")))
+        self.cids, self.new_players = [], True
 
     def ok(self):
         self.cids = [c for c, box in self.boxes if box.isChecked()]
+        self.new_players = not self.only.isChecked()
         self.accept()
 
 
@@ -200,6 +312,7 @@ class NewLife(BuilderPage):
         self.rows = []
         self.room = None
         self.custom = {}          # (country, league) -> {"off": {club ids left out}, "extra": [club ids]}
+        self.picks = {}           # club id -> [newlife_id]: the players chosen for a club not in the world yet
         self.action("Open NewLife Database...", self.open_dir)
         self.b_add = self.action("Add to your world", self.add, "primary",
                                  tip="Each selected league becomes a new league with its clubs and players")
@@ -249,6 +362,14 @@ class NewLife(BuilderPage):
         self.b_extra.clicked.connect(self.add_extra)
         self.b_extra.setEnabled(False)
         rv.addWidget(self.b_extra)
+        self.b_players = QPushButton(_("Choose the players..."))
+        self.b_players.setToolTip(_("The players of the selected club that go in its squad; without a choice it gets "
+                                    "its best ones"))
+        self.b_players.clicked.connect(self.choose_players)
+        self.b_players.setEnabled(False)
+        self.clubs.currentItemChanged.connect(lambda *a: self.club_selected())
+        self.clubs.itemDoubleClicked.connect(lambda *a: self.choose_players())
+        rv.addWidget(self.b_players)
         split.addWidget(right)
         split.setSizes([820, 340])
         self.outer.addWidget(split, 1)
@@ -298,6 +419,7 @@ class NewLife(BuilderPage):
             self.where.setText(text)
             self.read_rows()
             self.custom = {}
+            self.picks = {}
             self.fill()
 
         def failed(tb):
@@ -391,6 +513,9 @@ class NewLife(BuilderPage):
                                                       self.rel.clubs[r[0]]["name"].lower())):
             club = self.rel.clubs[cid]
             note = _("in the game") if club.get("in_game") == "1" else str(len(self.rel.squads.get(cid, [])))
+            chosen = self.chosen(cid) if club.get("in_game") != "1" else None
+            if chosen:
+                note = _("%d of %d chosen") % (len(chosen), len(self.rel.squads.get(cid, [])))
             if extra:
                 note += "  " + _("from %s") % club.get("league", "")
             it = QTreeWidgetItem([club["name"], note])
@@ -402,7 +527,64 @@ class NewLife(BuilderPage):
                     it.setForeground(k, Qt.gray)
             self.clubs.addTopLevelItem(it)
         self.clubs.blockSignals(False)
+        self.club_selected()
         self.count()
+
+    def chosen(self, cid):
+        """the players chosen for club cid (newlife_ids): in the league of the world that has it,
+        else on this page for a league still to add; None: its best ones"""
+        x, _k = N.placed(self.project.recipe, self.rel, cid)
+        return N.picks_of(x, cid) if x is not None else self.picks.get(cid)
+
+    def club_selected(self):
+        it = self.clubs.currentItem()
+        cid = it.data(0, Qt.UserRole)[0] if it else None
+        self.b_players.setEnabled(bool(self.rel and cid in self.rel.clubs
+                                       and self.rel.clubs[cid].get("in_game") != "1"
+                                       and self.rel.squads.get(cid)))
+
+    def choose_players(self):
+        it = self.clubs.currentItem()
+        if not it or not self.rel or not self.b_players.isEnabled():
+            return
+        cid = it.data(0, Qt.UserRole)[0]
+        d = PlayerPickDialog(self, self.rel, cid, self.chosen(cid))
+        if not d.finish():
+            return
+        self.use_players(cid, d.picked)
+
+    def use_players(self, cid, picked):
+        """picked (newlife_ids, None: the best ones) for club cid: for its league in the world now,
+        else when its league is added"""
+        name = self.rel.clubs[cid]["name"]
+        n = len(picked or self.rel.squad(cid))
+        x, k = N.placed(self.project.recipe, self.rel, cid)
+        if x is None:
+            if picked:
+                self.picks[cid] = picked
+            else:
+                self.picks.pop(cid, None)
+            self.say(_("%s: %d players chosen; they go in when you add the league.") % (name, n), "ok")
+        else:
+            try:
+                st, el = N.repick(self.project.recipe, self.rel, x, k, picked, info=self.info())
+            except N.Error as e:
+                error(self, "NewLife Database", tr(str(e)))
+                return
+            self.project.touch()
+            text = _("%s (%s): %d players chosen. Build again.") % (x["club_names"][k], x["name"], n)
+            if st:
+                text += "\n" + _("%d players stay at their game club (their club would have too few players).") % st
+            if el:
+                text += "\n" + _("%d players are not added: another league already has them.") % el
+            self.say(text, "ok")
+        cur = self.clubs.currentItem()
+        sel = cur.data(0, Qt.UserRole) if cur else None
+        self.show_league()
+        for i in range(self.clubs.topLevelItemCount()):
+            if self.clubs.topLevelItem(i).data(0, Qt.UserRole) == sel:
+                self.clubs.setCurrentItem(self.clubs.topLevelItem(i))
+                break
 
     def custom_of(self, L):
         return self.custom.setdefault(key(L), {"off": set(), "extra": []})
@@ -464,14 +646,20 @@ class NewLife(BuilderPage):
             text += "\n" + _("%d of your leagues are from another NewLife version (%s): Update my leagues to this "
                              "version brings them to %s.") % (len(old), ", ".join(x["name"] for x in old),
                                                                self.rel.version)
+        size = N.resized(self.project.recipe, self.rel) if self.rel else []
+        if size:
+            text += "\n" + _("%d of your leagues have squads of another size than Players per new club (%d): "
+                             "Update my leagues takes their players again (%s).") % (
+                len(size), P.SQUAD, ", ".join(x["name"] for x in size))
         self.foot.setText(text)
-        self.b_add.setEnabled(bool(sel) and used + sel <= room)
-        self.b_update.setEnabled(bool(old))
-        self.b_game.setEnabled(bool(self.rel) and info is not None)
-        self.b_undo.setEnabled(bool(self.project.recipe.get("newlife_game")))
+        busy = getattr(self, "bringing", False)  # B260: not while Bring the game's leagues works on a copy
+        self.b_add.setEnabled(bool(sel) and used + sel <= room and not busy)
+        self.b_update.setEnabled(bool(old or size) and not busy)
+        self.b_game.setEnabled(bool(self.rel) and info is not None and not busy)
+        self.b_undo.setEnabled(bool(self.project.recipe.get("newlife_game")) and not busy)
 
     def update(self):
-        old = N.outdated(self.project.recipe, self.rel) if self.rel else []
+        old = N.to_update(self.project.recipe, self.rel) if self.rel else []
         if not old:
             return
         d = UpdateDialog(self, self.rel, old, self.rows)
@@ -526,7 +714,8 @@ class NewLife(BuilderPage):
             if not L["country"]:
                 error(self, "NewLife Database", _("%s has no country the game knows.") % L["name"])
                 continue
-            name, st, el = N.add_league(self.project.recipe, self.rel, L, info=info, custom=key(L) in self.custom)
+            name, st, el = N.add_league(self.project.recipe, self.rel, L, info=info, custom=key(L) in self.custom,
+                                        picks={i: self.picks[i] for i in L["clubs"] if i in self.picks})
             names.append(name)
             stayed += st
             elsewhere += el
@@ -558,29 +747,33 @@ class NewLife(BuilderPage):
         if not d.finish() or not d.cids:
             return
         work = {k: copy.deepcopy(recipe[k]) for k in ("leagues", "edits", "players", "newlife_game") if k in recipe}
+        start = N.bring_start(recipe)
         self.app.busy(True)
+        self.bringing = True                     # B260: this page's buttons wait for it
+        self.count()
 
         def done(n):
             self.app.busy(False)
-            for k in ("edits", "players", "newlife_game"):
-                if k in work:
-                    recipe[k] = work[k]
-                else:
-                    recipe.pop(k, None)
+            self.bringing = False
+            N.take_bring(recipe, work, start)    # B260: what was added meanwhile stays
             self.project.touch()
             self.say(_("The game's leagues now have the %s season: %d clubs swap leagues, %d take the name of the "
                        "club that came up, %d squads (%d players join from other clubs, %d new, %d leave). Build "
                        "again and start a new career.") % (rel.version, 2 * n["swaps"], n["replaced"], n["clubs"],
-                                                          n["join"], n["add"], n["remove"]), "ok")
+                                                          n["join"], n["add"], n["remove"])
+                     + ("\n" + _("%d players of this season the game does not have were left out.") % n["skipped"]
+                        if n.get("skipped") else ""), "ok")
             self.read_rows()                     # B79: a club whose place went is a new club now
             self.fill()
             self.count()
 
         def failed(tb):
             self.app.busy(False)
+            self.bringing = False
+            self.count()
             error(self, "NewLife Database", tb.strip().splitlines()[-1])
 
-        run_job(lambda progress: N.refresh_game_leagues(work, rel, info, d.cids), done, failed)
+        run_job(lambda progress: N.refresh_game_leagues(work, rel, info, d.cids, d.new_players), done, failed)
 
     def undo_game(self):
         if N.undo_game_leagues(self.project.recipe):

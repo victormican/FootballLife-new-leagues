@@ -4,6 +4,17 @@ Honest list, as of 2026-09-28. Addresses are given so that a fault offset in you
 Viewer can be matched against them: the offset is the address minus `0x140000000`
 (so `0x1414c674d` shows up as exception offset `0x14c674d`).
 
+## Open in Mod Studio 0.2.4 (2026-10-20)
+
+- **Outside a match a new club can show another club's kit** (B175: in Become a Legend, after a
+  transfer to Alcorcón the player's Basic information showed him in Club América's kit, and clubs
+  of other leagues looked wrong too, until the game was restarted). A new club's kit has two parts:
+  the kit Kit Server (`kserv.lua`) puts on it -- the drawn one, or your kit pack's -- and, below it,
+  a kit of the game Build lends it so that it never plays in a blank one, the game's kit nearest its
+  colours (the Europack's Alcorcón: Club América's, yellow and blue). Kit Server dresses a club when
+  the game sets up its match or Edit mode, not on every menu screen; there the lent kit can show.
+  Restarting the game brought the right kit back for the player who reported it. Not fixed yet.
+
 ## Open in Mod Studio 0.2.1 (2026-10-10)
 
 - **A league package made from NewLife, with some clubs added by hand, stops Check the plan**
@@ -52,7 +63,8 @@ numbers are in [limits.md](research/limits.md).
   clubs already in the Copa Libertadores left out. The CAF Super Cup was played in the second
   and third seasons' July between the two CAF winners, each time with that year's winners
   (2026-10-01).
-- **Leagues of 10 to 24 clubs** with the right number of rounds, different sizes in one world.
+- **Leagues of 10 to 28 clubs** with the right number of rounds, different sizes in one world
+  (26 and 28 clubs played their 50 and 54 rounds on 2026-10-25).
 - **The menus**: up to 36 new leagues in Select Team (past 32 the plan names the ones that take the place of a game's "Other ..." group or get none), every one in Kick Off, Edit mode and Database →
   Competition Info, under its own country's name and flag.
 
@@ -128,6 +140,8 @@ numbers are in [limits.md](research/limits.md).
 | Matchday-results screen after *Skip Match*, on the day of the Europa / Conference League play-off first leg | `ucrtbase.dll` offset `0xa527e` (exception `0xc0000409`); the game's side is `0x140ca2203` / `0x140ca21db` | **Guarded** by `sider/experimental/fl26resultsguard.lua` (2026-09-25). The screen takes a page out of a list without checking that the list has any; on that day, with `fl26swiss`, it has none, and the game's own check ends the program. With the guard the page stays empty and the career goes on; both play-offs were played to the end. Reported in issue #9 at the Europa League knockout. Why the list is empty is not known yet. |
 | Edit (entering it, or creating Edit Data) with a face pack or another mod that brings its own `PlayerAppearance.bin` | `0x141ef8010`, also `0x141405b0a` (the write itself: `0x1414bd7a0`) | **Fixed 2026-10-06** in `fl26regen.dll` (0.1.9). The game copies every record of that file into a table of 30,024 without a check; a file with more writes past the end, over the counters and the data after it, and Edit crashes later (GitHub #65). FL26 itself fills 27,927. Reproduced here with 30,100 records (crash creating Edit Data); with the fix the game takes the first 30,023 and Edit opens. The records left out are the highest ids: those players keep the default look, and `sider.log` says `appearance loader capped at 30023 records`. |
 | New Master League setup, right after the manager settings, with an **Edit Data file saved on an older world** (a rebuilt world numbers its players differently; the saved squads still name the old numbers) | `0x140f325a4` | **Guarded 2026-10-14** by `fl26nullguard11.lua` (in `fl26guards.lua`): a squad entry whose player no longer exists is skipped. Without the guard: move `EDIT00000000` (and `EDIT00000000.fl26x`) out of `Documents\KONAMI\eFootball PES 2021 SEASON UPDATE\<id>\save` before starting the career, and the game writes a fresh one. |
+| Master League season, any day with matches, with an **Edit Data file saved on an older world** (the same squads as above) | `0x141321d00` | **Guarded 2026-10-22** by `fl26nullguard12.lua` (in `fl26guards.lua`): the game adds to a value of every player of a team (bits 18–24 of the player record at `+0x13c`, kept within 0–100) and did not check that the player was found. `fl26nullguard11` lets the career start past such a squad entry, but the entry stays in the squad, and this loop met it in the season: two new careers on the Europack, day 301 and day 75. Without the guard: move the old `EDIT00000000` aside as above and start a new career. |
+| Master League, late December, when the game picks the clubs of next year's pre-season friendly cup (regulation 106) | `0x14135a384` | **Guarded 2026-10-24** by `fl26nullguard13.lua` (in `fl26guards.lua`): the pick (`0x141359a60`) takes clubs from the end of a list of candidates until the cup is full and never compared with the list's start, so with fewer candidates than places it read below the list. Seen in a World Modpack career (Sporting FC, Costa Rica) three times out of three, day 346–348. The guard stops the loop when the candidates run out; the caller then tops the list up or leaves the cup alone, as the game already does. Without the guard: no workaround known. |
 | Startup, 9–11 seconds in, occasionally | — | Shipped game bug, reproduces on a clean install. Start again. |
 
 ## Missing or unverified features

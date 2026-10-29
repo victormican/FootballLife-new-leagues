@@ -45,6 +45,16 @@ def database_note(project):
              "game tables to its common\\etc\\pesdb folder and build again.") % (", ".join(mods), ", ".join(mods))
 
 
+def kits_note(project, game):
+    """B218: a warning when the world's new clubs get no kit: no kits file beside the tables, none
+    unpacked from the game and no mod that has one"""
+    if not any(B.new_club_count(L) for L in project.recipe["leagues"]) or B.kits_for(project.base, game):
+        return ""
+    return _("CAREFUL: no kits file (UniformParameter.bin) was found beside your tables, unpacked from the game "
+             "or in another mod, so the new clubs have no kit and the game calls them unlicensed. Unpack the "
+             "game's tables (Settings) and build again.")
+
+
 # the game's groups of clubs in no league (leaguebuilder.OTHERS), as Select Team names them
 def others_labels():
     return {"europe": _("Other European teams"), "latam": _("Other Latin American teams"),
@@ -65,7 +75,8 @@ ALL_CLUBS = -1
 # the European competitions a league place can lead to (fl26world.COMPETITIONS), short names for
 # the league list
 SHORT = {0: "UCL", 1: "UEL", 2: "UECL", 3: "LIB", 4: "LIB-Q", 5: "AFC", 6: "CAF CL", 7: "CAF CC",
-         8: "AFC CL2", 9: "SUD", 10: "UCL-Q", 11: "UEL-Q", 12: "UECL-Q", 13: "CONCACAF", 14: "OFC CL", 15: "AFC CHL"}
+         8: "AFC CL2", 9: "SUD", 10: "UCL-Q", 11: "UEL-Q", 12: "UECL-Q", 13: "CONCACAF", 14: "OFC CL", 15: "AFC CHL",
+         16: "LIB-F1", 17: "LIB-F2", 18: "LIB-F3", 19: "SUD-1"}
 TOP_FLIGHT = [[1, 10], [2, 1], [3, 2]]     # the preset: 1st UCL qualifying, 2nd UEL, 3rd UECL
 # the preset by the country's confederation (Country.bin): Asia to the AFC Champions League and
 # Champions League Two, South America to the Libertadores and the Sudamericana, Africa to the CAF
@@ -326,17 +337,72 @@ class PictureField(QWidget):
             self.view.setWordWrap(True)
 
 
+def modern_conmebol(project):
+    """whether the project's world has the modern CONMEBOL competitions (South American places >
+    Modern CONMEBOL competitions, leaguebuilder.recipe_has_modern_conmebol)"""
+    try:
+        return B.recipe_has_modern_conmebol(project.recipe)
+    except B.BuildError:
+        return False
+
+
+def continental_place_choices(items, modern=False):
+    """the competitions a place can lead to, in the order the list shows them. Classic (a world
+    without the modern CONMEBOL competitions, every world before 0.2.5): fl26world.COMPETITIONS
+    as they were, Libertadores qualifying included. Modern (PR #146): phase 2 and phase 1 under
+    the Libertadores, the first stage under the Sudamericana; Libertadores qualifying and phase 3
+    are left out, phase 3 takes the eight phase-2 winners and no league's place"""
+    items = [(int(c), name) for c, name in items]
+    if not modern:
+        return [(c, name) for c, name in items if c not in fl26world.CONMEBOL_STAGE_IDS]
+    by_id = {c: (c, name) for c, name in items}
+    hidden = {4, fl26world.LIB_F3}
+    child = {fl26world.LIB_F1, fl26world.LIB_F2, fl26world.SUD_FIRST}
+    labels = {
+        fl26world.LIB_F2: "Libertadores phase 2",
+        fl26world.LIB_F1: "Libertadores phase 1",
+        fl26world.SUD_FIRST: "Copa Sudamericana first stage",
+    }
+    out, seen = [], set()
+
+    def add(c, name=None):
+        if c in seen or c in hidden or c not in by_id:
+            return
+        out.append((c, labels.get(c, name if name is not None else by_id[c][1])))
+        seen.add(c)
+
+    for c, name in items:
+        if c in hidden or c in child:
+            continue
+        add(c, name)
+        if c == 3:
+            add(fl26world.LIB_F2)
+            add(fl26world.LIB_F1)
+        elif c == 9:
+            add(fl26world.SUD_FIRST)
+
+    # Filtered lists used by the CONMEBOL association editor may omit the parent rows.
+    for c in (fl26world.LIB_F2, fl26world.LIB_F1, fl26world.SUD_FIRST):
+        add(c)
+    return out
+
+
 class EuropeTable(QWidget):
     """a league's European places: league position -> competition, one row each, with a button
     that removes the row. tall: the table takes the height it is given (a dialog of its own)"""
 
-    def __init__(self, places, clubs, tall=False):
+    def __init__(self, places, clubs, tall=False, competitions=None, cup_winner=True,
+                 position_label="League position", modern=False):
         super().__init__()
         self.clubs = clubs
+        self.modern = modern
+        self.competitions = continental_place_choices(competitions or fl26world.COMPETITIONS, modern)
+        self.cup_winner = bool(cup_winner)
+        self.position_label = position_label
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels([_("League position"), _("Competition"), ""])
+        self.table.setHorizontalHeaderLabels([_(self.position_label), _("Competition"), ""])
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.Fixed)
         hh.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -368,16 +434,28 @@ class EuropeTable(QWidget):
         r = self.table.rowCount()
         self.table.insertRow(r)
         sp = QSpinBox()
-        sp.setRange(B.CUP_WINNER, max(self.clubs, 1))
-        sp.setSpecialValueText(_("Cup winner"))
-        sp.setToolTip(_("The league position, or Cup winner (below 1): the winner of the country's cup. "
-                        "When the winner already has a European place through the league, the place "
-                        "goes to the league's next club."))
-        sp.setValue(min(max(int(pos), B.CUP_WINNER), max(self.clubs, 1)))
+        low = B.CUP_WINNER if self.cup_winner else 1
+        sp.setRange(low, max(self.clubs, 1))
+        if self.cup_winner:
+            sp.setSpecialValueText(_("Cup winner"))
+            sp.setToolTip(_("The league position, or Cup winner (below 1): the winner of the country's cup. "
+                            "When the winner already has a continental place, the place cascades to the "
+                            "next eligible club of the same domestic source."))
+        else:
+            sp.setToolTip(_("The association rank used as a dynamic domestic source; it is not a team ID."))
+        sp.setValue(min(max(int(pos), low), max(self.clubs, 1)))
         cb = QComboBox()
-        for c, name in fl26world.COMPETITIONS:
+        for c, name in self.competitions:
             cb.addItem(_(name), c)
-        cb.setCurrentIndex(max(0, cb.findData(int(comp))))
+        i = cb.findData(int(comp))
+        if i < 0:
+            # a place the list does not offer (Libertadores qualifying with the modern CONMEBOL
+            # competitions on) is shown as it is, so OK keeps it: it became the first entry, a
+            # Champions League place, without a word (review of #146). Build says what is wrong
+            name = dict(fl26world.COMPETITIONS).get(int(comp))
+            cb.addItem(_(name) if name else _("Competition %d") % int(comp), int(comp))
+            i = cb.count() - 1
+        cb.setCurrentIndex(i)
         x = QPushButton("✕")
         x.setToolTip(_("Remove this place"))
         x.setFixedWidth(34)
@@ -417,10 +495,13 @@ class EuropeTable(QWidget):
             self.table.cellWidget(r, 0).setMaximum(max(n, 1))
 
     def set_confed(self, conf):
-        """the country changed: the preset follows its confederation"""
+        """the country changed: the preset follows its confederation. The modern CONMEBOL
+        competitions are set place by place: a South American league then has no preset (the
+        classic one sends 4th to Libertadores qualifying, which they do not have)"""
         label, tip, self.preset_places = PRESETS.get(conf, UEFA_PRESET)
         self.preset.setText(_(label))
         self.preset.setToolTip(_(tip))
+        self.preset.setVisible(not (self.modern and conf == 4))
 
     def set_top(self, top):
         self.preset.setEnabled(top)
@@ -558,6 +639,11 @@ class LeagueDialog(Dialog):
             "like any new club; the name above is only how Mod Studio lists them.")))
         self.form.addRow("", hint(_("one club or a few without a league: they go in the game's Other ... teams, "
                                     "next to its own clubs that play in no league; 1 to %d clubs") % B.OTHERS_MAX))
+        # B167: Cup mode fills the Champions League's last places from Other European teams
+        self.others_cupmode = hint(_("Cup mode can put these clubs in the Champions League: it fills the "
+                                     "last places from Other European teams. For small clubs, choose "
+                                     "Classic Teams."))
+        self.form.addRow("", self.others_cupmode)
 
         sp = L.get("split") or {}
         self.rr = QRadioButton(_("everyone plays everyone, times:"))
@@ -680,6 +766,12 @@ class LeagueDialog(Dialog):
         self.form.addRow("", row(helped(self.supercup, "One match shortly before the season: the league champion against the "
                                         "cup winner. It needs the national cup."), self.supercup_name))
         self.cup.toggled.connect(lambda on: self.supercup.setEnabled(on and self.cup.isEnabled()))
+        self.cup_join = QCheckBox(_("Its best clubs play the country's cup too"))
+        self.cup_join.setChecked(bool(L.get("cup_join")))
+        self.form.addRow("", helped(self.cup_join,
+            "For a third division under the game's second one, like National under Ligue 2: the game's cup "
+            "takes its two divisions and the first clubs of this league, up to 48 clubs in all, as the real "
+            "Coupe de France takes the lower leagues. Start a new career after the Build."))
         self.form.addRow("", hint(_("a top division of a new country: a national cup for it and the division "
                                     "below, any number of clubs (byes when the field is not 16, 32 ...)")))
         self.lcup = QCheckBox(_("League cup"))
@@ -708,7 +800,7 @@ class LeagueDialog(Dialog):
         self.form.addRow(_("Formation"), self.formation)
         self.form.addRow("", hint(_("how the league's clubs line up: a copy of the tactics of a club of the "
                                     "game with that formation; a club can have its own (Edit club)")))
-        self.europe = EuropeTable(L.get("europe"), self.clubs.value())
+        self.europe = EuropeTable(L.get("europe"), self.clubs.value(), modern=modern_conmebol(project))
         self.form.addRow(_("Europe"), self.europe)
         self.form.addRow("", hint(_("league position -> European competition, for a top division; "
                                     "leave it empty for lower tiers")))
@@ -722,6 +814,8 @@ class LeagueDialog(Dialog):
         self.above.currentIndexChanged.connect(
             lambda _i: self.supercup.setEnabled(self.cup.isEnabled() and self.cup.isChecked()))
         self.supercup.setEnabled(self.cup.isEnabled() and self.cup.isChecked())
+        self.above.currentIndexChanged.connect(lambda _i: self.cup_join.setEnabled(self.joins_cup()))
+        self.cup_join.setEnabled(self.joins_cup())
         self.above.currentIndexChanged.connect(lambda _i: self.season_follows())
         self.europe.set_confed(project.confeds.get(self.country_name()))
         self.country.currentTextChanged.connect(
@@ -767,6 +861,7 @@ class LeagueDialog(Dialog):
         loose = self.is_others()
         if loose:
             self.exhibition.setChecked(False)
+        self.form.setRowVisible(self.others_cupmode, self.others.currentData() == "europe")
         for w in (self.exhibition, self.rr, self.legs, self.slegs, self.groups, self.glegs, self.exchange,
                   self.logo, self.cup_name, self.supercup_name, self.lcup_name, self.cup_logo, self.supercup_logo,
                   self.lcup_logo, self.po_logo):
@@ -827,6 +922,10 @@ class LeagueDialog(Dialog):
             L["supercup_name"] = self.supercup_name.text().strip()
         else:
             L.pop("supercup_name", None)
+        if self.cup_join.isChecked() and self.joins_cup():
+            L["cup_join"] = True
+        else:
+            L.pop("cup_join", None)
         if self.lcup.isChecked() and self.above.currentData() is None:
             L["league_cup"] = True
         else:
@@ -873,7 +972,7 @@ class LeagueDialog(Dialog):
             if not L["game_clubs"]:
                 L.pop("game_clubs")
         places = self.europe.places()
-        bad = B.europe_problems(L["clubs"], places)
+        bad = B.europe_problems(L["clubs"], places, bool(L.get("cup")))
         if bad:
             error(self, "League", _("European places: %s") % "; ".join(tr(b) for b in bad))
             return
@@ -920,6 +1019,11 @@ class LeagueDialog(Dialog):
         self.accept()
 
 
+    def joins_cup(self):
+        """B228: division 3 right under one of the game's leagues, whose cup it can join"""
+        a = self.above.currentData()
+        return isinstance(a, int) and tier_of(self.project, a) == 3
+
     def show_tier(self):
         t = tier_of(self.project, self.above.currentData())
         self.tier_lab.setText(_("= division %d") % t if t else "")
@@ -962,6 +1066,36 @@ def set_club_stadium(project, key, st):
         pl[key].pop("stadium", None)
         if not pl[key]:
             pl.pop(key)
+
+
+def club_game_stadium(project, key):
+    """a new club's game stadium picked by hand (players[key]["game_stadium"]), 0 for automatic"""
+    return int((project.players().get(key) or {}).get("game_stadium") or 0)
+
+
+def set_club_game_stadium(project, key, sid):
+    pl = project.players()
+    if sid:
+        pl.setdefault(key, {})["game_stadium"] = int(sid)
+    elif key in pl:
+        pl[key].pop("game_stadium", None)
+        if not pl[key]:
+            pl.pop(key)
+
+
+def game_stadium_box(sid):
+    """Automatic, then the game's stadiums by name (fictional first, then the real ones)"""
+    import lbgamestadiums as G
+    box = QComboBox()
+    box.addItem(_("Automatic (Build picks one of the game's)"), 0)
+    for i in sorted(G.FICTIONAL, key=lambda i: G.FICTIONAL[i][0]):
+        box.addItem("%s (%s)" % (G.FICTIONAL[i][0], "{:,}".format(G.FICTIONAL[i][1]).replace(",", ".")), i)
+    for i in sorted(G.REAL, key=lambda i: G.REAL[i][0]):
+        box.addItem("%s (%s) - %s" % (G.REAL[i][0], "{:,}".format(G.REAL[i][1]).replace(",", "."),
+                                      _("a real club's")), i)
+    at = box.findData(int(sid or 0))
+    box.setCurrentIndex(at if at >= 0 else 0)
+    return box
 
 
 def pack_stadium_of(lib, tid):
@@ -1183,7 +1317,8 @@ class ClubDialog(Dialog):
             "Changes reach the game after Build and install.")
 
     def __init__(self, parent, name, short, crest, was=None, coach=None, formation=None, formations=(),
-                 league_formation="", portrait=None, stadium=None, stadium_lib=None, tid=None, kits=None):
+                 league_formation="", portrait=None, stadium=None, stadium_lib=None, tid=None, kits=None,
+                 game_stadium=None):
         super().__init__(parent, "Club")
         self.name = QLineEdit(name or "")
         self.name.setMinimumWidth(280)
@@ -1203,6 +1338,12 @@ class ClubDialog(Dialog):
             self.form.addRow("", hint(_("%d stadiums in your stadium pack; the choice is written to its "
                                         "map_teams.txt at Build") % len(S.library(stadium_lib, "folder")) if stadium_lib else
                                       _("install Stadium Server (Stadiums page) to give the club a home stadium")))
+        self.game_stadium, self.game_stadium_value = None, game_stadium
+        if game_stadium is not None:       # a new club: its stadium of the game (Team.bin, lbgamestadiums)
+            self.game_stadium = game_stadium_box(game_stadium)
+            self.form.addRow(_("Game stadium"), self.game_stadium)
+            self.form.addRow("", hint(_("the stadium of the game the club plays at; a home stadium of your "
+                                        "stadium pack above, when it has one, is shown in its place")))
         self.coach = None
         if coach is not None:              # a new club: its manager's name
             self.coach = QLineEdit(coach)
@@ -1249,6 +1390,8 @@ class ClubDialog(Dialog):
                 error(self, "Club", str(e))
                 return
         self.result = (self.name.text().strip(), B.short_name(short), self.crest.path)
+        if self.game_stadium is not None:
+            self.game_stadium_value = self.game_stadium.currentData() or 0
         if self.coach is not None:
             self.coach_name = self.coach.text().strip()
         if self.portrait is not None:
@@ -1276,10 +1419,14 @@ class GameClubDialog(Dialog):
             "- a new club with a name you type; Build makes it for you.\n\n"
             "A club that plays in nothing just moves: there is no old place to fill.")
 
-    def __init__(self, parent, project, taken, cur=None):
+    def __init__(self, parent, project, taken, cur=None, movable=None):
         super().__init__(parent, "Club of the game")
         self.info = B.game_info(project.base)
         cur = cur or {}
+        # B95 (vmican 17.10.): a club of the game in another place of the world (Envigado in the
+        # NewLife Colombian Second Division) is picked too and moves here: {team id: (league,
+        # place, its entry)}. Greyed out with "take it out first" it looked as if it did not exist
+        self.movable = dict(movable or {})
         # a club the recipe already uses is listed greyed with where (astyleUZ 04.10.: Sparta
         # Prague, already in his league, just did not turn up and looked impossible to pick)
         self.taken = dict(taken) if isinstance(taken, dict) else {t: "" for t in taken}
@@ -1375,9 +1522,15 @@ class GameClubDialog(Dialog):
         for t, n, s in self.used if want else []:
             if want not in (n or "").lower() and want not in (s or "").lower() and want != str(t):
                 continue
-            it = QTreeWidgetItem([n, s, str(t), _("already in your world: %s") % self.taken[t]])
-            it.setFlags(it.flags() & ~(Qt.ItemIsSelectable | Qt.ItemIsEnabled))
-            it.setToolTip(3, _("Take it out of that place first (Clubs: New club here), then pick it here."))
+            if t in self.movable:
+                it = QTreeWidgetItem([n, s, str(t), _("in your world: %s -- it moves here") % self.taken[t]])
+                it.setData(0, Qt.UserRole, t)
+                if t == keep:
+                    pick = it
+            else:
+                it = QTreeWidgetItem([n, s, str(t), _("already in your world: %s") % self.taken[t]])
+                it.setFlags(it.flags() & ~(Qt.ItemIsSelectable | Qt.ItemIsEnabled))
+                it.setToolTip(3, _("Take it out of that place first (Clubs: New club here), then pick it here."))
             self.tree.addTopLevelItem(it)
         if pick:
             self.tree.setCurrentItem(pick)
@@ -1390,6 +1543,15 @@ class GameClubDialog(Dialog):
 
     def show_swap(self):
         t = self.chosen()
+        if t in self.movable:
+            ML, at, _e = self.movable[t]
+            self.keep.setVisible(False)
+            self.where.setText(_("%s moves here from %s, club %d. That place becomes a new club (give it a club "
+                                 "there again), and who takes its places in the game's competitions stays as "
+                                 "it was.") % (self.info["clubs"][t][0], ML["name"], at + 1))
+            for w in (self.rb_game, self.m_game, self.swap_club, self.rb_new, self.m_new, self.swap_name):
+                w.setVisible(False)
+            return
         cont = t is not None and bool(set(self.info["entries"].get(t) or []) & B.CONTINENTAL_CIDS)
         self.keep.setVisible(cont)
         where = B.game_club_where(self.info, t, cont and self.keep.isChecked()) if t is not None else []
@@ -1410,6 +1572,11 @@ class GameClubDialog(Dialog):
         t = self.chosen()
         if t is None:
             error(self, "Club of the game", _("Pick a club."))
+            return
+        if t in self.movable:                  # B95: it takes its old entry's swap and keep along
+            _ML, _at, e = self.movable[t]
+            self.result = {"id": t, "swap": e.get("swap"), "keep": bool(e.get("keep")), "move": self.movable[t]}
+            self.accept()
             return
         swap = None
         keep = self.keep.isVisible() and self.keep.isChecked()
@@ -1584,9 +1751,10 @@ class CompetitionIdsDialog(Dialog):
         db = worlds[0] if worlds else project.base
         self.rows = B.competition_ids(db, project.base)
         where = (_("the world in the game (%s)") % project.live_worlds()[0]) if worlds else _("the game's tables")
-        self.v.insertWidget(0, hint(_("Every league and cup in %s. Competition ID is what scoreboards, kits and "
-                                      "the competition maps of Sider ask for; regulation IDs are the ones in "
-                                      "sider.log and the world file. New = made by this world.") % where))
+        self.v.insertWidget(0, hint(_("Every league and cup in %s. Regulation IDs are what scoreboards, kits and "
+                                      "the competition maps of Sider ask for (sider.log calls them tournament_id), "
+                                      "one for each stage; Competition ID is the game's own number for the "
+                                      "competition. New = made by this world.") % where))
         self.find = QLineEdit()
         self.find.setPlaceholderText(_("Find..."))
         self.find.textChanged.connect(self.fill)
@@ -1625,7 +1793,8 @@ class CompetitionNamesDialog(Dialog):
     and for the continental cups the world builds (ccup_names, ccup_logos)"""
 
     OURS = [("6", "CAF Champions League"), ("7", "CAF Confederation Cup"), ("8", "AFC Champions League Two"),
-            ("9", "Copa Sudamericana"), ("13", "CONCACAF Champions Cup"), ("14", "OFC Champions League"),
+            ("9", "Copa Sudamericana"), ("-1", "Recopa Sudamericana"),
+            ("13", "CONCACAF Champions Cup"), ("14", "OFC Champions League"),
             ("15", "AFC Challenge League"), ("0", "CAF Super Cup")]
 
     def __init__(self, parent, project):
@@ -1638,6 +1807,8 @@ class CompetitionNamesDialog(Dialog):
         self.logos = dict(r.get("ccup_logos") or {})
         if r.get("caf_super_cup_logo") and "0" not in self.logos:
             self.logos["0"] = r["caf_super_cup_logo"]
+        if r.get("samerica_super_cup_logo") and "-1" not in self.logos:
+            self.logos["-1"] = r["samerica_super_cup_logo"]
         self.v.insertWidget(0, hint(_("Cups, super cups and the continental competitions of the game, and the "
                                       "continental cups Mod Studio makes. Leagues are renamed on Game's "
                                       "leagues and clubs. Empty name: the game's own.")))
@@ -1728,6 +1899,90 @@ class CompetitionNamesDialog(Dialog):
         self.accept()
 
 
+class TrophiesDialog(Dialog):
+    """a trophy folder of your own for a competition (recipe trophies, lbtrophies; mato 21.10.):
+    FL26's Entrance.lua shows it in the game. A competition with none keeps what it had"""
+
+    def __init__(self, parent, project, world_db=None):
+        super().__init__(parent, "Trophies")
+        self.trophies = {str(k): v for k, v in (project.recipe.get("trophies") or {}).items()}
+        db = world_db if world_db and os.path.exists(os.path.join(world_db, "CompetitionRegulation.bin")) \
+            else project.base
+        self.rows = B.competition_ids(db, project.base)
+        self.v.insertWidget(0, hint(_(
+            "Pair a trophy folder of your own with a competition: Build copies it into the world and FL26's "
+            "Entrance.lua shows that trophy in the competition's matches and its final. The folder is laid out "
+            "as FL26's content\\Entrance ones (the files at its top or in a phase folder, the final's in "
+            "Final; they replace the AFC Champions League trophy's files). A competition with no folder keeps "
+            "what it had.")
+            + ("" if db != project.base else "  " + _("The world's new cups are listed after its first Build."))))
+        self.find = QLineEdit()
+        self.find.setPlaceholderText(_("Find..."))
+        self.find.textChanged.connect(self.fill)
+        self.v.insertWidget(1, self.find)
+        self.table = QTreeWidget()
+        self.table.setHeaderLabels([_("Name"), _("Kind"), _("Competition ID"), _("Regulation IDs"), _("Trophy folder")])
+        self.table.setRootIsDecorated(False)
+        self.table.setSortingEnabled(True)
+        self.table.itemDoubleClicked.connect(lambda *_a: self.pick())
+        self.v.insertWidget(2, self.table, 1)
+        self.b_pick = QPushButton(_("Pick a trophy folder..."))
+        self.b_pick.clicked.connect(self.pick)
+        self.b_clear = QPushButton(_("No trophy of its own"))
+        self.b_clear.clicked.connect(self.clear)
+        self.v.insertWidget(3, row(self.b_pick, self.b_clear, "stretch"))
+        self.scroll.hide()
+        self.fill()
+        self.table.sortByColumn(2, Qt.AscendingOrder)
+        for c in range(4):
+            self.table.resizeColumnToContents(c)
+        self.setMinimumSize(860, 540)
+
+    def fill(self):
+        want = self.find.text().strip().casefold()
+        cur = self.current()
+        self.table.clear()
+        known = set()
+        for cid, regs, name, kind, new in self.rows:
+            known.add(str(cid))
+            line = [name, _(kind), str(cid), ", ".join(map(str, regs)), self.trophies.get(str(cid), "")]
+            if want and want not in " ".join(line).casefold():
+                continue
+            it = _IdItem(line)
+            it.setData(0, Qt.UserRole, str(cid))
+            self.table.addTopLevelItem(it)
+            if str(cid) == cur:
+                self.table.setCurrentItem(it)
+        for cid, folder in sorted(self.trophies.items()):
+            if cid not in known:                     # paired before, not in these tables (yet)
+                it = _IdItem([_("(not in these tables)"), "", cid, "", folder])
+                it.setData(0, Qt.UserRole, cid)
+                self.table.addTopLevelItem(it)
+
+    def current(self):
+        it = self.table.currentItem() if hasattr(self, "table") else None
+        return it.data(0, Qt.UserRole) if it else None
+
+    def pick(self):
+        cid = self.current()
+        if cid is None:
+            return
+        d = QFileDialog.getExistingDirectory(self, _("Pick a trophy folder..."), self.trophies.get(cid, ""))
+        if not d:
+            return
+        import lbtrophies
+        if not lbtrophies.files_in(d):
+            error(self, "Trophies", _("%s has no files.") % d)
+            return
+        self.trophies[cid] = os.path.normpath(d)
+        self.fill()
+
+    def clear(self):
+        cid = self.current()
+        if cid is not None and self.trophies.pop(cid, None) is not None:
+            self.fill()
+
+
 class GameEuropeDialog(Dialog):
     """the recipe's game_europe: the European places of the game's own top divisions, in place of
     the shipped ones"""
@@ -1735,6 +1990,7 @@ class GameEuropeDialog(Dialog):
     def __init__(self, parent, project):
         super().__init__(parent, "European places of the game's leagues")
         self.tops = B.game_europe_tops(project.base)
+        self.modern = modern_conmebol(project)
         self.places = {}
         for k, v in (project.recipe.get("game_europe") or {}).items():
             if str(k).isdigit():
@@ -1757,7 +2013,7 @@ class GameEuropeDialog(Dialog):
         right.addWidget(self.own)
         self.l_whose = hint("")
         right.addWidget(self.l_whose)
-        self.table = EuropeTable([], 20, tall=True)
+        self.table = EuropeTable([], 20, tall=True, modern=self.modern)
         self.table.preset.hide()
         right.addWidget(self.table, 1)
         body.addLayout(right, 1)
@@ -1781,9 +2037,14 @@ class GameEuropeDialog(Dialog):
             self.l_whose.setText(_("Your places: they replace the game's for this league."))
             return
         sam = {r: (lib, libq) for r, lib, libq in fl26world.SAM_GAME}
-        if not shipped and rid in sam:
-            # the game keeps a South American league's Libertadores places in the exe, not in the
-            # European access list the table shows, so the table is empty for them (Vicentico12)
+        if not shipped and rid in sam and self.modern:
+            # the modern CONMEBOL competitions take the game's Libertadores places away
+            # (leaguebuilder.modern_libertadores_recipe)
+            self.l_whose.setText(_("With the modern CONMEBOL competitions on, this league has no Libertadores "
+                                   "places of the game's. Tick the box above to give it its places."))
+        elif not shipped and rid in sam:
+            # The game keeps a South American league's vanilla Libertadores places in the exe,
+            # not in the access list shown here. They stay untouched until the user opts in.
             self.l_whose.setText(_("The game gives this league its Libertadores places itself: group stage %s, "
                                    "qualifying round %s. They are not in this table. Tick the box above to set "
                                    "your own.") % sam[rid])
@@ -2133,43 +2394,278 @@ class GameSeasonsDialog(Dialog):
         self.accept()
 
 
+class ConmebolAssociationsDialog(Dialog):
+    """Dynamic CONMEBOL sources for countries that have no playable top division in this world.
+
+    The recipe remains {country: [[rank, competition], ...]}; a rank is resolved to a real club
+    at runtime, never to a team id stored by Mod Studio.
+    """
+
+    def __init__(self, parent, project):
+        super().__init__(parent, "CONMEBOL countries without a league")
+        ids = B.country_ids(project.base)
+        conf = B.confederations(project.base)
+        game = B.game_top_division_countries(project.base)
+        ours = {L.get("country") for L in project.recipe.get("leagues") or []
+                if L.get("above") in (None, "") and not L.get("others") and not L.get("exhibition")}
+        self.names = {i: n for n, i in ids}
+        self.assocs = []
+        for name, country in ids:
+            if conf.get(country) != 4 or country in game or name in ours:
+                continue
+            try:
+                capacity = B.association_club_capacity(project.base, country)
+            except (OSError, ValueError):
+                capacity = 0
+            self.assocs.append((country, name, capacity))
+        self.assocs.sort(key=lambda x: x[1].lower())
+
+        by_name = {n.lower(): i for n, i in ids}
+        self.places = {}
+        for key, rows in (project.recipe.get("conmebol_associations") or {}).items():
+            country = int(key) if str(key).strip().isdigit() else by_name.get(str(key).strip().lower())
+            if country in {a[0] for a in self.assocs}:
+                self.places[country] = [list(e) for e in (rows or [])]
+
+        self.v.insertWidget(0, hint(_(
+            "Places for South American countries that have no league in this world: the country's clubs of "
+            "Other Latin American teams, ranked when the season starts. They count with the leagues' places "
+            "towards the field the modern CONMEBOL competitions need; no country has to have any. A rank the "
+            "country has no club for stays empty, it is not given to another country.")))
+        body = QHBoxLayout()
+        self.list = QListWidget()
+        self.list.setFixedWidth(320)
+        for _country, name, capacity in self.assocs:
+            self.list.addItem("%s  (%s)" % (name, _("%d clubs") % capacity))
+        body.addWidget(self.list)
+        right = QVBoxLayout()
+        self.l_name = QLabel("")
+        self.l_name.setObjectName("cardtitle")
+        right.addWidget(self.l_name)
+        self.own = QCheckBox(_("Own places for this association"))
+        self.own.toggled.connect(self.toggle)
+        right.addWidget(self.own)
+        self.l_whose = hint("")
+        right.addWidget(self.l_whose)
+        allowed_ids = {3, 9} | set(fl26world.CONMEBOL_STAGE_IDS)
+        allowed = [(c, n) for c, n in fl26world.COMPETITIONS if c in allowed_ids]
+        self.table = EuropeTable([], B.FINAL_ASSOC_RANK, tall=True, competitions=allowed,
+                                 cup_winner=False, position_label="Association rank", modern=True)
+        self.table.preset.hide()
+        right.addWidget(self.table, 1)
+        body.addLayout(right, 1)
+        self.v.insertLayout(1, body, 1)
+        self.scroll.hide()
+        self.cur = -1
+        self.list.currentRowChanged.connect(self.show_assoc)
+        if self.assocs:
+            self.list.setCurrentRow(0)
+        else:
+            self.own.setEnabled(False)
+            self.table.setEnabled(False)
+            self.l_whose.setText(_("Every South American country has a league in this world."))
+        self.marks()
+        self.setMinimumSize(980, 640)
+
+    def marks(self):
+        for n, (country, name, capacity) in enumerate(self.assocs):
+            it = self.list.item(n)
+            it.setText(("●  " if country in self.places else "    ") +
+                       "%s  (%s)" % (name, _("%d clubs") % capacity))
+            it.setForeground(QBrush(QColor(theme.ACCENT if country in self.places else theme.TEXT)))
+
+    def keep(self):
+        if 0 <= self.cur < len(self.assocs) and self.own.isChecked():
+            self.places[self.assocs[self.cur][0]] = self.table.places()
+
+    def show_assoc(self, i):
+        self.keep()
+        self.cur = i
+        if not 0 <= i < len(self.assocs):
+            return
+        country, name, capacity = self.assocs[i]
+        self.l_name.setText(name)
+        mine = country in self.places
+        self.own.blockSignals(True)
+        self.own.setChecked(mine)
+        self.own.blockSignals(False)
+        self.table.set_places(self.places[country] if mine else [])
+        self.table.setEnabled(mine)
+        self.l_whose.setText(_("This country has %d clubs of the game that can play. A rank past them stays "
+                               "empty.") % capacity)
+
+    def toggle(self, on):
+        if not 0 <= self.cur < len(self.assocs):
+            return
+        country, _name, _capacity = self.assocs[self.cur]
+        if on:
+            self.places[country] = self.table.places()
+        else:
+            self.places.pop(country, None)
+            self.table.set_places([])
+        self.table.setEnabled(on)
+        self.marks()
+
+    def ok(self):
+        self.keep()
+        self.result = {self.names[c]: p for c, p in sorted(self.places.items(), key=lambda kv: self.names[kv[0]].lower())
+                       if p}
+        self.accept()
+
+
 class SouthAmericaDialog(Dialog):
-    """read only (GitHub #71): every South American league's Libertadores, qualifying and Copa
-    Sudamericana places -- the game's leagues and the world's own -- as Check the plan lists them"""
+    """GitHub #71: every South American league's Libertadores, qualifying and Copa Sudamericana
+    places, the game's leagues and the world's own, as Check the plan lists them; and the switch
+    for the modern CONMEBOL competitions (PR #146, vmardonesdev): Libertadores qualifying in three
+    phases, a Copa Sudamericana with a first stage and a play-off, the Recopa Sudamericana. Off, a
+    world builds the classic competitions exactly as before 0.2.5 (review of #146: a world with
+    Libertadores places became a modern one Build refused). A place only the modern ones have
+    keeps them on; switching them off takes such places out, after asking"""
+    help = ("Modern CONMEBOL competitions off (every world before 0.2.5): the game's Copa Libertadores "
+            "with its qualifying round, and a Copa Sudamericana of 32 clubs in eight groups when leagues have "
+            "places in it. The list shows who goes where.\n\n"
+            "On: Libertadores qualifying in three phases (phase 1: 6 clubs, phase 2: 13 clubs and the three "
+            "phase-1 winners, phase 3: the eight phase-2 winners), a Copa Sudamericana with a first stage of "
+            "32 clubs and a play-off after the groups, and the Recopa Sudamericana in February. The game's "
+            "South American leagues then have no Libertadores places of their own: give them theirs in "
+            "European places of the game's leagues. Build wants the whole field: 26 Libertadores group places, "
+            "13 in phase 2, 6 in phase 1, 12 Sudamericana group places and 32 in its first stage, from any "
+            "South American leagues you like.\n\n"
+            "Switching them off takes out the places only they have; Libertadores, qualifying and Sudamericana "
+            "places stay.")
 
     def __init__(self, parent, project):
         super().__init__(parent, "South American places")
+        self.project = project
+        self.v.insertWidget(0, hint(_("Which positions go to the Copa Libertadores, its qualifying round and the "
+                                      "Copa Sudamericana, for the game's South American leagues and yours. The "
+                                      "game's Libertadores places are its own; the Copa Sudamericana is built by "
+                                      "Mod Studio, your leagues' places first, then the game's leagues in turn.")))
+        self.modern = QCheckBox(_("Modern CONMEBOL competitions"))
+        self.modern.setToolTip(_("Libertadores qualifying in three phases, a Copa Sudamericana with a first stage "
+                                 "and a play-off, and the Recopa Sudamericana. Off: the classic competitions, "
+                                 "as every world before 0.2.5 has them"))
+        self.modern.setChecked(modern_conmebol(project))
+        self.modern.toggled.connect(self.show_places)
+        self.v.insertWidget(1, self.modern)
+        self.view = QPlainTextEdit()
+        self.view.setReadOnly(True)
+        self.v.insertWidget(2, self.view, 1)
+        self.scroll.hide()
+        self.show_places()
+        self.setMinimumSize(900, 500)
+
+    def show_places(self, _on=None):
+        self.view.setPlainText("\n".join(self.modern_lines() if self.modern.isChecked() else self.classic_lines()))
+
+    def classic_lines(self):
         own, names, clubs = [], {}, {}
-        for L in project.recipe["leagues"]:
+        for L in self.project.recipe["leagues"]:
             n = L.get("name") or "?"
             names[n], clubs[n] = n, L.get("clubs") or 0
             for pos, comp in L.get("europe") or []:
                 own.append(("", 0, comp, n) if pos == B.CUP_WINNER else (n, pos, comp, 0))
         cups, _notes = B.ccup_plan(own, clubs)
-        self.v.insertWidget(0, hint(_("Which positions go to the Copa Libertadores, its qualifying round and the "
-                                      "Copa Sudamericana, for the game's South American leagues and yours. The "
-                                      "game's Libertadores places are its own; the Copa Sudamericana is built by "
-                                      "Mod Studio, your leagues' places first, then the game's leagues in turn.")))
-        view = QPlainTextEdit()
-        view.setReadOnly(True)
         # the builder's lines are English (the command line prints them); the language file's
         # "log" rules put them in the user's language, as the Build log's
-        view.setPlainText("\n".join(tr(l)[4:] for l in B.samerica_lines(own, names, cups)[1:]))
-        self.v.insertWidget(1, view, 1)
-        self.scroll.hide()
-        self.setMinimumSize(820, 360)
+        return [tr(l)[4:] for l in B.samerica_lines(own, names, cups)[1:]]
 
-    def finish(self):
-        bb = QDialogButtonBox(QDialogButtonBox.Close)
-        bb.button(QDialogButtonBox.Close).setText(_("Close"))
-        bb.rejected.connect(self.reject)
-        self.add_buttons(bb)
+    def modern_lines(self):
+        """the places of the modern competitions, counted against the field Build wants"""
+        project = self.project
+        recipe = dict(project.recipe, conmebol=B.CONMEBOL_MODERN)
         try:
-            theme.dark_title_bar(self)
-        except Exception:
-            pass
-        self.exec()
-        return False
+            effective = B.modern_libertadores_recipe(recipe, project.base)
+            gtops = {rid: name for rid, name, _clubs, _shipped in B.game_europe_tops(project.base)}
+        except (OSError, ValueError, B.BuildError):
+            effective, gtops = recipe, {}
+        names = dict(continental_place_choices(fl26world.COMPETITIONS, True))
+        modern_ids = {3, 9, fl26world.LIB_F1, fl26world.LIB_F2, fl26world.LIB_F3, fl26world.SUD_FIRST}
+        rows = []
+
+        def add(source, pos, comp, kind="position"):
+            try:
+                pos, comp = int(pos), int(comp)
+            except (TypeError, ValueError):
+                return
+            if comp in modern_ids or comp == 4:
+                rows.append((source, pos, comp, kind))
+
+        for L in recipe.get("leagues") or []:
+            if project.confeds.get(L.get("country")) != 4:
+                continue
+            for pos, comp in L.get("europe") or []:
+                add(L.get("name") or "?", pos, comp)
+        for key, places in (effective.get("game_europe") or {}).items():
+            if not str(key).isdigit():
+                continue
+            source = gtops.get(int(key), _("regulation %d") % int(key))
+            for pos, comp in places or []:
+                add(source, pos, comp)
+        for country, places in (effective.get("conmebol_associations") or {}).items():
+            for pos, comp in places or []:
+                add(_("%s (country without a league)") % country, pos, comp, "rank")
+
+        counts = {c: 0 for c in (3, fl26world.LIB_F1, fl26world.LIB_F2, fl26world.LIB_F3, 9, fl26world.SUD_FIRST)}
+        legacy = 0
+        for _source, _pos, comp, _kind in rows:
+            if comp in counts:
+                counts[comp] += 1
+            elif comp == 4:
+                legacy += 1
+        expected = (
+            (3, 26, _("Libertadores groups")),
+            (fl26world.LIB_F2, 13, _("Libertadores phase 2")),
+            (fl26world.LIB_F1, 6, _("Libertadores phase 1")),
+            (fl26world.LIB_F3, 0, _("Libertadores phase 3 (only the phase-2 winners)")),
+            (9, 12, _("Copa Sudamericana groups")),
+            (fl26world.SUD_FIRST, 32, _("Copa Sudamericana first stage")),
+        )
+        complete = not legacy and all(counts[c] == want for c, want, _label in expected)
+        lines = [_("The field is complete: Build can make the modern competitions.") if complete
+                 else _("The field is not complete yet: Build refuses the world until it is."), "",
+                 _("Places, of the ones the modern competitions need:")]
+        for comp, want, label in expected:
+            got = counts[comp]
+            lines.append("  %s: %d / %d  %s" % (label, got, want, _("OK") if got == want else _("CHECK")))
+        if legacy:
+            lines += ["", _("Places in Libertadores qualifying: %d  CHECK") % legacy,
+                      _("The modern competitions have no such round: use phase 1 or phase 2 instead.")]
+        lines += ["", _("Filled by the competitions themselves, not by places:"),
+                  "  " + _("Libertadores phase 2 winners -> phase 3"),
+                  "  " + _("Libertadores phase 3 winners -> Libertadores groups"),
+                  "  " + _("Libertadores phase 3 losers -> Sudamericana groups"),
+                  "  " + _("Libertadores and Sudamericana winners -> the Recopa Sudamericana")]
+        if rows:
+            lines += ["", _("Places:")]
+            by_source = {}
+            for source, pos, comp, kind in rows:
+                by_source.setdefault(source, []).append((pos, comp, kind))
+            for source in sorted(by_source, key=str.lower):
+                lines.append(source + ":")
+                for pos, comp, kind in sorted(by_source[source], key=lambda e: (e[0] == B.CUP_WINNER, e[0], e[1])):
+                    where = (_("cup winner") if pos == B.CUP_WINNER and kind == "position" else
+                             _("rank %d") % pos if kind == "rank" else _("position %d") % pos)
+                    label = _(names.get(comp) or dict(fl26world.COMPETITIONS).get(comp) or str(comp))
+                    lines.append("  %s -> %s" % (where, label))
+        return lines
+
+    def ok(self):
+        r = self.project.recipe
+        on = self.modern.isChecked()
+        if on and r.get("conmebol") != B.CONMEBOL_MODERN:
+            r["conmebol"] = B.CONMEBOL_MODERN
+            self.project.touch()
+        elif not on and modern_conmebol(self.project):
+            gone = B.modern_conmebol_places(r)
+            if gone and not ask(self, "South American places", _(
+                    "Switching the modern CONMEBOL competitions off takes out the %d places only they have "
+                    "(Libertadores phase 1 and 2, Sudamericana first stage, countries without a league). "
+                    "Libertadores, qualifying and Copa Sudamericana places stay. Go on?") % len(gone)):
+                return
+            B.drop_modern_conmebol(r)
+            self.project.touch()
+        self.accept()
 
 
 class GameCupsDialog(Dialog):
@@ -2385,7 +2881,11 @@ class NewLeagues(BuilderPage):
             "League in a new career's first season.\n"
             "- UEFA ranking: put the European countries in order and every league gets its European places by "
             "UEFA's rules.\n"
-            "- South American places: shows who goes to the Libertadores and the Copa Sudamericana.\n"
+            "- South American places: shows who goes to the Libertadores and the Copa Sudamericana, and "
+            "switches the modern CONMEBOL competitions on or off (Libertadores phases, Sudamericana first "
+            "stage, Recopa).\n"
+            "- CONMEBOL countries without a league: with the modern competitions, places for South American "
+            "countries that have no league in the world.\n"
             "- Competition names: new names and logos for cups and continental competitions.\n"
             "- League order: the order of the countries in Select Team and Kick Off -- by continent, A-Z "
             "or your own.\n"
@@ -2411,9 +2911,15 @@ class NewLeagues(BuilderPage):
         self.action("UEFA ranking", self.uefa_rank, tip="Put the European countries in order and every league "
                     "gets its European places by UEFA's key")
         self.action("South American places", self.samerica, tip="Which positions of every South American "
-                    "league, the game's and yours, go to the Libertadores, its qualifying and the Sudamericana")
+                    "league, the game's and yours, go to the Libertadores, its qualifying and the Sudamericana; "
+                    "and the modern CONMEBOL competitions on or off")
+        self.action("CONMEBOL countries without a league", self.conmebol_associations,
+                    tip="With the modern CONMEBOL competitions: places for South American countries that have no "
+                    "league in this world")
         self.action("Competition names", self.competition_names, tip="New names and logos for the cups and "
                     "continental competitions of the game, and for the continental cups the world builds")
+        self.action("Trophies", self.trophies, tip="A trophy folder of your own for a competition: FL26's "
+                    "Entrance.lua shows it in the game")
         self.action("League order", self.league_order, tip="The order of the countries in Select Team and the "
                     "Kick Off list: by continent as the game has it, A-Z, or your own")
         self.action("Seasons of the game's leagues", self.game_seasons, tip="Experimental: the game's "
@@ -2596,6 +3102,48 @@ class NewLeagues(BuilderPage):
             if d.league["clubs"] < n_old:
                 self.project.drop_league(d.league["name"], d.league["clubs"])
             self.project.touch()
+            if d.league["clubs"] > n_old:
+                self.refill_newlife(d.league["name"], n_old)
+
+    def refill_newlife(self, name, start):
+        """B249 (jibibi 26.10.): a NewLife league made smaller and then bigger again got its clubs
+        back without their squads (Build gave them numbered players); the release puts them in again"""
+        L = self.project.league(name)
+        places = N.emptied(self.project.recipe, L, start) if L else []
+        if not places:
+            return
+        rel = getattr(self.app.pages.get("NewLife"), "rel", None) or getattr(self, "nl_rel", None)
+        folder = self.app.settings.get("newlife")
+        if rel is None and folder and os.path.isdir(folder) and self.project.base is not None:
+            self.app.busy(True)
+
+            def done(r):
+                self.app.busy(False)
+                self.nl_rel = r
+                self.refill_newlife(name, start)
+
+            run_job(lambda progress: N.Release(folder), done=done,
+                    failed=lambda tb: (self.app.busy(False), self.nl_missing(name, places)))
+            return
+        if rel is None or self.project.base is None:
+            self.nl_missing(name, places)
+            return
+        try:
+            info = B.game_info(self.project.base)
+        except OSError:
+            info = None
+        got = N.refill(self.project.recipe, rel, L, places, info)
+        if got:
+            self.project.touch()
+            self.say(_("%d clubs of %s have their NewLife squads again: %s.") % (len(got), name, ", ".join(got)), "ok")
+        if len(got) < len(places):
+            self.nl_missing(name, N.emptied(self.project.recipe, L, start))
+
+    def nl_missing(self, name, places):
+        if places:
+            self.say(_("Clubs %s of %s have no squad, so Build gives them numbered players. To get them back, "
+                       "remove the league and add it again on the NewLife page.")
+                     % (", ".join(str(k + 1) for k in places), name), "warn")
 
     def remove(self):
         rows = sorted({it.data(0, Qt.UserRole) for it in self.tree.selectedItems()})
@@ -2658,6 +3206,19 @@ class NewLeagues(BuilderPage):
                 r["caf_super_cup_logo"] = d.logos["0"]
             self.project.touch()
 
+    def trophies(self):
+        if self.need_tables(True):
+            return
+        world = self.project.recipe.get("world") or ""
+        db = os.path.join(self.app.game.sider_dir, "livecpk", world, "common", "etc", "pesdb") if world else None
+        d = TrophiesDialog(self, self.project, db)
+        if d.finish():
+            if d.trophies:
+                self.project.recipe["trophies"] = d.trophies
+            else:
+                self.project.recipe.pop("trophies", None)
+            self.project.touch()
+
     def game_europe(self):
         if self.need_tables(True):
             return
@@ -2690,8 +3251,25 @@ class NewLeagues(BuilderPage):
             self.say(_("UEFA ranking applied: every ranked league has its European places. Check the plan shows "
                        "them."), "ok")
 
+    def conmebol_associations(self):
+        if self.need_tables(True):
+            return
+        if not modern_conmebol(self.project):
+            info(self, "CONMEBOL countries without a league",
+                 _("These places belong to the modern CONMEBOL competitions: switch them on in South American "
+                   "places first."))
+            return
+        d = ConmebolAssociationsDialog(self, self.project)
+        if d.finish():
+            if d.result:
+                self.project.recipe["conmebol_associations"] = d.result
+            else:
+                self.project.recipe.pop("conmebol_associations", None)
+            self.project.touch()
+
     def samerica(self):
-        SouthAmericaDialog(self, self.project).finish()
+        if SouthAmericaDialog(self, self.project).finish():
+            self.refresh()
 
     def league_order(self):
         if self.need_tables(True):
@@ -2971,6 +3549,16 @@ class NewClubs(BuilderPage):
         it = self.tree.currentItem()
         return it.data(0, Qt.UserRole) if it else None
 
+    def select_place(self, k):
+        """the club at place k of the league shown (Build's Go there)"""
+        for i in range(self.tree.topLevelItemCount()):
+            it = self.tree.topLevelItem(i)
+            if it.data(0, Qt.UserRole) == k:
+                self.tree.setCurrentItem(it)
+                self.tree.scrollToItem(it)
+                return True
+        return False
+
     def taken(self, skip):
         """{team id: where the recipe already uses it} for the clubs of the game in a place or
         taking one, but the one at place `skip` of the league shown"""
@@ -2986,6 +3574,14 @@ class NewClubs(BuilderPage):
                     out[int(e["swap"])] = _("takes %s's place") % names.get(int(e["id"]), e["id"])
         return out
 
+    def movable(self, skip):
+        """B95: {team id: (league, place, entry)} for the clubs of the game in a place of the world
+        (not the one at place `skip` of the league shown), which Club of the game moves here; a club
+        that only takes another's place (swap) is not one of them"""
+        cur = self.league()
+        return {int(e["id"]): (L, int(e.get("at", 0)), e) for L in self.project.recipe["leagues"]
+                for e in L.get("game_clubs") or [] if not (L is cur and int(e.get("at", -1)) == skip)}
+
     def game_club(self):
         L, k = self.league(), self.current()
         if not L or k is None:
@@ -2997,8 +3593,14 @@ class NewClubs(BuilderPage):
         if self.project.base is None:
             self.need_tables()
             return
-        d = GameClubDialog(self, self.project, self.taken(k), self.game_places(L).get(k))
+        d = GameClubDialog(self, self.project, self.taken(k), self.game_places(L).get(k), self.movable(k))
         if d.finish() and d.result:
+            mv = d.result.get("move")
+            if mv:                              # B95: out of its old place first
+                ML, _at, old = mv
+                ML["game_clubs"] = [x for x in ML.get("game_clubs") or [] if x is not old]
+                if not ML["game_clubs"]:
+                    ML.pop("game_clubs")
             e = {"at": k, "id": d.result["id"]}
             if d.result["swap"] is not None:
                 e["swap"] = d.result["swap"]
@@ -3007,6 +3609,11 @@ class NewClubs(BuilderPage):
             gc = [x for x in L.get("game_clubs") or [] if int(x.get("at", -1)) != k]
             L["game_clubs"] = sorted(gc + [e], key=lambda x: int(x["at"]))
             self.project.touch()
+            if mv:
+                self.say(_("%s moved here from %s, club %d: that place is a new club now. Give it a club "
+                           "there (NewLife club..., Club of the game...), then Build again and start a new "
+                           "career.") % (self.project.game_cl.get(e["id"], (str(e["id"]),))[0], mv[0]["name"],
+                                         mv[1] + 1), "ok")
 
     def newlife_club(self):
         """NewLife Database clubs into this place and the ones after it (#83): a league made by
@@ -3034,7 +3641,7 @@ class NewClubs(BuilderPage):
             run_job(lambda progress: N.Release(folder), done=done,
                     failed=lambda tb: (self.app.busy(False), error(self, "NewLife club", tb.strip().splitlines()[-1])))
             return
-        used = {int(i) for x in self.project.recipe["leagues"] for i in (x.get("newlife") or {}).get("clubs") or []
+        used = {str(int(i)) for x in self.project.recipe["leagues"] for i in (x.get("newlife") or {}).get("clubs") or []
                 if str(i).isdigit()}
         try:
             game = B.game_info(self.project.base)
@@ -3042,8 +3649,10 @@ class NewClubs(BuilderPage):
             game = None
         rel.use_tables(game)              # "in the game" by the tables in use, a database mod's too
         rel.use_recipe(self.project.recipe)   # B56: a NewLife club that is the game's is a club of the game
-        skip = used | {cid for cid, c in rel.clubs.items() if c.get("in_game") == "1"}
-        d = ClubPickDialog(self, rel, skip)
+        # B252: the clubs of the game get their own name -- game stays the tables' info, which
+        # put_club reads (a set there made every pick end in 'set' object has no attribute 'get')
+        in_game = {cid for cid, c in rel.clubs.items() if c.get("in_game") == "1"}
+        d = ClubPickDialog(self, rel, used | in_game, in_game)
         if not d.finish() or not d.picked:
             return
         room = int(L["clubs"]) - k
@@ -3148,12 +3757,14 @@ class NewClubs(BuilderPage):
         d = ClubDialog(self, names[k], abbrs[k], crests[k], coach=coaches[k], formation=forms[k],
                        formations=self.project.formations(), league_formation=L.get("formation", ""),
                        portrait=coach_portrait(self.project, key), stadium=club_stadium(self.project, key),
-                       stadium_lib=stadium_lib(self.app), kits=self.kit_words(L, k))
+                       stadium_lib=stadium_lib(self.app), kits=self.kit_words(L, k),
+                       game_stadium=club_game_stadium(self.project, key))
         if d.finish() and d.result:
             names[k], abbrs[k], crests[k] = d.result
             self.set_kit_words(L, k, d.kits_value)
             set_coach_portrait(self.project, key, d.portrait_path)
             set_club_stadium(self.project, key, d.stadium_value)
+            set_club_game_stadium(self.project, key, d.game_stadium_value)
             coaches[k] = d.coach_name or ""
             if any(coaches):
                 L["club_coaches"] = coaches
@@ -3479,7 +4090,8 @@ class CrestImportDialog(Dialog):
         left = [c for c in clubs if c[1] not in taken and not (c[1][0] == "game" and c[1][1] in self.national)]
         # B139: a club of the folder's (or the file name's) country first, none of another ticked
         where = self.cm.folder_country(self.folder.text(), self.lands, self.leagues)
-        for f, j, sc in self.cm.match(rest, [(n, i, self.country.get(k)) for i, (n, k) in enumerate(left)],
+        for f, j, sc in self.cm.match(rest, [(n, i, self.country.get(k), k[0] == "game")
+                                             for i, (n, k) in enumerate(left)],
                                       where, self.lands):
             if j is not None:
                 found[f] = (left[j], sc)
@@ -4093,6 +4705,14 @@ class Build(BuilderPage):
         cl.addWidget(noted(self.mkits, helpmark(tip), hint(_("a whole league's kits at once, with the crest on the "
                                                              "chest; off = the new clubs keep the kit borrowed "
                                                              "from the game"))))
+        self.rkits = QCheckBox(_("Kits made for clubs in a game club's place"))
+        tip = ("On: a club that took the place of a club of the game (NewLife's Bring the game's leagues to this "
+               "season) gets kits made in its own colours, as a new club does. Off: it keeps the kit of the game "
+               "or of your kit pack for that place, which can be the kit of the club that left.")
+        self.rkits.setToolTip(_(tip))
+        self.rkits.toggled.connect(self.set_rkits)
+        cl.addWidget(noted(self.rkits, helpmark(tip), hint(_("off = the kit of the club that left stays; "
+                                                             "takes effect when the world is switched on"))))
         self.ekits = QCheckBox(_("Plain kits to change in Edit mode"))
         self.ekits.setToolTip(_("On: the new clubs get no kit borrowed from a club of the game. A borrowed kit is "
                                 "a licensed one, and the game's Edit mode refuses it (\"You cannot edit this "
@@ -4107,6 +4727,8 @@ class Build(BuilderPage):
             hint(_("instead of the kits above: with this on, Kit Server does not dress the new "
                    "clubs, so the made kits are switched off"))))
         self.ekits.toggled.connect(lambda on: self.mkits.setEnabled(not on))
+        self.ekits.toggled.connect(lambda on: self.rkits.setEnabled(not on and self.mkits.isChecked()))
+        self.mkits.toggled.connect(lambda on: self.rkits.setEnabled(on and not self.ekits.isChecked()))
         self.pfaces = QCheckBox(_("Faces from the regen face pack for new players"))
         tip = ("On: every new player without a face of his own gets a face of the regen face pack by his "
                "nationality. Off: new players keep the look the game gives them, or the one you set in the "
@@ -4115,6 +4737,17 @@ class Build(BuilderPage):
         self.pfaces.toggled.connect(self.set_pfaces)
         cl.addWidget(noted(self.pfaces, helpmark(tip), hint(_("off = the looks from Edit mode stay; "
                                                                "takes effect at the next Build"))))
+        # 0.2.5 (mato 27.10.): more than 30 players at a new club, up to 35 (40 is the game's wall for
+        # one club, and a club at it can sign nobody)
+        self.squad = QSpinBox()
+        self.squad.setRange(B.SQUAD_BASE, B.SQUAD_MAX)
+        tip = ("How many players each new club has: 30, or more up to 35. A NewLife league you added before "
+               "keeps the squads it was added with until NewLife Database > More > Update my leagues takes "
+               "them again at the new size. Build again and start a new career after changing this.")
+        self.squad.setToolTip(_(tip))
+        self.squad.valueChanged.connect(self.set_squad)
+        cl.addWidget(noted(QLabel(_("Players per new club")), self.squad, helpmark(tip),
+                           hint(_("30 to 35; takes effect at the next Build"))))
         self.b_euro = QPushButton(_("Build only the European cups..."))
         self.b_euro.setToolTip(_("A world with nothing but the new Champions League and Europa League (league "
                                  "phase of 36 and play-off) and, when ticked above, the Conference League: "
@@ -4130,6 +4763,33 @@ class Build(BuilderPage):
         cl.addStretch(1)
         self.state = hint("")
         self.outer.addWidget(self.state)
+        # Build simplifications (jibibi, vmican 19.10.): every problem of the plan in one list, each
+        # with where it is and Go there, instead of the first one in the log and the next after it
+        self.prob_box = QWidget()
+        pv = QVBoxLayout(self.prob_box)
+        pv.setContentsMargins(0, 0, 0, 0)
+        ph = QHBoxLayout()
+        self.prob_title = QLabel("")
+        self.prob_title.setWordWrap(True)
+        self.prob_title.setObjectName("banner_warn")
+        self.b_go = QPushButton(_("Go there"))
+        self.b_go.setToolTip(_("Opens the page of the problem picked, at its league, club or players"))
+        self.b_go.clicked.connect(self.go_there)
+        ph.addWidget(self.prob_title, 1)
+        ph.addWidget(self.b_go)
+        pv.addLayout(ph)
+        self.problems = QTreeWidget()
+        self.problems.setRootIsDecorated(False)
+        self.problems.setAlternatingRowColors(True)
+        self.problems.setHeaderLabels([_("Where"), _("Problem")])
+        self.problems.setColumnWidth(0, 260)
+        self.problems.setMaximumHeight(180)
+        self.problems.itemDoubleClicked.connect(lambda *_a: self.go_there())
+        self.problems.currentItemChanged.connect(
+            lambda it, _o: self.b_go.setEnabled(bool(it and it.data(0, Qt.UserRole))))
+        pv.addWidget(self.problems)
+        self.prob_box.hide()
+        self.outer.addWidget(self.prob_box)
         self.out = QPlainTextEdit()
         self.out.setObjectName("log")
         self.out.setReadOnly(True)
@@ -4166,6 +4826,14 @@ class Build(BuilderPage):
                 self.project.recipe["cup_draw"] = v
             self.project.touch()
 
+    def set_squad(self, n):
+        if B.squad_of(self.project.recipe) != n:
+            if n == B.SQUAD_BASE:
+                self.project.recipe.pop("squad", None)
+            else:
+                self.project.recipe["squad"] = n
+            self.project.touch()
+
     def set_ekits(self, on):
         if bool(self.project.recipe.get("editable_kits")) != on:
             if on:
@@ -4188,6 +4856,14 @@ class Build(BuilderPage):
                 self.project.recipe.pop("make_kits", None)
             else:
                 self.project.recipe["make_kits"] = False
+            self.project.touch()
+
+    def set_rkits(self, on):
+        if (self.project.recipe.get("replaced_kits") is not False) != on:
+            if on:
+                self.project.recipe.pop("replaced_kits", None)
+            else:
+                self.project.recipe["replaced_kits"] = False
             self.project.touch()
 
     def set_uecl_name(self):
@@ -4263,10 +4939,17 @@ class Build(BuilderPage):
         self.ekits.blockSignals(True)
         self.ekits.setChecked(bool(self.project.recipe.get("editable_kits")))
         self.ekits.blockSignals(False)
+        self.squad.blockSignals(True)
+        self.squad.setValue(B.squad_of(self.project.recipe))
+        self.squad.blockSignals(False)
         self.mkits.blockSignals(True)
         self.mkits.setChecked(self.project.recipe.get("make_kits") is not False)
         self.mkits.blockSignals(False)
         self.mkits.setEnabled(not self.ekits.isChecked())
+        self.rkits.blockSignals(True)
+        self.rkits.setChecked(self.project.recipe.get("replaced_kits") is not False)
+        self.rkits.blockSignals(False)
+        self.rkits.setEnabled(self.mkits.isChecked() and not self.ekits.isChecked())
         self.pfaces.blockSignals(True)
         self.pfaces.setChecked(self.project.recipe.get("pack_faces") is not False)
         self.pfaces.blockSignals(False)
@@ -4375,6 +5058,7 @@ class Build(BuilderPage):
         except B.BuildError as e:
             self.out.clear()
             self.say(_("error: %s") % tr(str(e)))
+            self.show_problems(e)
             return
         game, base = self.app.game.folder, self.project.base
 
@@ -4401,7 +5085,7 @@ class Build(BuilderPage):
             if ask(self, title, text):
                 def on(log):
                     snapshot(self.app.game.ini_path, "Your world: switch on " + name, self.app.game.sider_dir)
-                    self.switch_with_saves(sw, name, log)
+                    self.switch_with_saves(sw, name, log, redraw=True)     # right after a Build (B213)
                     self.project.drop_names()
                     log("\n" + _("Start the game, then 4. check."))
                 self.run(on)
@@ -4409,11 +5093,77 @@ class Build(BuilderPage):
                 save_note(self, sw)
         self.run(go, background=True, done=switch)
 
+    def where_text(self, w):
+        """a problem's place as the list shows it: the league and club, the club of the game by name
+        and team id, both (mato 21.10.: the ids stay visible)"""
+        game = self.project.game_cl or {}
+        label = lambda t: "%s (%d)" % (game[t][0], t) if t in game else str(t)
+        if "players" in w:
+            k = str(w["players"])
+            if k.isdigit():
+                return _("players of %s") % label(int(k))
+            lg, _s, n = k.rpartition("/")
+            return _("players of %s") % (_("%s, club %d") % (lg, int(n) + 1) if n.isdigit() else k)
+        if "place" in w:
+            return _("%s, club %d") % (w["league"], w["place"] + 1)
+        if "league" in w:
+            return w["league"]
+        if "club" in w:
+            return label(w["club"])
+        return ""
+
+    def show_problems(self, err=None):
+        """the plan's problems (leaguebuilder.PlanProblems) in the list above the log; None or
+        another error: the list goes"""
+        self.problems.clear()
+        probs = getattr(err, "problems", None)
+        if not probs:
+            self.prob_box.hide()
+            return
+        for text, w in probs:
+            it = QTreeWidgetItem([self.where_text(w), tr(text)])
+            it.setData(0, Qt.UserRole, w or None)
+            it.setToolTip(1, tr(text))
+            self.problems.addTopLevelItem(it)
+        self.prob_title.setText(_("%d problems to put right before Build. Go there (or a double-click) opens the "
+                                  "page of the one picked; then Check the plan again.") % len(probs)
+                                if len(probs) > 1 else
+                                _("1 problem to put right before Build. Go there (or a double-click) opens its "
+                                  "page; then Check the plan again."))
+        self.problems.setCurrentItem(self.problems.topLevelItem(0))
+        self.b_go.setEnabled(bool(probs[0][1]))
+        self.prob_box.show()
+
+    def go_there(self):
+        it = self.problems.currentItem()
+        w = it.data(0, Qt.UserRole) if it else None
+        if not w:
+            return
+        if "players" in w:
+            self.app.open_page("Players")
+            self.app.page("Players").show_club(str(w["players"]))
+        elif "league" in w:
+            if "place" in w:
+                self.app.open_page("NewClubs")
+                nc = self.app.page("NewClubs")
+                nc.combo.setCurrentText(w["league"])
+                nc.show_clubs()
+                nc.select_place(w["place"])
+            else:
+                self.app.open_page("Leagues")
+                self.app.page("Leagues").show_key("o" + w["league"])
+        elif "club" in w:
+            self.app.open_page("Leagues")
+            if not self.app.page("Leagues").show_game_club(int(w["club"])):
+                self.app.open_page("Players")
+                self.app.page("Players").show_club(str(w["club"]))
+
     def run(self, what, background=False, done=None, after=None, busy=None):
         """what(log) on the GUI thread, or with background in a worker with the clock; done() when it
         went through, after(ok) at the end either way (in the background); busy: what the bottom bar
         says meanwhile (B134: a switch on and an Export said "Building..." too)"""
         self.out.clear()
+        self.show_problems(None)
         if not background:
             try:
                 what(self.say)
@@ -4425,6 +5175,7 @@ class Build(BuilderPage):
                     denied_box(self, path)
                 elif isinstance(e, B.BuildError):
                     self.say(_("error: %s") % tr(str(e)))
+                    self.show_problems(e)
                 else:
                     import traceback
                     self.say(_("unexpected error:") + "\n" + traceback.format_exc())
@@ -4534,6 +5285,7 @@ class Build(BuilderPage):
         except B.BuildError as e:
             self.out.clear()
             self.say(_("error: %s") % tr(str(e)))
+            self.show_problems(e)
             return
         if not can_write(self, self.app.game):       # a game under Program Files (B14)
             return
@@ -4581,6 +5333,7 @@ class Build(BuilderPage):
         except B.BuildError as e:
             self.out.clear()
             self.say(_("error: %s") % tr(str(e)))
+            self.show_problems(e)
             return
         if not can_write(self, self.app.game):
             return
@@ -4616,7 +5369,8 @@ class Build(BuilderPage):
             self.switch_with_saves(sw, w, log)
             self.project.drop_names()
             info["secs"] = int(time.time() - info["t0"])
-            info["notes"] = [n for n in (sw.note(), database_note(self.project), exhibition_note(pl)) if n]
+            info["notes"] = [n for n in (sw.note(), database_note(self.project), exhibition_note(pl),
+                                                kits_note(self.project, game)) if n]
 
         def done():
             self.app.bus.ini_changed.emit()
@@ -4660,7 +5414,7 @@ class Build(BuilderPage):
             self.run(go, background=True, after=over, busy=_("Switching %s on") % w)
             return True
 
-    def switch_with_saves(self, sw, w, log):
+    def switch_with_saves(self, sw, w, log, redraw=False):
         """Switch on `w`, its save folder first (saves.Switch: the careers of the world going out
         aside, its own in, mato 15.10.); when the switch stops, the save folders go back as they were"""
         from .. import saves
@@ -4669,7 +5423,7 @@ class Build(BuilderPage):
         except saves.SaveError as e:
             raise B.BuildError(str(e))
         try:
-            B.switch_on(w, self.app.game.folder, log=log)
+            B.switch_on(w, self.app.game.folder, log=log, redraw=redraw)
         except BaseException:
             try:
                 sw.undo(log)

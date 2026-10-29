@@ -169,6 +169,35 @@ def main():
         log = []
         S.write(pm, b, log=log.append, root=w)
         ok("a changed crest makes that kit again", any("(1 new or changed)" in l for l in log))
+        # B213: a kit of the drawing before (no drawing in its stamp, the shorts crest on its side)
+        # is kept at a Switch on and drawn again at a Build
+        lib = os.path.join(b, S.KITS)
+        m911 = [m for m in S.to_make(pm, w) if m[0] == 911][0]
+        older = S._stamps(m911[3], m911[4], m911[5], S.numbers_kit(lib, "My world"), lib, drawing=1)[0]
+        ok("the drawing is in the stamp", older not in S._stamps(m911[3], m911[4], m911[5],
+                                                                 S.numbers_kit(lib, "My world"), lib))
+        put(os.path.join(red, "kitmaker.txt"), older + "\n")
+        log = []
+        S.write(pm, b, log=log.append, root=w)
+        ok("a kit of the drawing before: kept at a Switch on", any("(0 new or changed)" in l for l in log)
+           and open(os.path.join(red, "kitmaker.txt"), encoding="utf-8").read().strip() == older)
+        log = []
+        S.write(pm, b, log=log.append, root=w, redraw=True)
+        ok("a kit of the drawing before: drawn again at a Build", any("(1 new or changed)" in l for l in log)
+           and open(os.path.join(red, "kitmaker.txt"), encoding="utf-8").read().strip() != older)
+        log = []
+        S.write(pm, b, log=log.append, root=w, redraw=True)
+        ok("a Build after it draws nothing", any("(0 new or changed)" in l for l in log))
+        # B214: a kit of drawing 2 (one numbers kit for all) the same way
+        two = S._stamps(m911[3], m911[4], m911[5], S.numbers_kits(lib, "My world"), lib, drawing=2)[0]
+        put(os.path.join(red, "kitmaker.txt"), two + "\n")
+        log = []
+        S.write(pm, b, log=log.append, root=w)
+        ok("a kit of drawing 2: kept at a Switch on", any("(0 new or changed)" in l for l in log))
+        log = []
+        S.write(pm, b, log=log.append, root=w, redraw=True)
+        ok("a kit of drawing 2: drawn again at a Build", any("(1 new or changed)" in l for l in log)
+           and open(os.path.join(red, "kitmaker.txt"), encoding="utf-8").read().strip() != two)
         with open(os.path.join(b, S.KITS, "map.txt"), "a", encoding="utf-8") as f:
             f.write('912, "Mine\\Blue"\n911, "Gone\\Red"\n')
         os.makedirs(os.path.join(b, S.KITS, "Mine", "Blue"))
@@ -325,6 +354,110 @@ def main():
         os.remove(os.path.join(g, "modules", "common", "kits.lua"))
         os.makedirs(os.path.join(g, S.SPFL_KITS))
         ok("B165: no module file: the old rule", S.libs(g)[0] == S.SPFL_KITS)
+        # B265 (NedimMM 28.10.): his common\kits.lua (reading content\kit-server) stopped at its start
+        # without map_comp.txt -- the B130 check looked for kserv.lua only
+        g = os.path.join(tmp, "b265", "SiderAddons")
+        put(os.path.join(g, "sider.ini"), 'lua.module = "common' + BS + 'kits.lua"' + chr(10))
+        put(os.path.join(g, "modules", "common", "kits.lua"), root("kit-server"))
+        for d in (S.KITS, S.SPFL_KITS):
+            os.makedirs(os.path.join(g, d), exist_ok=True)
+        S.write(new, g, log=lambda *_: None)
+        comp = os.path.join(g, S.KITS, "map_comp.txt")
+        ok("B265: kits.lua that reads kit-server: an empty map_comp.txt there",
+           os.path.isfile(comp) and os.path.getsize(comp) == 0)
+        ok("B265: none in the folder it does not read", not os.path.exists(os.path.join(g, S.SPFL_KITS, "map_comp.txt")))
+        put(os.path.join(g, "modules", "common", "kits.lua"), root("kits"))
+        S.write(new, g, log=lambda *_: None)
+        ok("B265: SPFL26's own kits.lua: one in content kits",
+           os.path.isfile(os.path.join(g, S.SPFL_KITS, "map_comp.txt")))
+
+        # B176 (quicksite, NedimMM 20.10.): eu4 gave the game's places of Heidenheim (5009), St.
+        # Pauli (4139) and Wolfsburg (232) to Schalke, Paderborn and Elversberg (edits.clubs with
+        # "kit"); the kit pack's lines for those ids kept dressing them as the clubs that left
+        g = os.path.join(tmp, "b176", "SiderAddons")
+        wr = os.path.join(tmp, "b176", "world")
+        fl = os.path.join(wr, "common", "render", "symbol", "flag")
+        os.makedirs(fl)
+        for tid, col in ((5009, (40, 57, 131, 255)), (4139, (49, 41, 49, 255)), (232, (250, 250, 250, 255)),
+                         (300, (200, 0, 0, 255))):
+            Image.new("RGBA", (64, 64), col).save(os.path.join(fl, "e_%06d_r_ll.png" % tid))
+        for rel in (r"Bundesliga\Heidenheim", r"Bundesliga\St Pauli", r"Bundesliga\Wolfsburg",
+                    r"Modpack\Game leagues\SC Paderborn 07", r"Bundesliga\Union Berlin", r"Lib\Numbers"):
+            kit(g, rel)
+        for s in ("_back", "_leg", "_name"):
+            put(os.path.join(g, S.KITS, "Lib", "Numbers", "p1", "u1p1%s.ftex" % s), "x")
+        pack = ['5009, "Bundesliga%sHeidenheim"' % BS, '4139, "Modpack%sGame leagues%sSC Paderborn 07"' % (BS, BS),
+                '232, "Bundesliga%sWolfsburg"' % BS, '300, "Bundesliga%sUnion Berlin"' % BS]
+        mp6 = os.path.join(g, S.KITS, "map.txt")
+        put(mp6, chr(10).join(pack) + chr(10))
+        eu4 = {"world": "_FL26M2400E", "leagues": [], "edits": {"clubs": {
+            "5009": {"name": "FC Schalke 04", "abbr": "SCH", "crest": "x.png", "kit": "plain #293983 #ffffff #293983"},
+            "4139": {"name": "SC Paderborn 07", "abbr": "PAE", "kit": "plain #312931 #1073bd #312931"},
+            "232": {"name": "SV Elversberg", "abbr": "ELV", "kit": ""},
+            "300": {"name": "Union Berlin II", "crest": "u.png"}}}}
+        made = S.to_make(eu4, wr)
+        ok("B176: a kit is made for a game club whose place the world gave another club",
+           [(m[0], m[1], m[3]) for m in made] == [(4139, S.GAME, "plain #312931 #1073bd #312931"),
+                                                  (5009, S.GAME, "plain #293983 #ffffff #293983")])
+        ok("B176: none for one with no colours and no crest of its own, nor for a club only renamed",
+           not {232, 300} & {m[0] for m in made})
+        ok("B176: its folder is under the world's Clubs of the game",
+           S.made_rel(eu4, "_FL26M2400E", S.GAME, 5009) == "_FL26M2400E%sClubs of the game%sFC Schalke 04" % (BS, BS))
+        S.write(eu4, g, log=lambda *_: None, root=wr)
+        km = lines(mp6)
+        ok("B176: Schalke wears its made kit, the pack's Heidenheim line is switched off for it",
+           any(l.startswith('5009, "_FL26M2400E%sClubs of the game%sFC Schalke 04"' % (BS, BS)) for l in km)
+           and "#" + pack[0] + S.OFF in km
+           and os.path.isfile(os.path.join(g, S.KITS, "_FL26M2400E", "Clubs of the game", "FC Schalke 04", "p1", "u5009p1.ftex")))
+        ok("B176: a line of your own whose folder names the club stays, no kit made over it",
+           pack[1] in km and not any(l.startswith("4139, \"_FL26M2400E") for l in km))
+        ok("B176: lines for clubs the world did not give away untouched", pack[2] in km and pack[3] in km)
+        S.write({"world": "_FL26MyWorld", "leagues": []}, g, log=lambda *_: None, root=wr)
+        ok("B176: another world on: the pack's lines are back as they were", lines(mp6) == pack)
+        # Vicentico12 23.10.: "replaced_kits": false -- no kit made for them, the pack's lines stay
+        off = dict(eu4, replaced_kits=False)
+        ok("replaced_kits off: no kit made for a club in a game club's place", S.to_make(off, wr) == [])
+        S.write(eu4, g, log=lambda *_: None, root=wr)
+        S.write(off, g, log=lambda *_: None, root=wr)
+        ok("replaced_kits off after on: the pack's Heidenheim line is back, no made line for 5009",
+           lines(mp6) == pack)
+        S.write({"world": "_FL26MyWorld", "leagues": []}, g, log=lambda *_: None, root=wr)
+
+        # B166 (LaraCroft 19.10.): a kit changed by hand in its folder of the world went back to the
+        # package's (or the drawn one) at the next Build / Switch on
+        h = os.path.join(tmp, "b166")
+        src = os.path.join(h, "package", "SV Ried")
+        dst = os.path.join(h, "lib", "_FL26W", "Bundesliga", "SV Ried")
+        put(os.path.join(src, "p1", "u1p1.ftex"), "package kit")
+        put(os.path.join(src, "p1", "config.txt"), "x")
+        ok("B166: first copy", S._copy(src, dst) == "copied" and os.path.isfile(os.path.join(dst, S.COPIED)))
+        ok("B166: nothing changed, nothing copied", S._copy(src, dst) == "same")
+        put(os.path.join(dst, "p1", "u1p1.ftex"), "the kit LaraCroft put in by hand")
+        said = []
+        ok("B166: a kit changed by hand stays", S._copy(src, dst, said.append) == "kept" and said
+           and open(os.path.join(dst, "p1", "u1p1.ftex")).read() == "the kit LaraCroft put in by hand")
+        shutil.rmtree(dst)
+        S._copy(src, dst)
+        put(os.path.join(src, "p1", "u1p1.ftex"), "a newer kit of the package")
+        ok("B166: an untouched copy follows a newer package", S._copy(src, dst) == "copied"
+           and open(os.path.join(dst, "p1", "u1p1.ftex")).read() == "a newer kit of the package")
+        os.remove(os.path.join(dst, S.COPIED))     # a copy made before 0.2.5: no record of it
+        put(os.path.join(dst, "p1", "u1p1.ftex"), "by hand, before 0.2.5")
+        t = os.path.getmtime(os.path.join(src, "p1", "u1p1.ftex"))
+        os.utime(os.path.join(dst, "p1", "u1p1.ftex"), (t + 3600, t + 3600))
+        ok("B166: an older copy whose file is newer than the package's stays", S._copy(src, dst) == "kept")
+        os.utime(os.path.join(dst, "p1", "u1p1.ftex"), (t - 3600, t - 3600))
+        ok("B166: an older copy older than the package: the package's", S._copy(src, dst) == "copied")
+        # a made kit (kitmaker) changed by hand: not drawn over when its colours change
+        red = os.path.join(b, S.KITS, "My world", "Liga", "Red")
+        st = os.path.getmtime(os.path.join(red, "kitmaker.txt"))
+        os.utime(os.path.join(red, "kitmaker.txt"), (st - 3600, st - 3600))
+        put(os.path.join(red, "p1", "u911p1.ftex"), "by hand")
+        Image.new("RGBA", (64, 64), (0, 250, 250, 255)).save(os.path.join(flag, "e_000911_r_ll.png"))
+        said = []
+        S.write(pm, b, log=said.append, root=w)
+        ok("B166: a made kit changed by hand is not drawn again", any("changed by you" in l for l in said)
+           and open(os.path.join(red, "p1", "u911p1.ftex")).read() == "by hand")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("%d cases passed" % N)

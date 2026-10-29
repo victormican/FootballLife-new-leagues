@@ -69,9 +69,13 @@ class Col:
 
 
 class Map:
-    def __init__(self, file, title, cols, width=None, sep=",", quote=(), about=""):
+    def __init__(self, file, title, cols, width=None, sep=",", quote=(), about="", many=False):
         self.file, self.title, self.cols = file, title, cols
         self.width, self.sep, self.quote, self.about = width, sep, quote, about
+        # many: a club may have several lines, the server picks one of them (stadiums, balls,
+        # goal songs); else the server keeps only a club's last line (kserv, commentary, badges,
+        # weather: map[id] = line by line -- B203)
+        self.many = many
 
     @property
     def key(self):
@@ -142,8 +146,10 @@ def is_leaf(path):
     return bool(names & MARKERS) or "config.txt" in names or "order.ini" in names
 
 
-def library(root, kind="folder", depth=3):
-    """relative paths of the items under `root`: folders (kind folder) or .mp3 files (kind mp3)"""
+def library(root, kind="folder", depth=6):
+    """relative paths of the items under `root`: folders (kind folder) or .mp3 files (kind mp3).
+    depth 6: a world's scoreboards sit five folders down (_FL26M2400S/_packs/England/FA Cup/BBC);
+    at 3 every one of them was "not found in the library" and its line turned yellow (SladeBR, 23.10.)"""
     out = []
     root = os.path.normpath(root)
 
@@ -229,7 +235,7 @@ SERVERS = [
                Map("map_teams.txt", "Home stadiums", [
                    TEAM, Col("Slot", "id3", "the stadium slot the folder was made for (often 009)", "009"),
                    Col("Stadium name", "text", "the name shown in the game"),
-                   Col("Stadium", "item")]),
+                   Col("Stadium", "item")], many=True),
                Map("map_competitions.txt", "Competitions", [
                    COMP, Col("Slot", "id3", default="009"), Col("Stadium name", "text"),
                    Col("Stadium", "item")], width=7,
@@ -251,7 +257,7 @@ SERVERS = [
                    Col("Finals ball id", "id3"), Col("Finals ball", "item"),
                    Col("Winter ball id", "id3"), Col("Winter ball", "item")], width=7,
                    about="Every line needs all seven fields; empty ones stay empty."),
-               Map("map_teams.txt", "Home clubs", [TEAM, Col("Ball id", "id3"), Col("Ball", "item")]),
+               Map("map_teams.txt", "Home clubs", [TEAM, Col("Ball id", "id3"), Col("Ball", "item")], many=True),
                Map("map_winter_weeks.txt", "Winter weeks", [
                    COMP, Col("From week", "int"), Col("To week", "int"),
                    Col("Always", "flag", "1 = the winter ball in those weeks even without snow")],
@@ -286,7 +292,8 @@ SERVERS = [
                  "(exclusive = only that song in that competition).",
            maps=[
                Map("map_teams.txt", "Clubs", [
-                   TEAM, Col("Song", "item"), Col("Volume +/-", "float", "added to the master volume", "0")]),
+                   TEAM, Col("Song", "item"), Col("Volume +/-", "float", "added to the master volume", "0")],
+                   many=True),
                Map("map_competitions.txt", "Competitions", [
                    COMP, Col("Song", "item"), Col("Volume +/-", "float", default="0"),
                    Col("Exclusive", "flag", default="0")]),

@@ -161,8 +161,9 @@ def pack_lines(path, world, comps):
 
 def borrowed_kits(path, world, teams, have):
     """the world's clubs whose kit comes from a line of another pack (SPFL26's own folders, a
-    modpack ...): [(team id, kit folder as in the map)], one per club, the first line in
-    effect.  `have`: the team ids Build already gave a kit of ours."""
+    modpack ...): [(team id, kit folder as in the map)], one per club, the line in effect: the
+    last one (kserv keeps a club's last line, B203).  `have`: the team ids Build already gave a
+    kit of ours."""
     try:
         with open(path, "rb") as f:
             raw = f.read()
@@ -177,7 +178,7 @@ def borrowed_kits(path, world, teams, have):
         if not s or s.startswith("#") or OUR_LINE in s:
             continue
         m = re.match(r'(\d+)\s*,\s*"([^"]+)"', s)
-        if m and int(m.group(1)) in want and int(m.group(1)) not in out \
+        if m and int(m.group(1)) in want \
                 and not m.group(2).lower().startswith((world + "\\").lower()):
             out[int(m.group(1))] = m.group(2).strip()
     return sorted(out.items())
@@ -224,6 +225,26 @@ SiderAddons\\modules\\fl26world.txt, and put  cpk.root = ".\\livecpk\\{world}"  
 sider.ini above the other roots (with any other _FL26 world switched off). For the kits and
 scoreboards and themes add the lines of the zip's map.txt / map_competitions.txt to your own.
 """
+
+
+# B199 (JamesNotLike, 22.10.): a scoreboard pack can carry crests of its own, by team id
+# (common/render/symbol/flag/e_000204_r_b.png ...). The World Modpack's Community Shield board
+# had Leicester's crest for 204, the id whose place the world gives Bolton Wanderers, and in the
+# matches with that board Bolton wore Leicester's crest. A crest the world draws itself (its own
+# file for the id in livecpk/<world>/common/render/symbol) wins: the pack's is left out.
+CREST_FILE = re.compile(r"(?:^|/)common/render/symbol/(?:flag|emblemLc)/(?:e_(\d{6})_|emb_(\d{4,6})_)[^/]*$", re.I)
+
+
+def own_crests(root):
+    """the team ids whose crest the world at root draws itself"""
+    ids = set()
+    for sub in ("flag", "emblemLc"):
+        d = os.path.join(root, "common", "render", "symbol", sub)
+        for f in os.listdir(d) if os.path.isdir(d) else []:
+            m = CREST_FILE.search("common/render/symbol/%s/%s" % (sub, f))
+            if m:
+                ids.add(int(m.group(1) or m.group(2)))
+    return ids
 
 
 def export_world(sider_dir, world, out, log=lambda t: None, menus=False):
@@ -306,6 +327,7 @@ def export_world(sider_dir, world, out, log=lambda t: None, menus=False):
                          boards=info["scoreboards"], menus=info["menus"]).replace("\n", "\r\n")
     part = out + ".part"
     n = 0
+    own, crests = own_crests(root), 0
     with zipfile.ZipFile(part, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr(WORLD_README, text)
         z.writestr(WORLD_INFO, json.dumps(info, indent=1, ensure_ascii=False))
@@ -329,11 +351,17 @@ def export_world(sider_dir, world, out, log=lambda t: None, menus=False):
                         name = "SiderAddons/content/%s/%s/%s" % (s.folder, dst.replace("\\", "/"), rel)
                         if name.lower() in written:
                             continue              # a pack folder inside another one already written
+                        m = CREST_FILE.search(rel) if dst != world else None
+                        if m and int(m.group(1) or m.group(2)) in own:
+                            crests += 1           # B199: the world draws this club's crest itself
+                            continue
                         written.add(name.lower())
                         z.write(p, name)
                         n += 1
             log("%s: %d map line(s) from %s%s" % (s.title, len(lines), here,
                 ", %d of them kits of other packs" % len(lent) if lent else ""))
+        if crests:
+            log("%d crest file(s) of other packs left out: the world draws those clubs' crests itself" % crests)
         for dp, dn, fn in os.walk(root):
             dn.sort()
             for f in sorted(fn):
@@ -408,6 +436,54 @@ def unpack(src, work, progress=None):
         shutil.copy2(src, os.path.join(work, os.path.basename(src)))
         return work
     raise ValueError("not a mod this program knows: %s" % os.path.basename(src))
+
+
+GB = 1 << 30
+ROOM = GB // 2          # bytes left free on a disk after an unpack
+
+
+def unpacked_size(src):
+    """bytes `src` takes unpacked: a zip's or 7z's files, a single file's own size; 0 for a folder
+    or what cannot be read (unpack says why)"""
+    low = src.lower()
+    try:
+        if os.path.isdir(src):
+            return 0
+        if low.endswith(".zip"):
+            with zipfile.ZipFile(src) as z:
+                return sum(m.file_size for m in z.infolist())
+        if low.endswith(".7z"):
+            import py7zr
+            with py7zr.SevenZipFile(src, "r") as z:
+                return sum(f.uncompressed or 0 for f in z.list())
+        return os.path.getsize(src)
+    except Exception:
+        return 0
+
+
+def free(d):
+    try:
+        return shutil.disk_usage(d).free
+    except OSError:
+        return 0
+
+
+def work_dir(src, near):
+    """B41 (vmican, 15.10.): where to unpack `src`. %TEMP% as always while its disk has room; the
+    Modpack is 7 GB unpacked and on a full C: the unpack stopped half-way, the game on D: did not
+    help. Then a folder beside the game instead (`near`, the Sider folder: the disk Install copies to
+    anyway). Neither with room: ValueError naming what it needs."""
+    need = unpacked_size(src)
+    tmp = tempfile.gettempdir()
+    if not need or free(tmp) >= need + ROOM:
+        return tempfile.mkdtemp(prefix="fl26ms_")
+    if near and os.path.isdir(near) and free(near) >= need + ROOM:
+        here = os.path.join(near, "_fl26ms_unpack")
+        os.makedirs(here, exist_ok=True)
+        return tempfile.mkdtemp(prefix="fl26ms_", dir=here)
+    raise ValueError("not enough free space: %.1f GB unpacked, %.1f GB free on %s, %.1f GB beside the game"
+                     % (need / GB, free(tmp) / GB, os.path.splitdrive(tmp)[0] or tmp,
+                        free(near) / GB if near else 0))
 
 
 def lower_names(d):
@@ -890,6 +966,19 @@ def worlds_of(rec):
     """the ready worlds an install record brought in"""
     return [w for w in [rec.get("world")] + [p[1] for p in (rec.get("parts") or [])
                                              if isinstance(p, (list, tuple)) and len(p) > 1 and p[0] == "world"] if w]
+
+
+def header_pack(recs, live):
+    """the install record the header's PACK box names (B168): the newest that brought in the world
+    switched on in the game (live: its names), else the newest that brought in no world (a
+    scoreboard or kit pack); None when neither is there -- after Activate of r12 the box said
+    the eu4 zip installed last, while ACTIVE WORLD was right"""
+    by_time = sorted(recs, key=lambda r: r.get("time", ""), reverse=True)
+    for want in (lambda w: bool(set(w) & set(live)), lambda w: not w):
+        for r in by_time:
+            if want(worlds_of(r)):
+                return r
+    return None
 
 
 def uninstall(game, ini, rec, log=lambda t: None, kept=False):

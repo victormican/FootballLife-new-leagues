@@ -121,7 +121,8 @@ class Leagues(BuilderPage):
                             ("European places of the game's leagues", "game_europe"),
                             ("First-season European clubs", "europe_first"),
                             ("UEFA ranking", "uefa_rank"), ("South American places", "samerica"),
-                            ("Competition names", "competition_names"), ("Competition IDs", "competition_ids"),
+                            ("Competition names", "competition_names"), ("Trophies", "trophies"),
+                            ("Competition IDs", "competition_ids"),
                             # the order of the countries in Select Team; the 0.1.8 look left it and the
                             # two below out of this menu (Discord, laracroft7826 15.10.: "it was in the old one")
                             ("League order", "league_order"),
@@ -454,6 +455,30 @@ class Leagues(BuilderPage):
         it = self.tree.currentItem()
         return it.data(0, ROLE) if it else None
 
+    def show_key(self, key):
+        """pick the league of entries() key ("o<name>", "g<competition id>"); True when it is there
+        (Build's Go there)"""
+        if not self.tree.topLevelItemCount():
+            self.fill()
+        for i in range(self.tree.topLevelItemCount()):
+            h = self.tree.topLevelItem(i)
+            for it in [h] + [h.child(j) for j in range(h.childCount())]:
+                e = it.data(0, ROLE)
+                if e and e[0] == key:
+                    self.tree.setCurrentItem(it)
+                    self.tree.scrollToItem(it)
+                    return True
+        return False
+
+    def show_game_club(self, tid):
+        """pick the game's league club tid plays in and the club in it; False when it plays in none"""
+        for _rid, cid, _n, teams in self.project.game_lgs:
+            if tid in teams and self.show_key("g%d" % cid):
+                self.show_current()
+                self.game.select_club(tid)
+                return True
+        return False
+
     def show_current(self):
         if self.b_places.isChecked():
             self.right.setCurrentWidget(self.places)
@@ -520,6 +545,8 @@ class Leagues(BuilderPage):
         while self.o_crests.count():
             w = self.o_crests.takeAt(0).widget()
             if w:
+                w.hide()
+                w.setParent(None)
                 w.deleteLater()
         P = self.project
         crests = list(L.get("club_crests") or [])
@@ -544,6 +571,12 @@ class Leagues(BuilderPage):
             if not pm:
                 tid = int(game[k]["id"]) if k in game else (teams[k] if k < len(teams) else None)
                 pm = pixmap(world_crest(wdir, tid), 44)
+                if not pm and k in game:          # B108: a club of the game keeps the game's crest
+                    from .. import gamecrest
+                    try:
+                        pm = pixmap(gamecrest.crest(self.app.game, tid), 44)
+                    except Exception:
+                        pm = None
             if pm:
                 cell.setPixmap(pm)
             else:

@@ -1,5 +1,11 @@
 {
  "text": {
+  "%d clubs of %s have their NewLife squads again: %s.": "%d klubova lige %s opet ima NewLife momčadi: %s.",
+  "Clubs %s of %s have no squad, so Build gives them numbered players. To get them back, remove the league and add it again on the NewLife page.": "Klubovi %s lige %s nemaju momčad, pa im Build daje numerirane igrače. Da ih vratiš, ukloni ligu i dodaj je ponovno na stranici NewLife.",
+  "Its best clubs play the country's cup too": "Njeni najbolji klubovi igraju i kup države",
+  "For a third division under the game's second one, like National under Ligue 2: the game's cup takes its two divisions and the first clubs of this league, up to 48 clubs in all, as the real Coupe de France takes the lower leagues. Start a new career after the Build.": "Za treću ligu ispod druge lige iz igre, kao National ispod Ligue 2: kup iz igre uzima njene dvije lige i prve klubove ove lige, ukupno do 48 klubova, kao što pravi Coupe de France uzima niže lige. Nakon Builda pokreni novu karijeru.",
+  "CAREFUL: no kits file (UniformParameter.bin) was found beside your tables, unpacked from the game or in another mod, so the new clubs have no kit and the game calls them unlicensed. Unpack the game's tables (Settings) and build again.": "PAZI: uz tvoje tablice, među raspakiranima iz igre ni u drugom modu nema datoteke dresova (UniformParameter.bin), pa novi klubovi nemaju dres i igra ih smatra nelicenciranima. Raspakiraj tablice igre (Settings) i ponovno pokreni Build.",
+  "Abilities taken from %s (%s), at the same rating.": "Sposobnosti preuzete od %s (%s), uz istu ocjenu.",
   "a top division of a new country: February to December plays like Brazil, Japan or Saudi Arabia, clubs going up and down at New Year; the divisions below it follow it. Not with a split, Apertura/Clausura or a league cup yet": "prva liga nove zemlje: veljača do prosinca igra kao Brazil, Japan ili Saudijska Arabija, klubovi idu gore i dolje na Novu godinu; lige ispod nje je prate. Još ne s podjelom, Apertura/Clausura ni ligaškim kupom",
   "The game gives this league no places in this table. Tick the box above to give it some.": "Igra ovoj ligi ne daje mjesta u ovoj tablici. Označi kvačicu iznad da joj ih daš.",
   "The game gives this league its Libertadores places itself: group stage %s, qualifying round %s. They are not in this table. Tick the box above to set your own.": "Igra sama daje ovoj ligi mjesta u Libertadoresu: grupna faza %s, kvalifikacije %s. Nisu u ovoj tablici. Označi kvačicu iznad za svoja.",
@@ -298,6 +304,12 @@
   "If you switch": "Ako prebaciš",
   "Import": "Uvezi",
   "Import CSV...": "Uvezi CSV...",
+  "Import transfers...": "Uvezi transfere...",
+  "The first line names the columns: player (his name or id), to (the club he joins) and, if you like, from (his club now).": "Prvi redak imenuje stupce: player (ime ili id igrača), to (klub u koji ide) i, po želji, from (njegov sadašnji klub).",
+  "%d players move to their new clubs at Build.": "%d igrača prelazi u nove klubove pri Buildu.",
+  "%d are at that club already (a transfer of theirs was called off).": "%d ih je već u tom klubu (njihov transfer je otkazan).",
+  "More than %d players at these clubs: Build leaves out the last ones to come.": "Više od %d igrača u ovim klubovima: Build izostavlja zadnje pristigle.",
+  "%d lines left out:": "%d redaka izostavljeno:",
   "Import a squad from a table": "Uvoz momčadi iz tablice",
   "Import a squad from a table...": "Uvezi momčad iz tablice...",
   "Import...": "Uvezi...",
@@ -744,7 +756,7 @@
   "the name shown in the game": "ime koje se vidi u igri",
   "the stadium slot the folder was made for (often 009)": "mjesto stadiona za koje je mapa napravljena (često 009)",
   "the tunnel scenes": "scene u tunelu",
-  "this club is listed more than once; the first line counts": "ovaj klub je naveden više puta; vrijedi prvi redak",
+  "this club has a later line, and only the last one counts: this line is not used": "ovaj klub ima redak niže, a vrijedi samo zadnji: ovaj redak se ne koristi",
   "three letters or digits; Č, Ž, Đ ... become C, Z, D (the game's short names have no marks); empty = made from the name": "tri slova ili znamenke; Č, Ž, Đ ... postaju C, Z, D (kratice u igri nemaju kvačica); prazno = složi se iz imena",
   "tournament anthem in the tunnel": "himna natjecanja u tunelu",
   "tournament_anth_tunnel needs match-stats.enabled = 1 in sider.ini": "tournament_anth_tunnel treba match-stats.enabled = 1 u sider.ini",
@@ -778,7 +790,7 @@
   "Unsaved changes": "Nespremljene promjene",
   "Competition IDs": "ID-evi natjecanja",
   "the game's tables": "tablicama igre",
-  "Every league and cup in %s. Competition ID is what scoreboards, kits and the competition maps of Sider ask for; regulation IDs are the ones in sider.log and the world file. New = made by this world.": "Sve lige i kupovi u %s. ID natjecanja traže semafori, dresovi i Siderove mape natjecanja; ID-evi pravilnika su oni iz sider.loga i datoteke svijeta. Novo = napravio ovaj svijet.",
+  "Every league and cup in %s. Regulation IDs are what scoreboards, kits and the competition maps of Sider ask for (sider.log calls them tournament_id), one for each stage; Competition ID is the game's own number for the competition. New = made by this world.": "Sve lige i kupovi u %s. ID-eve pravilnika traže semafori, dresovi i Siderove mape natjecanja (sider.log ih zove tournament_id), jedan za svaku fazu; ID natjecanja je igrin vlastiti broj natjecanja. Novo = napravio ovaj svijet.",
   "Find...": "Traži...",
   "Kind": "Vrsta",
   "Competition ID": "ID natjecanja",
@@ -1262,6 +1274,9 @@
   "a whole league's kits at once, with the crest on the chest; off = the new clubs keep the kit borrowed from the game": "dresovi cijele lige odjednom, s grbom na prsima; isključeno = novi klubovi zadrže dres posuđen iz igre",
   "instead of the kits above: with this on, Kit Server does not dress the new clubs, so the made kits are switched off": "umjesto dresova iznad: kad je ovo uključeno, Kit Server ne oblači nove klubove, pa su napravljeni dresovi isključeni",
   "Kits made in the clubs' colours": "Dresovi u bojama klubova",
+  "Kits made for clubs in a game club's place": "Dresovi za klubove na mjestu kluba iz igre",
+  "On: a club that took the place of a club of the game (NewLife's Bring the game's leagues to this season) gets kits made in its own colours, as a new club does. Off: it keeps the kit of the game or of your kit pack for that place, which can be the kit of the club that left.": "Uključeno: klub koji je zauzeo mjesto kluba iz igre (NewLife: Dovedi lige igre u ovu sezonu) dobije dresove u svojim bojama, kao novi klub. Isključeno: zadrži dres igre ili tvog paketa dresova za to mjesto, a to može biti dres kluba koji je otišao.",
+  "off = the kit of the club that left stays; takes effect when the world is switched on": "isključeno = ostaje dres kluba koji je otišao; vrijedi kad se svijet uključi",
   "Plain kits to change in Edit mode": "Obični dresovi za Edit mod",
   "Not saved yet: click to save (Ctrl+S)": "Nije još spremljeno: klikni za spremanje (Ctrl+S)",
   "%d changes": "Izmjena: %d",
@@ -1370,7 +1385,8 @@
   "Install the world": "Instaliraj svijet",
   "Its leagues are in your world now. Build and install puts them in the game.": "Njegove lige su sad u tvom svijetu. Izgradi i instaliraj ih stavlja u igru.",
   "League packages in your world: %d (Build and edit your world > League packages)": "Paketi liga u tvom svijetu: %d (Izgradi i uredi svoj svijet > Paketi liga)",
-  "Mod Studio already runs as administrator: the folder or a file in it is read-only, or another program (an antivirus, the game) holds it.": "Mod Studio već radi kao administrator: mapa ili datoteka u njoj je samo za čitanje, ili je drži drugi program (antivirus, igra).",
+  "Mod Studio already runs as administrator, so something else holds the folder:\n  1. close the game and Sider (Task Manager > Details: no FL_2026.exe left),\n  2. an antivirus: Windows Security > Virus & threat protection > Ransomware protection > Controlled folder access -- allow FL26ModStudio.exe, or\n  3. right-click the folder > Properties: untick Read-only.": "Mod Studio već radi kao administrator, pa mapu drži nešto drugo:\n  1. zatvori igru i Sider (Task Manager > Details: da ne ostane FL_2026.exe),\n  2. antivirus: Windows Security > Virus & threat protection > Ransomware protection > Controlled folder access -- dopusti FL26ModStudio.exe, ili\n  3. desni klik na mapu > Properties: makni kvačicu Read-only.",
+  "Restart Mod Studio as administrator (right-click FL26ModStudio.exe > Run as administrator). If it still says this: the folder or a file in it is read-only, or another program (an antivirus, the game) holds it.": "Pokreni Mod Studio kao administrator (desni klik na FL26ModStudio.exe > Run as administrator). Ako i dalje ovo piše: mapa ili datoteka u njoj je samo za čitanje, ili je drži drugi program (antivirus, igra).",
   "Mod Studio could not start itself as administrator. Close it, right-click FL26ModStudio.exe and choose Run as administrator.": "Mod Studio se nije uspio pokrenuti kao administrator. Zatvori ga, desni klik na FL26ModStudio.exe i odaberi Run as administrator.",
   "Mod Studio has %s open": "Mod Studio ima otvoren %s",
   "Mod Studio saves your world by itself a moment after each change": "Mod Studio sam sprema tvoj svijet trenutak nakon svake promjene",
@@ -1919,9 +1935,137 @@
   "Support FL26 Mod Studio": "Podrži FL26 Mod Studio",
   "Support on Ko-fi": "Podrži na Ko-fiju",
   "Not now": "Ne sada",
-  "FL26 Mod Studio is free and donating is never required, but a small donation on Ko-fi makes it easier for us to keep the project maintained and updated. Thank you!": "FL26 Mod Studio je besplatan i donacija nije obavezna, ali mala donacija na Ko-fiju olakšava nam održavanje i ažuriranje projekta. Hvala!"
+  "FL26 Mod Studio is free and donating is never required, but a small donation on Ko-fi makes it easier for us to keep the project maintained and updated. Thank you!": "FL26 Mod Studio je besplatan i donacija nije obavezna, ali mala donacija na Ko-fiju olakšava nam održavanje i ažuriranje projekta. Hvala!",
+  "%d club(s) get another stadium: check them and press Save.": "%d klub(ova) dobiva drugi stadion: provjeri ih i pritisni Spremi.",
+  "%d of the %d stadiums of the stadium pack the world names are in yours.": "%d od %d stadiona iz paketa stadiona koje svijet navodi imaš i ti.",
+  "%s: %d new clubs, each at one of the game's stadiums.": "%s: %d novih klubova, svaki na jednom od igrinih stadiona.",
+  "%s: not in your pack": "%s: nije u tvom paketu",
+  "(found, not saved yet)": "(pronađeno, još nije spremljeno)",
+  "Automatic (Build picks one of the game's)": "Automatski (Build odabere jedan od igrinih)",
+  "Changes not saved yet.": "Promjene još nisu spremljene.",
+  "Choose a game stadium...": "Odaberi igrin stadion...",
+  "Find a club, a league or a stadium...": "Traži klub, ligu ili stadion...",
+  "Find in your pack": "Traži u svom paketu",
+  "Found %d stadium(s) in your pack: check them and press Save.": "U tvom paketu pronađeno %d stadion(a): provjeri ih i pritisni Spremi.",
+  "From your stadium pack...": "Iz tvog paketa stadiona...",
+  "Game stadium": "Igrin stadion",
+  "Game stadiums automatically": "Igrini stadioni automatski",
+  "Home stadiums: %d of %d clubs have theirs. Your stadium pack does not have the other %d, so those clubs play at the stadium the game gives them. Stadiums > Your world's clubs finds them in your pack or lets you pick others": "Domaći stadioni: %d od %d klubova ima svoj. Tvoj paket stadiona nema ostalih %d, pa ti klubovi igraju na stadionu koji im da igra. Stadioni > Klubovi tvog svijeta pronalazi ih u tvom paketu ili ti da da odabereš druge",
+  "No imported world is in the game. A world you build has its stadiums in Build: Edit club > Game stadium and Home stadium.": "U igri nema uvezenog svijeta. Svijet koji sam gradiš ima stadione u Buildu: Uredi klub > Igrin stadion i Domaći stadion.",
+  "No pack stadium": "Bez stadiona iz paketa",
+  "Nothing more found in your pack.": "U tvom paketu nema ništa više.",
+  "Only clubs whose pack stadium you do not have": "Samo klubovi čiji stadion iz paketa nemaš",
+  "Stadium pack": "Paket stadiona",
+  "The game is running. It reads the stadiums when it starts: restart it after saving. Save now?": "Igra je pokrenuta. Stadione čita kad se pokrene: ponovno je pokreni nakon spremanja. Spremiti sada?",
+  "The home stadiums of the clubs of a world you imported (a modpack). Every new club plays at one of the game's stadiums: give them all one automatically or choose one for a club. A stadium of your stadium pack, when the club has one, is played in its place. Save, then start a new Master League.": "Domaći stadioni klubova svijeta koji si uvezao (modpack). Svaki novi klub igra na jednom od igrinih stadiona: daj svima jedan automatski ili odaberi jedan za klub. Stadion iz tvog paketa stadiona, kad ga klub ima, igra se umjesto njega. Spremi, pa pokreni novu Master ligu.",
+  "The stadium of the game for %d club(s):": "Igrin stadion za %d klub(ova):",
+  "The world could not be read: %s": "Svijet se nije mogao pročitati: %s",
+  "The world's pack stadium": "Stadion iz paketa svijeta",
+  "a real club's": "stvarnog kluba",
+  "the club's own (a club of the game)": "klupski vlastiti (klub iz igre)",
+  "the stadium of the game the club plays at; a home stadium of your stadium pack above, when it has one, is shown in its place": "igrin stadion na kojem klub igra; domaći stadion iz tvog paketa stadiona gore, kad ga ima, prikazuje se umjesto njega",
+  "Your world's clubs": "Klubovi tvog svijeta",
+  "Forward": "Naprijed",
+  "Undo": "Poništi",
+  "Redo": "Ponovi",
+  "Take back the last change to your world (Ctrl+Z)": "Vrati zadnju izmjenu tvog svijeta (Ctrl+Z)",
+  "Do the taken-back change again (Ctrl+Y)": "Ponovi vraćenu izmjenu (Ctrl+Y)",
+  "Change taken back": "Izmjena vraćena",
+  "Change done again": "Izmjena ponovljena",
+  "Cup mode can put these clubs in the Champions League: it fills the last places from Other European teams. For small clubs, choose Classic Teams.": "Cup mode može ove klubove staviti u Ligu prvaka: zadnja mjesta popunjava iz Other European teams. Za male klubove odaberi Classic Teams.",
+  "%s stays in %s: the game's league has more places than this season's. A NewLife league that has it too (Ligue 3 after Ligue 2) cannot take it: there, use Club of the game and give it a new club in its place, or leave it out.": "%s ostaje u ligi %s: liga u igri ima više mjesta nego ova sezona. NewLife liga koja ga isto ima (Ligue 3 nakon Ligue 2) ne može ga uzeti: tamo upotrijebi Klub iz igre i na njegovo mjesto stavi novi klub, ili ga izostavi.",
+  "in your world: %s -- it moves here": "u tvom svijetu: %s -- seli se ovamo",
+  "%s moves here from %s, club %d. That place becomes a new club (give it a club there again), and who takes its places in the game's competitions stays as it was.": "%s se seli ovamo iz lige %s, klub %d. To mjesto postaje novi klub (tamo opet stavi klub), a tko zauzima njegova mjesta u natjecanjima igre ostaje isto.",
+  "%s moved here from %s, club %d: that place is a new club now. Give it a club there (NewLife club..., Club of the game...), then Build again and start a new career.": "%s je preseljen ovamo iz lige %s, klub %d: to mjesto je sada novi klub. Stavi tamo klub (NewLife klub..., Klub iz igre...), zatim ponovno izgradi i započni novu karijeru.",
+  "a club of the game: Club of the game... puts it here": "klub iz igre: Klub iz igre... ga stavlja ovamo",
+  "The game has this club, with its team ID: in Clubs, Club of the game... puts it in this place, and moves it from another league of your world.": "Igra ima ovaj klub, s njegovim ID-em momčadi: u Klubovima ga Klub iz igre... stavlja na ovo mjesto i seli iz druge lige tvog svijeta.",
+  "The world in the game is not from a pack. %d packs installed here; the last one: %s": "Svijet u igri nije iz paketa. Ovdje instalirano paketa: %d; zadnji: %s",
+  "%d problems to put right before Build. Go there (or a double-click) opens the page of the one picked; then Check the plan again.": "%d problema za ispraviti prije Builda. Idi tamo (ili dvoklik) otvara stranicu odabranog; zatim ponovno Provjeri plan.",
+  "1 problem to put right before Build. Go there (or a double-click) opens its page; then Check the plan again.": "1 problem za ispraviti prije Builda. Idi tamo (ili dvoklik) otvara njegovu stranicu; zatim ponovno Provjeri plan.",
+  "Go there": "Idi tamo",
+  "Opens the page of the problem picked, at its league, club or players": "Otvara stranicu odabranog problema, na njegovoj ligi, klubu ili igračima",
+  "Problem": "Problem",
+  "players of %s": "igrači kluba %s",
+  "%s has no files.": "%s nema datoteka.",
+  "(not in these tables)": "(nije u ovim tablicama)",
+  "No trophy of its own": "Bez vlastitog pehara",
+  "Pair a trophy folder of your own with a competition: Build copies it into the world and FL26's Entrance.lua shows that trophy in the competition's matches and its final. The folder is laid out as FL26's content\\Entrance ones (the files at its top or in a phase folder, the final's in Final; they replace the AFC Champions League trophy's files). A competition with no folder keeps what it had.": "Upari vlastitu mapu pehara s natjecanjem: Build je kopira u svijet, a FL26-ov Entrance.lua pokazuje taj pehar na utakmicama natjecanja i u finalu. Mapa je složena kao FL26-ove u content\\Entrance (datoteke na vrhu ili u mapi faze, za finale u Final; zamjenjuju datoteke pehara AFC Lige prvaka). Natjecanje bez mape ostaje kakvo je bilo.",
+  "Pick a trophy folder...": "Odaberi mapu pehara...",
+  "The world's new cups are listed after its first Build.": "Novi kupovi svijeta pojave se nakon njegovog prvog Builda.",
+  "Trophies": "Pehari",
+  "Trophy folder": "Mapa pehara",
+  "A trophy folder of your own for a competition: FL26's Entrance.lua shows it in the game": "Vlastita mapa pehara za natjecanje: FL26-ov Entrance.lua ga pokazuje u igri",
+  "Copa Sudamericana groups": "Skupine Copa Sudamericane",
+  "Libertadores groups": "Skupine Libertadoresa",
+  "Own places for this association": "Vlastita mjesta za ovu asocijaciju",
+  "The association rank used as a dynamic domestic source; it is not a team ID.": "Poredak asocijacije koristi se kao dinamički domaći izvor; nije ID momčadi.",
+  "The league position, or Cup winner (below 1): the winner of the country's cup. When the winner already has a continental place, the place cascades to the next eligible club of the same domestic source.": "Pozicija u ligi ili Pobjednik kupa (ispod 1): pobjednik nacionalnog kupa. Ako pobjednik već ima kontinentalno mjesto, mjesto prelazi na sljedeći klub koji ispunjava uvjete iz istog domaćeg izvora.",
+  "position %d": "pozicija %d",
+  "rank %d": "rang %d",
+  "%s (country without a league)": "%s (zemlja bez lige)",
+  "CHECK": "PROVJERI",
+  "CONMEBOL countries without a league": "Zemlje CONMEBOL-a bez lige",
+  "Competition %d": "Natjecanje %d",
+  "Copa Sudamericana first stage": "Copa Sudamericana, prva faza",
+  "Copa Sudamericana - First stage": "Copa Sudamericana - Prva faza",
+  "Every South American country has a league in this world.": "Svaka južnoamerička zemlja ima ligu u ovom svijetu.",
+  "Filled by the competitions themselves, not by places:": "Popunjavaju ih sama natjecanja, ne mjesta:",
+  "Libertadores and Sudamericana winners -> the Recopa Sudamericana": "Pobjednici Libertadoresa i Sudamericane -> Recopa Sudamericana",
+  "Libertadores phase 1": "Libertadores, 1. faza",
+  "Libertadores phase 2": "Libertadores, 2. faza",
+  "Libertadores - Phase 1": "Libertadores - 1. faza",
+  "Libertadores - Phase 2": "Libertadores - 2. faza",
+  "Libertadores - Phase 3": "Libertadores - 3. faza",
+  "Libertadores phase 2 winners -> phase 3": "Pobjednici 2. faze Libertadoresa -> 3. faza",
+  "Libertadores phase 3 (only the phase-2 winners)": "Libertadores, 3. faza (samo pobjednici 2. faze)",
+  "Libertadores phase 3 losers -> Sudamericana groups": "Poraženi u 3. fazi Libertadoresa -> skupine Sudamericane",
+  "Libertadores phase 3 winners -> Libertadores groups": "Pobjednici 3. faze Libertadoresa -> skupine Libertadoresa",
+  "Libertadores qualifying in three phases, a Copa Sudamericana with a first stage and a play-off, and the Recopa Sudamericana. Off: the classic competitions, as every world before 0.2.5 has them": "Kvalifikacije za Libertadores u tri faze, Copa Sudamericana s prvom fazom i doigravanjem te Recopa Sudamericana. Isključeno: klasična natjecanja, kao u svakom svijetu prije 0.2.5",
+  "Modern CONMEBOL competitions": "Moderna natjecanja CONMEBOL-a",
+  "Places for South American countries that have no league in this world: the country's clubs of Other Latin American teams, ranked when the season starts. They count with the leagues' places towards the field the modern CONMEBOL competitions need; no country has to have any. A rank the country has no club for stays empty, it is not given to another country.": "Mjesta za južnoameričke zemlje koje u ovom svijetu nemaju ligu: klubovi te zemlje iz Ostalih latinoameričkih momčadi, poredani na početku sezone. Broje se zajedno s mjestima liga u broj klubova koji trebaju moderna natjecanja CONMEBOL-a; nijedna zemlja ne mora imati nijedno. Rang za koji zemlja nema klub ostaje prazan, ne prelazi na drugu zemlju.",
+  "Places in Libertadores qualifying: %d  CHECK": "Mjesta u kvalifikacijama za Libertadores: %d  PROVJERI",
+  "Places, of the ones the modern competitions need:": "Mjesta, od onih koja trebaju moderna natjecanja:",
+  "Places:": "Mjesta:",
+  "Switching the modern CONMEBOL competitions off takes out the %d places only they have (Libertadores phase 1 and 2, Sudamericana first stage, countries without a league). Libertadores, qualifying and Copa Sudamericana places stay. Go on?": "Isključivanje modernih natjecanja CONMEBOL-a uklanja %d mjesta koja imaju samo ona (1. i 2. faza Libertadoresa, prva faza Sudamericane, zemlje bez lige). Mjesta u Libertadoresu, kvalifikacijama i Copa Sudamericani ostaju. Nastaviti?",
+  "The field is complete: Build can make the modern competitions.": "Broj klubova je potpun: Build može napraviti moderna natjecanja.",
+  "The field is not complete yet: Build refuses the world until it is.": "Broj klubova još nije potpun: Build odbija svijet dok ne bude.",
+  "The modern competitions have no such round: use phase 1 or phase 2 instead.": "Moderna natjecanja nemaju to kolo: koristi 1. ili 2. fazu.",
+  "These places belong to the modern CONMEBOL competitions: switch them on in South American places first.": "Ta mjesta pripadaju modernim natjecanjima CONMEBOL-a: prvo ih uključi u Južnoamerička mjesta.",
+  "This country has %d clubs of the game that can play. A rank past them stays empty.": "Ova zemlja ima %d klubova igre koji mogu igrati. Rang iza njih ostaje prazan.",
+  "With the modern CONMEBOL competitions on, this league has no Libertadores places of the game's. Tick the box above to give it its places.": "S uključenim modernim natjecanjima CONMEBOL-a ova liga nema mjesta u Libertadoresu koja daje igra. Označi kućicu gore da joj daš njezina mjesta.",
+  "regulation %d": "pravilnik %d",
+  "Association rank": "Rang u zemlji",
+  "Recopa Sudamericana": "Recopa Sudamericana",
+  "Only the game's own players": "Samo igrini igrači",
+  "The clubs that keep their place get only the transfers between the game's players and the new ratings: no new players, nobody let go. Clubs that came up still get their whole squad.": "Klubovi koji zadrže mjesto dobiju samo transfere između igrinih igrača i nove ocjene: nijedan novi igrač, nitko ne odlazi. Klubovi koji su ušli i dalje dobiju cijelu momčad.",
+  "Tick it if Bring gives you the same player twice.": "Označi ako ti Bring da istog igrača dvaput.",
+  "%d players of this season the game does not have were left out.": "%d igrača ove sezone kojih igra nema je izostavljeno.",
+  "An Edit save from before this install is in the game's save folder. Made for an older version of the world, it can stop a new Master League in the season or leave a club without its players, and it hides the new squads in Exhibition and Edit mode.": "U mapi saveova igre je Edit save od prije ove instalacije. Napravljen je za stariju verziju svijeta: nova Master League s njim može stati usred sezone ili klub ostane bez svojih igrača, a u Exhibitionu i Edit modu skriva nove momčadi.",
+  "Players per new club": "Igrača po novom klubu",
+  "How many players each new club has: 30, or more up to 35. A NewLife league you added before keeps the squads it was added with until NewLife Database > More > Update my leagues takes them again at the new size. Build again and start a new career after changing this.": "Koliko igrača ima svaki novi klub: 30, ili više do 35. NewLife liga koju si dodao prije zadržava momčadi s kojima je dodana dok ih NewLife Database > More > Update my leagues ne uzme ponovno u novoj veličini. Nakon promjene napravi Build i započni novu karijeru.",
+  "30 to 35; takes effect at the next Build": "30 do 35; vrijedi od sljedećeg Builda",
+  "%d of your leagues have squads of another size than Players per new club (%d): Update my leagues takes their players again (%s).": "%d tvojih liga ima momčadi druge veličine od Igrača po novom klubu (%d): Update my leagues ponovno uzima njihove igrače (%s).",
+  "%d of %d chosen": "%d od %d odabrano",
+  "%d of %d players ticked; a club takes up to %d.": "Označeno %d od %d igrača; klub prima najviše %d.",
+  "%s (%s): %d players chosen. Build again.": "%s (%s): odabrano %d igrača. Ponovno izgradi.",
+  "%s: %d players chosen; they go in when you add the league.": "%s: odabrano %d igrača; ulaze kad dodaš ligu.",
+  "%s: tick the players the club gets, up to %d.": "%s: označi igrače koje klub dobiva, najviše %d.",
+  "Choose the players...": "Odaberi igrače...",
+  "Choose the players": "Odaberi igrače",
+  "No goalkeeper ticked.": "Nijedan vratar nije označen.",
+  "Player": "Igrač",
+  "The best ones": "Najbolji",
+  "The club gets stand-in players up to %d.": "Klub dobiva zamjenske igrače do %d.",
+  "The players of the selected club that go in its squad; without a choice it gets its best ones": "Igrači odabranog kluba koji ulaze u momčad; bez odabira dobiva svoje najbolje",
+  "Tick at least one player.": "Označi barem jednog igrača.",
+  "Ticks the players the club gets when nobody chooses: its best %d, three goalkeepers at most": "Označava igrače koje klub dobiva bez odabira: najboljih %d, najviše tri vratara",
+  "Untick %d: a club takes up to %d players.": "Odznači %d: klub prima najviše %d igrača."
  },
  "log": [
+  [
+   "^(.+) now has (\\d+) clubs \\(it had (\\d+)\\): check its European places and promotion$",
+   "\\1 sada ima \\2 klubova (imala je \\3): provjeri europska mjesta i ulazak u viši rang"
+  ],
   [
    "^  August qualifying: ",
    "  pretkola u kolovozu: "
@@ -2201,6 +2345,106 @@
   [
    "Liga prvaka play-off\\b",
    "doigravanje Lige prvaka"
+  ],
+  [
+   "^  NOTE: Cup mode can put these clubs in the Champions League \\(it fills the last places from Other European teams\\); for small clubs choose Classic Teams$",
+   "  PAZI: Cup mode može ove klubove staviti u Ligu prvaka (zadnja mjesta popunjava iz Other European teams); za male klubove odaberi Classic Teams"
+  ],
+  [
+   "(?m)^(\\d+) problems:$",
+   "\\1 problema:"
+  ],
+  [
+   "(?m)^(\\s*)clubs that swap leagues: ",
+   "\\1klubovi koji mijenjaju ligu: "
+  ],
+  [
+   "(?m)^(\\s*)competition names: ",
+   "\\1imena natjecanja: "
+  ],
+  [
+   "(?m)(.+) is in two swaps$",
+   "\\1 je u dvije zamjene"
+  ],
+  [
+   "(?m)(.+) plays in a new league of the recipe; it cannot also swap$",
+   "\\1 igra u novoj ligi svijeta; ne može i mijenjati ligu"
+  ],
+  [
+   "(?m)swap (.+): the two clubs play in the same league$",
+   "zamjena \\1: oba kluba igraju u istoj ligi"
+  ],
+  [
+   "(?m)swap (.+): (.+) plays in no league of the game$",
+   "zamjena \\1: \\2 ne igra ni u jednoj ligi igre"
+  ],
+  [
+   "(?m)the swap of (.+) and (.+) is left out: the game's tables have both in the same league now \\(remove it on Leagues to stop this note\\)$",
+   "zamjena klubova \\1 i \\2 je izostavljena: u tablicama igre oba su sada u istoj ligi (makni je na stranici Lige da ova napomena nestane)"
+  ],
+  [
+   "(?m)^  note: ",
+   "  napomena: "
+  ],
+  [
+   "(?m)^(\\s*)trophies: competition (\\d+): no trophy folder (.+)$",
+   "\\1pehari: natjecanje \\2: nema mape pehara \\3"
+  ],
+  [
+   "(?m)^(\\s*)trophies: competition (\\d+): the trophy folder (.+) has no files$",
+   "\\1pehari: natjecanje \\2: mapa pehara \\3 nema datoteka"
+  ],
+  [
+   "^  trophies: (\\d+) competition\\(s\\) with a trophy of their own \\(Entrance\\.lua shows them once the world is switched on\\)$",
+   "  pehari: \\1 natjecanje/a s vlastitim peharom (Entrance.lua ih pokazuje kad se svijet uključi)"
+  ],
+  [
+   "^  warning: trophy of competition (\\d+) -- the world has no such competition, left out$",
+   "  upozorenje: pehar natjecanja \\1 -- svijet nema to natjecanje, izostavljen"
+  ],
+  [
+   "^Entrance\\.lua: (\\d+) trophy\\(ies\\) of (\\S+)$",
+   "Entrance.lua: \\1 pehar(a) svijeta \\2"
+  ],
+  [
+   "^Entrance\\.lua: the trophies of another world taken out$",
+   "Entrance.lua: maknuti pehari drugog svijeta"
+  ],
+  [
+   "^NOTE: (\\d+) trophy\\(ies\\) of (\\S+) -- the game has no FL26 Entrance\\.lua in modules, so they are not shown$",
+   "NAPOMENA: \\1 pehar(a) svijeta \\2 -- igra nema FL26 Entrance.lua u modules, pa se ne pokazuju"
+  ],
+  [
+   "^line (\\d+): ",
+   "redak \\1: "
+  ],
+  [
+   " -- no club of that name in the world$",
+   " -- u svijetu nema kluba tog imena"
+  ],
+  [
+   " -- (\\d+) clubs of that name$",
+   " -- \\1 kluba tog imena"
+  ],
+  [
+   " -- no player of that name$",
+   " -- nema igrača tog imena"
+  ],
+  [
+   " -- (\\d+) players of that name; a from column tells them apart$",
+   " -- \\1 igrača tog imena; stupac from ih razlikuje"
+  ],
+  [
+   " -- already on line (\\d+); that line counts$",
+   " -- već u retku \\1; vrijedi taj redak"
+  ],
+  [
+   "^the file is empty$",
+   "datoteka je prazna"
+  ],
+  [
+   "^the first line needs a column player \\(or name\\) and a column to \\(or club\\); it has: ",
+   "prvi redak treba stupac player (ili name) i stupac to (ili club); ima: "
   ]
  ]
 }

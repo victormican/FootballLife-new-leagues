@@ -1,5 +1,11 @@
 {
  "text": {
+  "%d clubs of %s have their NewLife squads again: %s.": "%d clubes de %s vuelven a tener sus plantillas de NewLife: %s.",
+  "Clubs %s of %s have no squad, so Build gives them numbered players. To get them back, remove the league and add it again on the NewLife page.": "Los clubes %s de %s no tienen plantilla, así que Build les da jugadores numerados. Para recuperarlos, quita la liga y vuelve a añadirla en la página NewLife.",
+  "Its best clubs play the country's cup too": "Sus mejores clubes juegan también la copa del país",
+  "For a third division under the game's second one, like National under Ligue 2: the game's cup takes its two divisions and the first clubs of this league, up to 48 clubs in all, as the real Coupe de France takes the lower leagues. Start a new career after the Build.": "Para una tercera división bajo la segunda del juego, como el National bajo la Ligue 2: la copa del juego toma sus dos divisiones y los primeros clubes de esta liga, hasta 48 clubes en total, como la Coupe de France real incluye las ligas inferiores. Empieza una carrera nueva después del Build.",
+  "CAREFUL: no kits file (UniformParameter.bin) was found beside your tables, unpacked from the game or in another mod, so the new clubs have no kit and the game calls them unlicensed. Unpack the game's tables (Settings) and build again.": "ATENCIÓN: no se encontró ningún archivo de equipaciones (UniformParameter.bin) junto a tus tablas, desempaquetado del juego ni en otro mod, así que los clubes nuevos no tienen equipación y el juego los trata como sin licencia. Desempaqueta las tablas del juego (Ajustes) y vuelve a construir.",
+  "Abilities taken from %s (%s), at the same rating.": "Habilidades tomadas de %s (%s), con la misma valoración.",
   "a top division of a new country: February to December plays like Brazil, Japan or Saudi Arabia, clubs going up and down at New Year; the divisions below it follow it. Not with a split, Apertura/Clausura or a league cup yet": "primera división de un país nuevo: febrero a diciembre juega como Brasil, Japón o Arabia Saudí, los clubes suben y bajan en Año Nuevo; las divisiones de abajo la siguen. Todavía sin fase final, Apertura/Clausura ni copa de la liga",
   "The game gives this league no places in this table. Tick the box above to give it some.": "El juego no le da a esta liga plazas en esta tabla. Marca la casilla de arriba para darle algunas.",
   "The game gives this league its Libertadores places itself: group stage %s, qualifying round %s. They are not in this table. Tick the box above to set your own.": "El juego le da a esta liga sus plazas de Libertadores: fase de grupos %s, fase previa %s. No están en esta tabla. Marca la casilla de arriba para poner las tuyas.",
@@ -298,6 +304,12 @@
   "If you switch": "Si cambias",
   "Import": "Importar",
   "Import CSV...": "Importar CSV...",
+  "Import transfers...": "Importar traspasos...",
+  "The first line names the columns: player (his name or id), to (the club he joins) and, if you like, from (his club now).": "La primera línea nombra las columnas: player (su nombre o id), to (el club al que va) y, si quieres, from (su club actual).",
+  "%d players move to their new clubs at Build.": "%d jugadores pasan a sus nuevos clubes al hacer Build.",
+  "%d are at that club already (a transfer of theirs was called off).": "%d ya están en ese club (se anuló un traspaso suyo).",
+  "More than %d players at these clubs: Build leaves out the last ones to come.": "Más de %d jugadores en estos clubes: Build deja fuera a los últimos en llegar.",
+  "%d lines left out:": "%d líneas no se usaron:",
   "Import a squad from a table": "Importar una plantilla desde una tabla",
   "Import a squad from a table...": "Importar una plantilla desde una tabla...",
   "Import...": "Importar...",
@@ -744,7 +756,7 @@
   "the name shown in the game": "el nombre que se ve en el juego",
   "the stadium slot the folder was made for (often 009)": "el hueco de estadio para el que se hizo la carpeta (a menudo 009)",
   "the tunnel scenes": "las escenas del túnel",
-  "this club is listed more than once; the first line counts": "este club aparece más de una vez; cuenta la primera línea",
+  "this club has a later line, and only the last one counts: this line is not used": "este club tiene una línea más abajo y solo cuenta la última: esta línea no se usa",
   "three letters or digits; Č, Ž, Đ ... become C, Z, D (the game's short names have no marks); empty = made from the name": "tres letras o cifras; Č, Ž, Đ ... pasan a C, Z, D (las abreviaturas del juego no llevan tildes); vacío = se hace a partir del nombre",
   "tournament anthem in the tunnel": "himno del torneo en el túnel",
   "tournament_anth_tunnel needs match-stats.enabled = 1 in sider.ini": "tournament_anth_tunnel necesita match-stats.enabled = 1 en sider.ini",
@@ -778,7 +790,7 @@
   "Unsaved changes": "Cambios sin guardar",
   "Competition IDs": "IDs de competiciones",
   "the game's tables": "las tablas del juego",
-  "Every league and cup in %s. Competition ID is what scoreboards, kits and the competition maps of Sider ask for; regulation IDs are the ones in sider.log and the world file. New = made by this world.": "Todas las ligas y copas de %s. El ID de competición es el que piden los marcadores, las equipaciones y los mapas de competiciones de Sider; los IDs de reglamento son los de sider.log y del archivo del mundo. Nueva = creada por este mundo.",
+  "Every league and cup in %s. Regulation IDs are what scoreboards, kits and the competition maps of Sider ask for (sider.log calls them tournament_id), one for each stage; Competition ID is the game's own number for the competition. New = made by this world.": "Todas las ligas y copas de %s. Los IDs de reglamento son los que piden los marcadores, las equipaciones y los mapas de competiciones de Sider (sider.log los llama tournament_id), uno por cada fase; el ID de competición es el número propio del juego para la competición. Nueva = creada por este mundo.",
   "Find...": "Buscar...",
   "Kind": "Tipo",
   "Competition ID": "ID de competición",
@@ -1263,6 +1275,9 @@
   "a whole league's kits at once, with the crest on the chest; off = the new clubs keep the kit borrowed from the game": "las equipaciones de toda una liga de una vez, con el escudo en el pecho; desactivado = los clubes nuevos se quedan con la equipación prestada del juego",
   "instead of the kits above: with this on, Kit Server does not dress the new clubs, so the made kits are switched off": "en lugar de las equipaciones de arriba: con esto activado, Kit Server no viste a los clubes nuevos, así que las equipaciones hechas quedan desactivadas",
   "Kits made in the clubs' colours": "Equipaciones con los colores del club",
+  "Kits made for clubs in a game club's place": "Equipaciones para clubes en el lugar de un club del juego",
+  "On: a club that took the place of a club of the game (NewLife's Bring the game's leagues to this season) gets kits made in its own colours, as a new club does. Off: it keeps the kit of the game or of your kit pack for that place, which can be the kit of the club that left.": "Activado: un club que ocupó el lugar de un club del juego (NewLife: Llevar las ligas del juego a esta temporada) recibe equipaciones en sus propios colores, como un club nuevo. Desactivado: conserva la equipación del juego o de tu pack de equipaciones para ese lugar, que puede ser la del club que se fue.",
+  "off = the kit of the club that left stays; takes effect when the world is switched on": "desactivado = queda la equipación del club que se fue; se aplica al activar el mundo",
   "Plain kits to change in Edit mode": "Equipaciones simples para el modo Edición",
   "Not saved yet: click to save (Ctrl+S)": "Aún sin guardar: clic para guardar (Ctrl+S)",
   "%d changes": "%d cambios",
@@ -1371,7 +1386,8 @@
   "Install the world": "Instalar el mundo",
   "Its leagues are in your world now. Build and install puts them in the game.": "Sus ligas ya están en tu mundo. Construir e instalar las pone en el juego.",
   "League packages in your world: %d (Build and edit your world > League packages)": "Paquetes de ligas en tu mundo: %d (Construye y edita tu mundo > Paquetes de ligas)",
-  "Mod Studio already runs as administrator: the folder or a file in it is read-only, or another program (an antivirus, the game) holds it.": "Mod Studio ya se ejecuta como administrador: la carpeta o un archivo dentro es de solo lectura, u otro programa (un antivirus, el juego) lo tiene abierto.",
+  "Mod Studio already runs as administrator, so something else holds the folder:\n  1. close the game and Sider (Task Manager > Details: no FL_2026.exe left),\n  2. an antivirus: Windows Security > Virus & threat protection > Ransomware protection > Controlled folder access -- allow FL26ModStudio.exe, or\n  3. right-click the folder > Properties: untick Read-only.": "Mod Studio ya se ejecuta como administrador, así que otra cosa tiene la carpeta:\n  1. cierra el juego y Sider (Administrador de tareas > Detalles: que no quede FL_2026.exe),\n  2. un antivirus: Seguridad de Windows > Protección antivirus y contra amenazas > Protección contra ransomware > Acceso controlado a carpetas -- permite FL26ModStudio.exe, o\n  3. clic derecho en la carpeta > Propiedades: desmarca Solo lectura.",
+  "Restart Mod Studio as administrator (right-click FL26ModStudio.exe > Run as administrator). If it still says this: the folder or a file in it is read-only, or another program (an antivirus, the game) holds it.": "Reinicia Mod Studio como administrador (clic derecho en FL26ModStudio.exe > Ejecutar como administrador). Si sigue diciendo esto: la carpeta o un archivo dentro es de solo lectura, u otro programa (un antivirus, el juego) lo tiene abierto.",
   "Mod Studio could not start itself as administrator. Close it, right-click FL26ModStudio.exe and choose Run as administrator.": "Mod Studio no pudo iniciarse como administrador. Ciérralo, haz clic derecho en FL26ModStudio.exe y elige Ejecutar como administrador.",
   "Mod Studio has %s open": "Mod Studio tiene abierto %s",
   "Mod Studio saves your world by itself a moment after each change": "Mod Studio guarda tu mundo solo, un momento después de cada cambio",
@@ -1918,9 +1934,137 @@
   "Support FL26 Mod Studio": "Apoya FL26 Mod Studio",
   "Support on Ko-fi": "Apoyar en Ko-fi",
   "Not now": "Ahora no",
-  "FL26 Mod Studio is free and donating is never required, but a small donation on Ko-fi makes it easier for us to keep the project maintained and updated. Thank you!": "FL26 Mod Studio es gratis y donar no es obligatorio, pero una pequeña donación en Ko-fi nos facilita mantener y actualizar el proyecto. ¡Gracias!"
+  "FL26 Mod Studio is free and donating is never required, but a small donation on Ko-fi makes it easier for us to keep the project maintained and updated. Thank you!": "FL26 Mod Studio es gratis y donar no es obligatorio, pero una pequeña donación en Ko-fi nos facilita mantener y actualizar el proyecto. ¡Gracias!",
+  "%d club(s) get another stadium: check them and press Save.": "%d club(es) reciben otro estadio: revísalos y pulsa Guardar.",
+  "%d of the %d stadiums of the stadium pack the world names are in yours.": "%d de los %d estadios del pack de estadios que nombra el mundo están en el tuyo.",
+  "%s: %d new clubs, each at one of the game's stadiums.": "%s: %d clubes nuevos, cada uno en uno de los estadios del juego.",
+  "%s: not in your pack": "%s: no está en tu pack",
+  "(found, not saved yet)": "(encontrado, aún sin guardar)",
+  "Automatic (Build picks one of the game's)": "Automático (Build elige uno de los del juego)",
+  "Changes not saved yet.": "Cambios aún sin guardar.",
+  "Choose a game stadium...": "Elegir un estadio del juego...",
+  "Find a club, a league or a stadium...": "Buscar un club, una liga o un estadio...",
+  "Find in your pack": "Buscar en tu pack",
+  "Found %d stadium(s) in your pack: check them and press Save.": "Encontrados %d estadio(s) en tu pack: revísalos y pulsa Guardar.",
+  "From your stadium pack...": "De tu pack de estadios...",
+  "Game stadium": "Estadio del juego",
+  "Game stadiums automatically": "Estadios del juego automáticamente",
+  "Home stadiums: %d of %d clubs have theirs. Your stadium pack does not have the other %d, so those clubs play at the stadium the game gives them. Stadiums > Your world's clubs finds them in your pack or lets you pick others": "Estadios: %d de %d clubes tienen el suyo. Tu pack de estadios no tiene los otros %d, así que esos clubes juegan en el estadio que les da el juego. Estadios > Clubes de tu mundo los busca en tu pack o te deja elegir otros",
+  "No imported world is in the game. A world you build has its stadiums in Build: Edit club > Game stadium and Home stadium.": "No hay ningún mundo importado en el juego. Un mundo que construyes tiene sus estadios en Build: Editar club > Estadio del juego y Estadio local.",
+  "No pack stadium": "Sin estadio del pack",
+  "Nothing more found in your pack.": "No se encontró nada más en tu pack.",
+  "Only clubs whose pack stadium you do not have": "Solo clubes cuyo estadio del pack no tienes",
+  "Stadium pack": "Pack de estadios",
+  "The game is running. It reads the stadiums when it starts: restart it after saving. Save now?": "El juego está abierto. Lee los estadios al iniciarse: reinícialo después de guardar. ¿Guardar ahora?",
+  "The home stadiums of the clubs of a world you imported (a modpack). Every new club plays at one of the game's stadiums: give them all one automatically or choose one for a club. A stadium of your stadium pack, when the club has one, is played in its place. Save, then start a new Master League.": "Los estadios locales de los clubes de un mundo que importaste (un modpack). Cada club nuevo juega en uno de los estadios del juego: dales uno a todos automáticamente o elige uno para un club. Un estadio de tu pack de estadios, cuando el club lo tiene, se juega en su lugar. Guarda y empieza una nueva Liga Master.",
+  "The stadium of the game for %d club(s):": "El estadio del juego para %d club(es):",
+  "The world could not be read: %s": "No se pudo leer el mundo: %s",
+  "The world's pack stadium": "El estadio del pack del mundo",
+  "a real club's": "de un club real",
+  "the club's own (a club of the game)": "el suyo propio (un club del juego)",
+  "the stadium of the game the club plays at; a home stadium of your stadium pack above, when it has one, is shown in its place": "el estadio del juego donde juega el club; un estadio local de tu pack de estadios de arriba, cuando lo tiene, se muestra en su lugar",
+  "Your world's clubs": "Clubes de tu mundo",
+  "Forward": "Adelante",
+  "Undo": "Deshacer",
+  "Redo": "Rehacer",
+  "Take back the last change to your world (Ctrl+Z)": "Deshace el último cambio de tu mundo (Ctrl+Z)",
+  "Do the taken-back change again (Ctrl+Y)": "Vuelve a hacer el cambio deshecho (Ctrl+Y)",
+  "Change taken back": "Cambio deshecho",
+  "Change done again": "Cambio rehecho",
+  "Cup mode can put these clubs in the Champions League: it fills the last places from Other European teams. For small clubs, choose Classic Teams.": "El modo Copa puede meter estos clubes en la Champions League: llena las últimas plazas con Other European teams. Para clubes pequeños, elige Classic Teams.",
+  "%s stays in %s: the game's league has more places than this season's. A NewLife league that has it too (Ligue 3 after Ligue 2) cannot take it: there, use Club of the game and give it a new club in its place, or leave it out.": "%s se queda en %s: la liga del juego tiene más plazas que la de esta temporada. Una liga de NewLife que también lo tenga (la Ligue 3 después de la Ligue 2) no puede llevarlo: allí usa Club del juego y pon un club nuevo en su lugar, o déjalo fuera.",
+  "in your world: %s -- it moves here": "en tu mundo: %s -- se mueve aquí",
+  "%s moves here from %s, club %d. That place becomes a new club (give it a club there again), and who takes its places in the game's competitions stays as it was.": "%s se mueve aquí desde %s, club %d. Ese puesto pasa a ser un club nuevo (vuelve a ponerle un club allí), y quien ocupa sus plazas en las competiciones del juego sigue igual.",
+  "%s moved here from %s, club %d: that place is a new club now. Give it a club there (NewLife club..., Club of the game...), then Build again and start a new career.": "%s se movió aquí desde %s, club %d: ese puesto ahora es un club nuevo. Ponle un club allí (Club NewLife..., Club del juego...), luego vuelve a construir y empieza una carrera nueva.",
+  "a club of the game: Club of the game... puts it here": "un club del juego: Club del juego... lo pone aquí",
+  "The game has this club, with its team ID: in Clubs, Club of the game... puts it in this place, and moves it from another league of your world.": "El juego tiene este club, con su ID de equipo: en Clubes, Club del juego... lo pone en este puesto y lo mueve desde otra liga de tu mundo.",
+  "The world in the game is not from a pack. %d packs installed here; the last one: %s": "El mundo del juego no viene de un pack. %d packs instalados aquí; el último: %s",
+  "%d problems to put right before Build. Go there (or a double-click) opens the page of the one picked; then Check the plan again.": "%d problemas que arreglar antes de Build. Ir allí (o un doble clic) abre la página del elegido; luego vuelve a Comprobar el plan.",
+  "1 problem to put right before Build. Go there (or a double-click) opens its page; then Check the plan again.": "1 problema que arreglar antes de Build. Ir allí (o un doble clic) abre su página; luego vuelve a Comprobar el plan.",
+  "Go there": "Ir allí",
+  "Opens the page of the problem picked, at its league, club or players": "Abre la página del problema elegido, en su liga, club o jugadores",
+  "Problem": "Problema",
+  "players of %s": "jugadores de %s",
+  "%s has no files.": "%s no tiene archivos.",
+  "(not in these tables)": "(no está en estas tablas)",
+  "No trophy of its own": "Sin trofeo propio",
+  "Pair a trophy folder of your own with a competition: Build copies it into the world and FL26's Entrance.lua shows that trophy in the competition's matches and its final. The folder is laid out as FL26's content\\Entrance ones (the files at its top or in a phase folder, the final's in Final; they replace the AFC Champions League trophy's files). A competition with no folder keeps what it had.": "Empareja una carpeta de trofeo tuya con una competición: Build la copia al mundo y el Entrance.lua de FL26 muestra ese trofeo en los partidos de la competición y en su final. La carpeta va como las de content\\Entrance de FL26 (los archivos arriba o en una carpeta de fase, los de la final en Final; reemplazan los archivos del trofeo de la AFC Champions League). Una competición sin carpeta se queda como estaba.",
+  "Pick a trophy folder...": "Elegir carpeta de trofeo...",
+  "The world's new cups are listed after its first Build.": "Las copas nuevas del mundo salen después de su primer Build.",
+  "Trophies": "Trofeos",
+  "Trophy folder": "Carpeta del trofeo",
+  "A trophy folder of your own for a competition: FL26's Entrance.lua shows it in the game": "Una carpeta de trofeo tuya para una competición: el Entrance.lua de FL26 lo muestra en el juego",
+  "Copa Sudamericana groups": "Grupos de Copa Sudamericana",
+  "Libertadores groups": "Grupos de Libertadores",
+  "Own places for this association": "Plazas propias para esta asociación",
+  "The association rank used as a dynamic domestic source; it is not a team ID.": "El puesto en el ranking de la asociación se usa como fuente nacional dinámica; no es un ID de equipo.",
+  "The league position, or Cup winner (below 1): the winner of the country's cup. When the winner already has a continental place, the place cascades to the next eligible club of the same domestic source.": "La posición de liga, o Ganador de copa (debajo de 1): el ganador de la copa del país. Si el ganador ya tiene una plaza continental, la plaza pasa al siguiente club elegible de la misma fuente nacional.",
+  "position %d": "posición %d",
+  "rank %d": "puesto %d",
+  "%s (country without a league)": "%s (país sin liga)",
+  "CHECK": "REVISAR",
+  "CONMEBOL countries without a league": "Países de la CONMEBOL sin liga",
+  "Competition %d": "Competición %d",
+  "Copa Sudamericana first stage": "Copa Sudamericana, primera fase",
+  "Copa Sudamericana - First stage": "Copa Sudamericana - Primera fase",
+  "Every South American country has a league in this world.": "Todos los países sudamericanos tienen una liga en este mundo.",
+  "Filled by the competitions themselves, not by places:": "Las llenan las propias competiciones, no las plazas:",
+  "Libertadores and Sudamericana winners -> the Recopa Sudamericana": "Campeones de Libertadores y Sudamericana -> la Recopa Sudamericana",
+  "Libertadores phase 1": "Libertadores, fase 1",
+  "Libertadores phase 2": "Libertadores, fase 2",
+  "Libertadores - Phase 1": "Libertadores - Fase 1",
+  "Libertadores - Phase 2": "Libertadores - Fase 2",
+  "Libertadores - Phase 3": "Libertadores - Fase 3",
+  "Libertadores phase 2 winners -> phase 3": "Ganadores de la fase 2 de la Libertadores -> fase 3",
+  "Libertadores phase 3 (only the phase-2 winners)": "Libertadores, fase 3 (solo los ganadores de la fase 2)",
+  "Libertadores phase 3 losers -> Sudamericana groups": "Perdedores de la fase 3 de la Libertadores -> grupos de la Sudamericana",
+  "Libertadores phase 3 winners -> Libertadores groups": "Ganadores de la fase 3 de la Libertadores -> grupos de la Libertadores",
+  "Libertadores qualifying in three phases, a Copa Sudamericana with a first stage and a play-off, and the Recopa Sudamericana. Off: the classic competitions, as every world before 0.2.5 has them": "Clasificación de la Libertadores en tres fases, una Copa Sudamericana con primera fase y repesca, y la Recopa Sudamericana. Desactivado: las competiciones clásicas, como las tiene todo mundo anterior a la 0.2.5",
+  "Modern CONMEBOL competitions": "Competiciones modernas de la CONMEBOL",
+  "Places for South American countries that have no league in this world: the country's clubs of Other Latin American teams, ranked when the season starts. They count with the leagues' places towards the field the modern CONMEBOL competitions need; no country has to have any. A rank the country has no club for stays empty, it is not given to another country.": "Plazas para los países sudamericanos que no tienen liga en este mundo: los clubes del país en Otros equipos latinoamericanos, ordenados al empezar la temporada. Cuentan junto con las plazas de las ligas para el cupo que necesitan las competiciones modernas de la CONMEBOL; ningún país tiene que tener alguna. Un puesto para el que el país no tiene club queda vacío, no pasa a otro país.",
+  "Places in Libertadores qualifying: %d  CHECK": "Plazas en la clasificación de la Libertadores: %d  REVISAR",
+  "Places, of the ones the modern competitions need:": "Plazas, de las que necesitan las competiciones modernas:",
+  "Places:": "Plazas:",
+  "Switching the modern CONMEBOL competitions off takes out the %d places only they have (Libertadores phase 1 and 2, Sudamericana first stage, countries without a league). Libertadores, qualifying and Copa Sudamericana places stay. Go on?": "Desactivar las competiciones modernas de la CONMEBOL quita las %d plazas que solo ellas tienen (fases 1 y 2 de la Libertadores, primera fase de la Sudamericana, países sin liga). Las plazas de Libertadores, clasificación y Copa Sudamericana se quedan. ¿Continuar?",
+  "The field is complete: Build can make the modern competitions.": "El cupo está completo: Build puede crear las competiciones modernas.",
+  "The field is not complete yet: Build refuses the world until it is.": "El cupo aún no está completo: Build rechaza el mundo hasta que lo esté.",
+  "The modern competitions have no such round: use phase 1 or phase 2 instead.": "Las competiciones modernas no tienen esa ronda: usa la fase 1 o la fase 2.",
+  "These places belong to the modern CONMEBOL competitions: switch them on in South American places first.": "Estas plazas son de las competiciones modernas de la CONMEBOL: actívalas antes en Plazas sudamericanas.",
+  "This country has %d clubs of the game that can play. A rank past them stays empty.": "Este país tiene %d clubes del juego que pueden jugar. Un puesto más allá queda vacío.",
+  "With the modern CONMEBOL competitions on, this league has no Libertadores places of the game's. Tick the box above to give it its places.": "Con las competiciones modernas de la CONMEBOL activadas, esta liga no tiene las plazas de Libertadores del juego. Marca la casilla de arriba para darle sus plazas.",
+  "regulation %d": "reglamento %d",
+  "Association rank": "Puesto en el país",
+  "Recopa Sudamericana": "Recopa Sudamericana",
+  "Only the game's own players": "Solo los jugadores del juego",
+  "The clubs that keep their place get only the transfers between the game's players and the new ratings: no new players, nobody let go. Clubs that came up still get their whole squad.": "Los clubes que mantienen su plaza reciben solo los traspasos entre jugadores del juego y las nuevas valoraciones: ningún jugador nuevo y nadie se va. Los clubes que subieron reciben igualmente toda su plantilla.",
+  "Tick it if Bring gives you the same player twice.": "Márcalo si Traer te deja el mismo jugador dos veces.",
+  "%d players of this season the game does not have were left out.": "%d jugadores de esta temporada que el juego no tiene se quedaron fuera.",
+  "An Edit save from before this install is in the game's save folder. Made for an older version of the world, it can stop a new Master League in the season or leave a club without its players, and it hides the new squads in Exhibition and Edit mode.": "En la carpeta de partidas del juego hay una partida Edit de antes de esta instalación. Hecha para una versión anterior del mundo, puede detener una Master League nueva en mitad de la temporada o dejar a un club sin sus jugadores, y oculta las nuevas plantillas en Exhibition y en el modo Edit.",
+  "Players per new club": "Jugadores por club nuevo",
+  "How many players each new club has: 30, or more up to 35. A NewLife league you added before keeps the squads it was added with until NewLife Database > More > Update my leagues takes them again at the new size. Build again and start a new career after changing this.": "Cuántos jugadores tiene cada club nuevo: 30, o más hasta 35. Una liga NewLife que añadiste antes mantiene las plantillas con las que se añadió hasta que NewLife Database > More > Update my leagues las vuelva a tomar con el nuevo tamaño. Haz Build otra vez y empieza una carrera nueva después de cambiarlo.",
+  "30 to 35; takes effect at the next Build": "de 30 a 35; vale desde el próximo Build",
+  "%d of your leagues have squads of another size than Players per new club (%d): Update my leagues takes their players again (%s).": "%d de tus ligas tienen plantillas de otro tamaño que Jugadores por club nuevo (%d): Update my leagues vuelve a tomar sus jugadores (%s).",
+  "%d of %d chosen": "%d de %d elegidos",
+  "%d of %d players ticked; a club takes up to %d.": "%d de %d jugadores marcados; un club admite hasta %d.",
+  "%s (%s): %d players chosen. Build again.": "%s (%s): %d jugadores elegidos. Vuelve a construir.",
+  "%s: %d players chosen; they go in when you add the league.": "%s: %d jugadores elegidos; entran cuando añadas la liga.",
+  "%s: tick the players the club gets, up to %d.": "%s: marca los jugadores que tendrá el club, hasta %d.",
+  "Choose the players...": "Elegir los jugadores...",
+  "Choose the players": "Elegir los jugadores",
+  "No goalkeeper ticked.": "Ningún portero marcado.",
+  "Player": "Jugador",
+  "The best ones": "Los mejores",
+  "The club gets stand-in players up to %d.": "El club recibe jugadores de relleno hasta %d.",
+  "The players of the selected club that go in its squad; without a choice it gets its best ones": "Los jugadores del club seleccionado que entran en su plantilla; sin elegir, tiene los mejores",
+  "Tick at least one player.": "Marca al menos un jugador.",
+  "Ticks the players the club gets when nobody chooses: its best %d, three goalkeepers at most": "Marca los jugadores que tendría el club sin elegir: sus %d mejores, tres porteros como máximo",
+  "Untick %d: a club takes up to %d players.": "Desmarca %d: un club admite hasta %d jugadores."
  },
  "log": [
+  [
+   "^(.+) now has (\\d+) clubs \\(it had (\\d+)\\): check its European places and promotion$",
+   "\\1 tiene ahora \\2 clubes (tenía \\3): revisa sus plazas europeas y los ascensos"
+  ],
   [
    "^  August qualifying: ",
    "  fase previa de agosto: "
@@ -2204,6 +2348,106 @@
   [
    "Liga de Campeones play-off\\b",
    "play-off de la Liga de Campeones"
+  ],
+  [
+   "^  NOTE: Cup mode can put these clubs in the Champions League \\(it fills the last places from Other European teams\\); for small clubs choose Classic Teams$",
+   "  OJO: el modo Copa puede meter estos clubes en la Champions League (llena las últimas plazas con Other European teams); para clubes pequeños elige Classic Teams"
+  ],
+  [
+   "(?m)^(\\d+) problems:$",
+   "\\1 problemas:"
+  ],
+  [
+   "(?m)^(\\s*)clubs that swap leagues: ",
+   "\\1clubes que cambian de liga: "
+  ],
+  [
+   "(?m)^(\\s*)competition names: ",
+   "\\1nombres de competiciones: "
+  ],
+  [
+   "(?m)(.+) is in two swaps$",
+   "\\1 está en dos intercambios"
+  ],
+  [
+   "(?m)(.+) plays in a new league of the recipe; it cannot also swap$",
+   "\\1 juega en una liga nueva del mundo; no puede también intercambiarse"
+  ],
+  [
+   "(?m)swap (.+): the two clubs play in the same league$",
+   "intercambio \\1: los dos clubes juegan en la misma liga"
+  ],
+  [
+   "(?m)swap (.+): (.+) plays in no league of the game$",
+   "intercambio \\1: \\2 no juega en ninguna liga del juego"
+  ],
+  [
+   "(?m)the swap of (.+) and (.+) is left out: the game's tables have both in the same league now \\(remove it on Leagues to stop this note\\)$",
+   "el intercambio de \\1 y \\2 se omite: las tablas del juego ya tienen a los dos en la misma liga (quítalo en Ligas para que no salga esta nota)"
+  ],
+  [
+   "(?m)^  note: ",
+   "  nota: "
+  ],
+  [
+   "(?m)^(\\s*)trophies: competition (\\d+): no trophy folder (.+)$",
+   "\\1trofeos: competición \\2: no hay carpeta de trofeo \\3"
+  ],
+  [
+   "(?m)^(\\s*)trophies: competition (\\d+): the trophy folder (.+) has no files$",
+   "\\1trofeos: competición \\2: la carpeta de trofeo \\3 no tiene archivos"
+  ],
+  [
+   "^  trophies: (\\d+) competition\\(s\\) with a trophy of their own \\(Entrance\\.lua shows them once the world is switched on\\)$",
+   "  trofeos: \\1 competición(es) con trofeo propio (Entrance.lua los muestra cuando el mundo esté activado)"
+  ],
+  [
+   "^  warning: trophy of competition (\\d+) -- the world has no such competition, left out$",
+   "  aviso: trofeo de la competición \\1 -- el mundo no tiene esa competición, se omite"
+  ],
+  [
+   "^Entrance\\.lua: (\\d+) trophy\\(ies\\) of (\\S+)$",
+   "Entrance.lua: \\1 trofeo(s) de \\2"
+  ],
+  [
+   "^Entrance\\.lua: the trophies of another world taken out$",
+   "Entrance.lua: quitados los trofeos de otro mundo"
+  ],
+  [
+   "^NOTE: (\\d+) trophy\\(ies\\) of (\\S+) -- the game has no FL26 Entrance\\.lua in modules, so they are not shown$",
+   "NOTA: \\1 trofeo(s) de \\2 -- el juego no tiene el Entrance.lua de FL26 en modules, así que no se muestran"
+  ],
+  [
+   "^line (\\d+): ",
+   "línea \\1: "
+  ],
+  [
+   " -- no club of that name in the world$",
+   " -- ningún club con ese nombre en el mundo"
+  ],
+  [
+   " -- (\\d+) clubs of that name$",
+   " -- \\1 clubes con ese nombre"
+  ],
+  [
+   " -- no player of that name$",
+   " -- ningún jugador con ese nombre"
+  ],
+  [
+   " -- (\\d+) players of that name; a from column tells them apart$",
+   " -- \\1 jugadores con ese nombre; una columna from los distingue"
+  ],
+  [
+   " -- already on line (\\d+); that line counts$",
+   " -- ya está en la línea \\1; cuenta esa línea"
+  ],
+  [
+   "^the file is empty$",
+   "el archivo está vacío"
+  ],
+  [
+   "^the first line needs a column player \\(or name\\) and a column to \\(or club\\); it has: ",
+   "la primera línea necesita una columna player (o name) y una columna to (o club); tiene: "
   ]
  ]
 }

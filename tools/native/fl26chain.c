@@ -184,8 +184,11 @@ static int reg_list(uint16_t id, uint32_t* out)
  * built for 18 and 16: a 38-club DFB-Pokal was left with three undated first-round matches and
  * no round of 16. So when a cup's new list holds clubs of our league, the cup gets the top
  * league's clubs instead -- the field the shipped game gives it. The triples come from the world
- * file (`cup=` on the league line, written by the League Builder). */
-#define MAX_CUPS 16
+ * file (`cup=` on the league line, written by the League Builder).
+ * 16 until 0.2.5: the Europack eu5 has 18 cups and the Modpack more, and the ones past 16 were
+ * left to the game, which filled the Greek Cup (124) with both Greek leagues, 30 clubs, played
+ * the first round and never the second (B178, monkusgigus 2026-10-20; eu5, day 298 of 2026). */
+#define MAX_CUPS 128
 /* GitHub #32: `cupall=1` on the league line (bit 15 of the cup id here) is the other way round --
  * the cup takes both leagues, in turn (top, low, top ...) so the first round, which pairs 1 v 2,
  * is top flight against the league below, as the real DFB-Pokal draws it. The League
@@ -199,7 +202,10 @@ static int reg_list(uint16_t id, uint32_t* out)
  * both leagues with 22 clubs crashed it, and the cup's own entry list does not help -- the
  * game fills a domestic cup from the leagues, not from the entries. So the cup is written with
  * the top league's clubs and the first clubs of the one below, `max` in all (0 = no cap). */
-typedef struct { uint16_t cup, top, low, all, max; } cup_t;
+/* B228: `cupthird=` on a cupall line names a new third division whose first clubs join the two
+ * shipped ones, up to cupn -- the Coupe de France of Ligue 1, Ligue 2 and the first 9 of
+ * National, 48 (jibibi 2026-10-24); the League Builder raised the cup's bracket to that field. */
+typedef struct { uint16_t cup, top, low, all, max, third; } cup_t;
 static cup_t    g_cup[MAX_CUPS]; static int g_ncup = 0;
 static uint64_t g_cup_flag[MAX_CUPS]; static int g_cup_seen[MAX_CUPS];
 
@@ -219,7 +225,13 @@ static int cup_fix(cup_t* c, const uint32_t* list, int n, uint64_t flag, const c
   if (c->all) {
     if (nt + nl > 2 * MAX_CLUBS) return 0;
     memcpy(top + nt, low, nl * sizeof low[0]);
-    int m = nt + nl;
+    int m = nt + nl, n3 = 0;
+    if (c->third) {                                  /* B228: then the third division's first clubs */
+      uint32_t th[MAX_CLUBS];
+      int k3 = reg_list(c->third, th);
+      for (int i = 0; i < k3 && m < 2 * MAX_CLUBS; i++) top[m++] = th[i];
+      n3 = k3 > 0 ? k3 : 0;
+    }
     if (c->max && m > c->max) m = c->max;           /* #74: a field the bracket screen draws */
     /* the order of the list is the first-round draw (1 v 2, 3 v 4 ...): the two leagues in
        turn, so a first round is top flight against the league below, not the top league among
@@ -235,8 +247,13 @@ static int cup_fix(cup_t* c, const uint32_t* list, int n, uint64_t flag, const c
     int was = g_reentrant; g_reentrant = 1;
     ((set_fn)(uintptr_t)g_tramp_set)(c->cup, &v, flag);
     g_reentrant = was;
-    logf("cup %u: %d clubs (%s) -- given %u's %d and %u's %d clubs", c->cup, n, when, c->top,
-         nt < m ? nt : m, c->low, m > nt ? m - nt : 0);
+    if (c->third)
+      logf("cup %u: %d clubs (%s) -- given %u's %d, %u's %d and %u's first %d clubs", c->cup, n, when, c->top,
+           nt < m ? nt : m, c->low, m > nt + nl ? nl : (m > nt ? m - nt : 0), c->third,
+           m > nt + nl ? (m - nt - nl < n3 ? m - nt - nl : n3) : 0);
+    else
+      logf("cup %u: %d clubs (%s) -- given %u's %d and %u's %d clubs", c->cup, n, when, c->top,
+           nt < m ? nt : m, c->low, m > nt ? m - nt : 0);
     return 1;
   }
   if (c->max && nt > c->max) nt = c->max;
@@ -590,6 +607,17 @@ static void fix_chain(chain_t* ch)
   orig(ch->cfg.low, &vc, ch->flag_low);
   g_reentrant = 0;
   g_stat[1]++;
+  /* B256 (jibibi 2026-10-27, six French tiers): a league can be the low end of one pair and the
+     mid of the next (N2-B 171 under 11 and over 181). The other pair's copy of its list is the
+     one the pass wrote, so it gets the list just written here -- else the second fix would put
+     the first one's clubs back. */
+  for (int i = 0; i < g_nchain; i++) {
+    chain_t* o = &g_chain[i]; if (o == ch) continue;
+    if (o->cfg.mid == ch->cfg.mid) { memcpy(o->list_mid, nb, nnb*4); o->n_list_mid = nnb; }
+    if (o->cfg.mid == ch->cfg.low) { memcpy(o->list_mid, nc, nnc*4); o->n_list_mid = nnc; }
+    if (o->cfg.low == ch->cfg.mid) { memcpy(o->list_low, nb, nnb*4); o->n_list_low = nnb; }
+    if (o->cfg.low == ch->cfg.low) { memcpy(o->list_low, nc, nnc*4); o->n_list_low = nnc; }
+  }
   if (ch->cfg.regular) split_regular(ch, orig, down, nd, up, nu);
   logf("fix %u->%u: %d down (%08x %08x %08x) %d up (%08x %08x %08x); lists now %d/%d; slots %u/%u",
        ch->cfg.mid, ch->cfg.low, nd, down[0], nd>1?down[1]:0, nd>2?down[2]:0, nu, up[0], nu>1?up[1]:0, nu>2?up[2]:0,
@@ -601,6 +629,13 @@ void apply_post(void* ctx)
   (void)ctx;
   for (int i = 0; i < g_nchain; i++) {
     chain_t* ch = &g_chain[i];
+    /* B256: the bottom of a six-tier pyramid (N2-C 181) may not be written by the pass at all,
+       its list then comes from the game as it stands, with the flag of the side that was */
+    if ((ch->seen & 3) == 1 && ch->n_stand_low > 0) {
+      int n = reg_list(ch->cfg.low, ch->list_low);
+      if (n > 0) { ch->n_list_low = n; ch->flag_low = ch->flag_mid; ch->seen |= 2;
+                   logf("apply: chain %u->%u -- %u not written by the pass, its %d clubs read", ch->cfg.mid, ch->cfg.low, ch->cfg.low, n); }
+    }
     if ((ch->seen & 3) == 3) fix_chain(ch);
     else if (ch->seen & 3) { logf("apply: chain %u->%u incomplete (seen %d) -- untouched", ch->cfg.mid, ch->cfg.low, ch->seen); g_stat[2]++; }
   }
@@ -740,7 +775,7 @@ __declspec(dllexport) int fl26_chain_cups(const uint16_t* triples, int n)
   if (n > MAX_CUPS) n = MAX_CUPS;
   for (int i = 0; i < n; i++) {
     g_cup[i].cup = triples[3*i] & ~CUP_ALL; g_cup[i].all = (triples[3*i] & CUP_ALL) != 0;
-    g_cup[i].top = triples[3*i+1]; g_cup[i].low = triples[3*i+2]; g_cup[i].max = 0;
+    g_cup[i].top = triples[3*i+1]; g_cup[i].low = triples[3*i+2]; g_cup[i].max = 0; g_cup[i].third = 0;
     logf("fl26chain: cup %u -- %s", g_cup[i].cup, g_cup[i].all ? "both leagues (cupall)" : "the top league only");
   }
   g_ncup = n;
@@ -758,6 +793,20 @@ __declspec(dllexport) int fl26_chain_cupsize(const uint16_t* pairs, int n)
       if (g_cup[i].cup == pairs[2*k]) {
         g_cup[i].max = pairs[2*k+1]; set++;
         logf("fl26chain: cup %u -- at most %u clubs", g_cup[i].cup, g_cup[i].max);
+      }
+  return set;
+}
+
+/* B228: n pairs {cup, third division}, for cupall cups fl26_chain_cups already named */
+__declspec(dllexport) int fl26_chain_cupthird(const uint16_t* pairs, int n)
+{
+  if (!pairs || n < 0) return 0;
+  int set = 0;
+  for (int k = 0; k < n; k++)
+    for (int i = 0; i < g_ncup; i++)
+      if (g_cup[i].cup == pairs[2*k] && g_cup[i].all) {
+        g_cup[i].third = pairs[2*k+1]; set++;
+        logf("fl26chain: cup %u -- also the first clubs of %u", g_cup[i].cup, g_cup[i].third);
       }
   return set;
 }

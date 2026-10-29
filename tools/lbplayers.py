@@ -44,11 +44,11 @@ common/render/symbol/coach/coach_<coach id>.png, 256 pixels square (1001 of them
 A club names its manager in Team.bin +0x00, so the picture goes under the id of the club's
 manager in the world: the shipped one for a game club, the one mkcoaches added for a new club.
 """
-import collections, csv, os
+import collections, csv, os, re
 
 import pesdb
 import playeredit as E
-from lbrating import move, rating, shift_to, shifted   # what Mod Studio shows (B53)
+from lbrating import WEIGHTS, move, rating, shift_to, shifted   # what Mod Studio shows (B53)
 
 P_REC, P_ID = E.P_REC, E.P_ID
 A_REC = E.A_REC
@@ -236,16 +236,18 @@ class Squads:
         """[{player, name, Nationality, Registered Position, Age, rating, clubs}] of every player,
         for finding one (the Players page's Sign / Call up list); read once, a few seconds"""
         if getattr(self, "_summary", None) is None:
+            # rated like the Players page (rating(), the game's number): the mean of the five
+            # GK abilities made Ter Stegen a 91 here and an 85 in the game (cwrti, 23.10.)
             need = {"Nationality", "Registered Position", "Age"}
-            for pos in ("GK", "CB", "DMF", "CF"):
-                need |= set(RATED[pos])
+            for _c, w in WEIGHTS.values():
+                need |= set(w)
             out = []
             for pid, o in self.index.items():
                 rec = self.players[o:o + P_REC]
                 r = {n: E.show(n, E.getf(rec, n)) for n in need}
                 r["player"] = str(pid)
                 r["name"] = E.cstr(rec[E.P_NAME:E.P_NAME + E.P_NAME_LEN])
-                r["rating"] = overall(r)
+                r["rating"] = rating(r)
                 r["clubs"] = list(self.clubs_of.get(pid, []))
                 out.append(r)
             self._summary = out
@@ -266,8 +268,9 @@ class Squads:
         return [self.row(pid, shirt, order) for order, pid, shirt, _o in self.by_club.get(tid, [])
                 if pid in self.index]
 
-    def proto(self, per=SQUAD):
+    def proto(self, per=None):
         """the squad every new club starts with (mkplayers.py picks it the same way)"""
+        per = SQUAD if per is None else per        # the world's (leaguebuilder.use_squad), not 30 for good
         tid = next((c for c in sorted(self.by_club) if len(self.by_club[c]) >= per), None)
         if tid is None:
             return []
@@ -293,6 +296,60 @@ def at_level(row, want):
     return {n: str(max(40, min(99, int(row.get(n) or 40) + d))) for n, _b in E.ABILITIES}
 
 
+def keeper_side(a, b):
+    """True when positions a and b are on either side of the goalkeeper line"""
+    return (a == "GK") != (b == "GK")
+
+
+def new_position(a, pos, rows, want):
+    """a new player (a recipe "add" entry, a copy of the club's player a["like"]) given the
+    registered position pos: rated 2 (natural) there, and 0 at every position over the keeper line
+    from it.  When pos is over that line from the player he is a copy of, he becomes a copy of a
+    player of that kind from rows (the club's players; pos itself first, the rating nearest
+    `want` next) brought to the rating `want`, his own ability and position changes dropped.
+    B201/B202 (JoJofiaz 22.10.): a new player copied from a midfielder and made a keeper kept
+    the midfielder's natural positions; one copied from a keeper and made a CF kept the keeper's
+    abilities, and the Rating box took them to 99.  Returns the row he is now a copy of, or None."""
+    if pos not in E.POSITIONS:
+        return None
+    like = next((r for r in rows if r.get("player") == str(a.get("like"))), None)
+    src = None
+    if like is not None and keeper_side(like.get("Registered Position"), pos):
+        kind = [r for r in rows if r.get("player") and not keeper_side(r.get("Registered Position"), pos)]
+        if kind:
+            src = min(kind, key=lambda r: (r.get("Registered Position") != pos,
+                                           abs(rating(r) - want) if want else 0))
+            for n, _b in E.ABILITIES:
+                a.pop(n, None)
+            for p in E.POSITIONS:
+                a.pop(p, None)
+            a["like"] = src["player"]
+            if want:
+                m = dict(src)
+                m.update({k: v for k, v in a.items() if k != "like"})
+                a.update(shifted(m, shift_to([m], want)))
+    a[pos] = "2"
+    for p in E.POSITIONS:
+        if keeper_side(p, pos):
+            a[p] = "0"
+    return src
+
+
+SQUAD_MADE = 30      # the places a NewLife squad of the recipe was made for when it does not say
+
+
+def fit_places(c):
+    """a NewLife club's players entry made for fewer places than the world has now (World options >
+    Players per new club raised after the league was added, 0.2.5): the places it never knew
+    leave the club, else they would stay the prototype players, "FL P" men at a real club. Its
+    own squad comes from the NewLife Database again (Update) or by picking its players"""
+    made = int(c.get("squad_places") or SQUAD_MADE)
+    if made < SQUAD:
+        gone = set(c.get("remove") or [])
+        gone |= {str(n) for n in range(made, SQUAD)}
+        c["remove"] = sorted(gone, key=lambda x: int(x) if x.isdigit() else 1 << 30)
+
+
 def fill_newlife(pl, base, log=print):
     """pl's "players" with the prototype players who stay at a NewLife club brought to its level
     (fill_level), for recipes whose leagues were added before Mod Studio did it itself (Risto
@@ -305,6 +362,10 @@ def fill_newlife(pl, base, log=print):
         nl = (L.get("newlife") or {}).get("clubs") or []
         if not nl:
             continue
+        for k in range(len(nl)):
+            c = out.get(new_key(L["name"], k))
+            if c is not None:
+                fit_places(c)
         clubs = [out.get(new_key(L["name"], k)) or {} for k in range(len(nl))]
         own = [[overall(ch) for ch in (c.get("edits") or {}).values() if "Registered Position" in ch] for c in clubs]
         league = [x for xs in own for x in xs]
@@ -391,6 +452,57 @@ LINEUP = ["GK", "CB", "CB", "RB", "LB", "DMF", "DMF", "RMF", "LMF", "AMF", "CF"]
 
 
 SECOND_POS = 6   # a player at a position he can also play (rating 1) counts with this much off
+
+# ismael 22.10.: a new club kept the shirt numbers of the squad Build cloned for it, place by
+# place, so a striker wore 1 and a keeper 10. Now the eleven wear the numbers of their places
+# (the keeper 1, the full backs 2 and 3, the centre backs 4 and 5, the striker 9 ...), most
+# particular place first, and the rest of the squad the usual numbers of their line
+ROLE_SHIRTS = {"GK": (1,), "RB": (2,), "LB": (3,), "CF": (9, 10, 11, 7), "AMF": (10, 8, 7, 11),
+               "DMF": (6, 8, 5, 4), "CB": (4, 5, 3, 2, 6), "CMF": (8, 6, 10, 14), "RWF": (7, 11, 10),
+               "LWF": (11, 7, 10), "RMF": (7, 11, 8), "LMF": (11, 7, 10), "SS": (10, 9, 11, 7)}
+ROLE_FIRST = ["GK", "RB", "LB", "CF", "AMF", "DMF", "CB", "CMF", "RWF", "LWF", "RMF", "LMF", "SS"]
+LINE_OF = {"GK": "GK", "CB": "DEF", "LB": "DEF", "RB": "DEF", "DMF": "MID", "CMF": "MID", "LMF": "MID",
+           "RMF": "MID", "AMF": "MID", "LWF": "FWD", "RWF": "FWD", "SS": "FWD", "CF": "FWD"}
+LINE_SHIRTS = {"GK": (1, 13, 12, 25, 31, 99, 30, 40),
+               "DEF": (2, 3, 4, 5, 15, 22, 23, 24, 26, 28, 32, 33, 34, 35, 36, 38),
+               "MID": (6, 8, 10, 14, 16, 18, 20, 21, 27, 37, 39, 42, 44),
+               "FWD": (9, 7, 11, 17, 19, 21, 27, 29, 39, 45, 47, 49)}
+
+
+def position_shirts(squad, lineup=None):
+    """{key: shirt number} for a squad [(key, squad order, registered position)]: the players at
+    orders 0-10 take the numbers of their places in the formation (lineup, the role of each
+    place; the 4-2-3-1 by default), the others the usual numbers of their position's line, in
+    squad order; each number once, a keeper's numbers to outfield players only when nothing
+    else is free"""
+    places = list(lineup or LINEUP)
+    taken, out = set(), {}
+
+    def give(key, wants, keeper):
+        n = next((x for x in wants if x not in taken), None)
+        if n is None:
+            free = [x for x in range(1, 100) if x not in taken]
+            n = (free[0] if keeper else next((x for x in free if x not in E.KEEPER_SHIRTS), free[0]))
+        taken.add(n)
+        out[key] = n
+    rows = sorted(squad, key=lambda r: r[1])
+    eleven = [(k, places[n], pos) for n, (k, _o, pos) in enumerate(rows[:len(places)])]
+    bench = rows[len(places):]
+    for role in ROLE_FIRST:
+        for k, place, pos in eleven:
+            if place == role:
+                # a keeper wears a keeper's number wherever a short squad puts him, an outfielder
+                # in goal (a squad with no keeper) one of his line's
+                if pos == "GK":
+                    give(k, LINE_SHIRTS["GK"], True)
+                else:
+                    give(k, ROLE_SHIRTS[role] if role != "GK" else LINE_SHIRTS[LINE_OF.get(pos, "MID")], False)
+    for k, place, pos in eleven:              # a place of no known role
+        if k not in out:
+            give(k, LINE_SHIRTS[LINE_OF.get(pos, "MID")], pos == "GK")
+    for k, _o, pos in bench:
+        give(k, LINE_SHIRTS[LINE_OF.get(pos, "MID")], pos == "GK")
+    return out
 
 
 def best_eleven(rows, lineup=None):
@@ -1544,6 +1656,7 @@ def apply(pl, base, db, cap, log=print, faces=None, lineups=None, ids=None, port
     # a new club starts with the prototype's squad order, which is sorted by position and
     # plays centre backs out wide; unless the recipe orders it, give it its best eleven
     lined = 0
+    lu_of = {}                                         # club id -> the roles its eleven play
     for key, tid in tids.items():
         eds = (changes.get(key) or {}).get("edits") or {}
         if any("order" in ch for ch in eds.values()):
@@ -1568,11 +1681,31 @@ def apply(pl, base, db, cap, log=print, faces=None, lineups=None, ids=None, port
                 lu = mktactics.roles(e["places"])
                 if picked is not None:
                     picked[tid] = e
+        lu_of[tid] = lu
         for ao, o in best_eleven(rows, lu).items():
             ao = int(ao)
             pack = u32(assigns, ao + E.A_PACK) & ~E.ORDER_MASK | int(o) << E.ORDER_SHIFT
             assigns[ao + E.A_PACK:ao + E.A_PACK + 4] = pack.to_bytes(4, "little")
         lined += 1 if rows else 0
+    # ismael 22.10.: a new club's numbers by position (position_shirts), unless its recipe gives
+    # numbers of its own
+    numbered = 0
+    for key, tid in tids.items():
+        eds = (changes.get(key) or {}).get("edits") or {}
+        if any(str(ch.get("shirt", "") or "").strip() for ch in eds.values()):
+            continue
+        sq = [(ao, order, E.show("Registered Position",
+                                 E.getf(players[index[pid]:index[pid] + P_REC], "Registered Position")))
+              for order, pid, ao in squad_of(tid) if ao not in drop and pid in index]
+        if not sq:
+            continue
+        lu = lu_of.get(tid) or (lineups or {}).get(tid)
+        for ao, n in position_shirts(sq, lu).items():
+            pack = E.with_shirt(u32(assigns, ao + E.A_PACK), n)
+            assigns[ao + E.A_PACK:ao + E.A_PACK + 4] = pack.to_bytes(4, "little")
+        numbered += 1
+    if numbered:
+        log("  players: %d new clubs numbered by position" % numbered)
     # B157 (jibibi 18.10.): a place keeps the shirt number of the squad Build cloned for the club,
     # whoever the recipe puts there, so a NewLife centre forward got the 1 at Bourg-en-Bresse.
     # The 1 goes to the club's first keeper, who swaps numbers with whoever wore it; a club whose
@@ -1726,7 +1859,7 @@ def _write(players, assigns, po, ao, ch):
         v = str(v).strip()
         if n in E.FIELDS and v != "":
             E.setf(rec, n, E.parse(n, v))
-    E.natural(rec, old)
+    E.natural(rec, old, given={n for n, v in ch.items() if str(v).strip() != ""})
     name = str(ch.get("name", "")).strip()
     if name:
         rec[E.P_NAME:E.P_NAME + E.P_NAME_LEN * E.P_NAME_SLOTS] = E.name_slots(name)
@@ -1807,3 +1940,101 @@ def import_csv(path, rows, elsewhere=None):
     if elsewhere is None:
         return out, err
     return out, err, joins
+
+
+# ---- Import transfers: a CSV of the whole world, player -> new club (jibibi 23.10.) ----
+
+TRANSFER_PLAYER = ("player", "player_id", "name", "player name")
+TRANSFER_TO = ("to", "club", "to_club", "to club", "new club", "new_club")
+TRANSFER_FROM = ("from", "from_club", "from club", "old club", "old_club")
+# words a club's name has in one list and not in another (Paris Saint-Germain FC / Paris Saint-Germain)
+CLUB_WORDS = {"fc", "cf", "ac", "afc", "sc", "sv", "fk", "sk", "cd", "ca", "cs", "club", "de", "the", "1"}
+
+
+def _norm(text):
+    """a name to compare: no accents, lower case, letters and digits in single spaces"""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode().lower()
+    return " ".join(re.split(r"[^a-z0-9]+", s)).strip()
+
+
+def _club_norm(text):
+    return " ".join(w for w in _norm(text).split() if w not in CLUB_WORDS) or _norm(text)
+
+
+def import_transfers(path, players, clubs):
+    """([(player ref, club key, line)], [problem]) from a CSV of transfers: one line a player,
+    columns player (his id, or his name), to (the club he joins: its name in the world or a game
+    team id) and, to tell two players of one name apart, from (his club now). Names are compared
+    without accents and case; a club's name also without FC, CF, SC and such. players:
+    [{"player": ref, "name": ..., "home": [club keys]}] of the whole world; clubs: [(name, club
+    key)]. A line that names no one, or two, is a problem, not a guess."""
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        sample = f.read(4096)
+        f.seek(0)
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+        except csv.Error:
+            dialect = csv.excel
+        lines = list(csv.reader(f, dialect))
+    if not lines:
+        return [], ["the file is empty"]
+    head = [_norm(c).replace(" ", "_") for c in lines[0]]
+    col = lambda names: next((i for i, h in enumerate(head) if h in {n.replace(" ", "_") for n in names}), None)
+    cp, ct, cf = col(TRANSFER_PLAYER), col(TRANSFER_TO), col(TRANSFER_FROM)
+    if cp is None or ct is None:
+        raise Error("the first line needs a column player (or name) and a column to (or club); it has: %s"
+                    % (", ".join(c for c in lines[0] if c) or "nothing"))
+    by_ref = {str(p["player"]): p for p in players}
+    by_name = collections.defaultdict(list)
+    for p in players:
+        by_name[_norm(p.get("name") or "")].append(p)
+    by_short = collections.defaultdict(list)          # "k mbappe" for Kylian Mbappe and K. Mbappe
+    for p in players:
+        w = _norm(p.get("name") or "").split()
+        if len(w) >= 2:
+            by_short[w[0][0] + " " + w[-1]].append(p)
+    club_key = {str(k) for _n, k in clubs}
+    club_names = collections.defaultdict(set)
+    for n, k in clubs:
+        club_names[_norm(n)].add(k)
+        club_names[_club_norm(n)].add(k)
+
+    def club_of(text):
+        t = text.strip()
+        if t.isdigit():
+            return ({t} if t in club_key else set())
+        return club_names.get(_norm(t)) or club_names.get(_club_norm(t)) or set()
+
+    moves, err, seen = [], [], {}
+    for n, line in enumerate(lines[1:], 2):
+        cell = lambda i: line[i].strip() if i is not None and i < len(line) else ""
+        who, to, frm = cell(cp), cell(ct), cell(cf)
+        if not who and not to:
+            continue
+        dest = club_of(to)
+        if len(dest) != 1:
+            err.append("line %d: %s -- %s" % (n, to or "?", "no club of that name in the world" if not dest
+                                              else "%d clubs of that name" % len(dest)))
+            continue
+        if who.isdigit() and who in by_ref:
+            found = [by_ref[who]]
+        else:
+            found = by_name.get(_norm(who)) or []
+            if not found:
+                w = _norm(who).split()
+                found = by_short.get(w[0][0] + " " + w[-1], []) if len(w) >= 2 else []
+            if len(found) > 1 and frm:
+                home = club_of(frm)
+                found = [p for p in found if home & set(p.get("home") or [])] or found
+        if len(found) != 1:
+            err.append("line %d: %s -- %s" % (n, who or "?", "no player of that name" if not found else
+                                              "%d players of that name; a from column tells them apart" % len(found)))
+            continue
+        ref = str(found[0]["player"])
+        if ref in seen:
+            err.append("line %d: %s -- already on line %d; that line counts" % (n, who, seen[ref]))
+            continue
+        seen[ref] = n
+        moves.append((ref, next(iter(dest)), n))
+    return moves, err
