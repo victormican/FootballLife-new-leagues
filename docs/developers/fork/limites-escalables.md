@@ -203,6 +203,7 @@ En **todo** mundo (nuevo o existente) se deben incluir estos bloques, sin borrar
 |---|---|---|---|---|
 | **Oceania** | 11-12 selecciones OFC como liga aparte | 11-12 | 7 | Separado de Asia (no dentro de Asia-Oceania). Ya creado con `mk_oceania.py`. |
 | **Non-FIFA Nations** | 8 selecciones no-FIFA (Martínique, Guadalupe, Guayana Francesa, San Martín, Sint Maarten, Bonaire, Cataluña, Padania) | 8 | 6 | Con banderas en `flag_96..123.png`. Creado con `add_nonfifa.py`. |
+| **Otros Asia** | ✅ Creado (cid 254, slot 124) | 24 |
 | **Otros África** | Clubes ocultos + genéricos hasta completar 48 | 48 | 5 | `Otros CAF`: clubes ocultos + genéricos. |
 | **Otros Concacaf** | 48 equipos | 48 | 6 | `OTROS CONCACAF`. |
 | **Otros Asia** | Clubes ocultos + genéricos | hasta 48 | 3 | Crear si no existe. |
