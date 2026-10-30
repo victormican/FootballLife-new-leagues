@@ -214,12 +214,21 @@ En **todo** mundo (nuevo o existente) se deben incluir estos bloques, sin borrar
 
 | Bloque | cid | reg | equipos | slot |
 |---|---|---|---|---|
-| Oceania | 91 | 196 | 12 | auto (206) |
-| Non-FIFA Nations | 255 | 255 | 8 | auto (207) |
-| Otros Asia | 254 | 256 | 24 | auto (249) |
-| Otros Africa (Otros CAF) | 165 | - | 24 | 76 |
-| Otros Concacaf (OTROS CONCACAF) | 221 | - | 24 | 158 |
-| Classics | - | - | - | del juego |
+| Oceania | 91 | 196 | 12 | auto (76) |
+| Non-FIFA Nations | 255 | 255 | 8 | auto (206) |
+| Otros Asia (fusion con "Other Clubs (Asia)") | 254 | 256 | 48 (26 del juego + 22 gen.) | **70** |
+| Otros Africa (fusion con "Other Clubs (Africa)") | 165 | 181 | 48 (Wydad + 47 gen.) | **75** |
+| Otros Concacaf (OTROS CONCACAF) | 221 | 250 | 48 gen. | 128 |
+| Other European Leagues | - | - | 54 del juego | 69 (del juego) |
+| Other / Other Latin American | - | - | del juego | 71 / 73 |
+| Classics | - | - | del juego | 5/6 |
+
+`tools/fill_group.py --reg <id> [--slot N] [--pool N] --to 48` crece una liga y, con `--pool N`,
+le pone delante los clubes del propio grupo del juego (nibble de `Team.bin` +0x4f: 1 Classics,
+2 Other European, 3 Other Asia, 5 Other, 6 Other Latin American, 7 Africa). Con el slot del grupo
+y el pool dentro, la liga **sustituye** a ese grupo en el menu (fl26comptab aparta la fila del
+exe a 123), asi que no hay duplicado. Medido 2026-10-30: slots 70 y 75 servidos por nuestras
+regulaciones 256 y 181, sin aborting.
 
 ### Como se coloca un bloque nuevo (leccion 2026-10-30)
 
@@ -235,9 +244,12 @@ En **todo** mundo (nuevo o existente) se deben incluir estos bloques, sin borrar
   restauradas desde `_FL26MyWorld.bak` y reconstruidas con `mkleague.add_league`.
 
 ### Pendiente
-- Completar Otros Africa y Otros Concacaf a 48 clubes.
-- Completar Classics a 48.
-- Confirmar en pantalla que los tres bloques aparecen en Select Team.
+- **Bloqueador: no hay cids libres** (255/255; solo el 0). Para dar liga propia a
+  "Other European Leagues" (69), "Other" (71), "Other Latin American Teams" (73) y a los
+  Classic Teams (5/6) y completarlos a 48 hay que **liberar cids**: la unica fuente son las
+  ligas genericas de prueba ("Generic League 01..N"). Mientras no se liberen, esos grupos
+  quedan tal cual los dibuja el juego (69 con 54 clubes, 71/73 con los suyos, 5/6 Classics).
+- Confirmar en pantalla el resultado de la fusion 70/75 y de Otros Concacaf a 48.
 
 ## 5. Como se sube cada tope (receta)
 
