@@ -195,39 +195,49 @@ Coste: **2 de las 255 competiciones**. Límite efectivo para ligas del usuario: 
 | Regulaciones | 1.200 | 214 | 986 |
 | Clubes del Edit | 4.700 | 3.802 | 898 |
 
-## 4d. Regla de mundo: bloques obligatorios (2026-10-29)
+## 4d. Regla de mundo: bloques obligatorios (2026-10-29, actualizado 2026-10-30)
 
 En **todo** mundo (nuevo o existente) se deben incluir estos bloques, sin borrar los del juego:
 
 | Bloque | Contenido | Clubs | Conf | Notas |
 |---|---|---|---|---|
-| **Oceania** | 11-12 selecciones OFC como liga aparte | 11-12 | 7 | Separado de Asia (no dentro de Asia-Oceania). Ya creado con `mk_oceania.py`. |
-| **Non-FIFA Nations** | 8 selecciones no-FIFA (Martínique, Guadalupe, Guayana Francesa, San Martín, Sint Maarten, Bonaire, Cataluña, Padania) | 8 | 6 | Con banderas en `flag_96..123.png`. Creado con `add_nonfifa.py`. |
-| **Otros Asia** | ✅ Creado (cid 254, slot 124) | 24 |
-| **Otros África** | Clubes ocultos + genéricos hasta completar 48 | 48 | 5 | `Otros CAF`: clubes ocultos + genéricos. |
-| **Otros Concacaf** | 48 equipos | 48 | 6 | `OTROS CONCACAF`. |
-| **Otros Asia** | Clubes ocultos + genéricos | hasta 48 | 3 | Crear si no existe. |
-| **Classics** | Completar hasta 48 | 48 | — | `Classic Teams` del juego (no borrar). |
+| **Oceania** | 11-12 selecciones OFC como liga aparte | 11-12 | 7 | Separado de Asia (no dentro de Asia-Oceania). `mk_oceania.py`. |
+| **Non-FIFA Nations** | 8 selecciones no-FIFA (Martinica, Guadalupe, Guayana Francesa, San Martin, Sint Maarten, Bonaire, Cataluna, Padania) | 8 | 6 | Banderas `flag_96..123.png`. `add_nonfifa.py`. |
+| **Otros Africa** | Clubes ocultos + genericos hasta 48 | 24 -> 48 | 5 | `Otros CAF` (cid 165). |
+| **Otros Concacaf** | 48 equipos | 24 -> 48 | 6 | `OTROS CONCACAF` (cid 221). |
+| **Otros Asia** | Clubes ocultos + genericos | 24 | 3 | creado (cid 254). |
+| **Classics** | Completar hasta 48 | 48 | - | `Classic Teams` del juego (no borrar). |
 
-**Coste fijo**: Oceania (1) + Non-FIFA (1) = **2 competiciones** descontadas del total de 255.
-Límite efectivo para ligas de usuario: **253**.
+**Coste fijo**: Oceania (1) + Non-FIFA (1) = **2 competiciones** de las 255. Limite efectivo: **253**.
 
-### Estado actual (_FL26MyWorld)
+### Estado actual (_FL26MyWorld, 2026-10-30)
 
-| Bloque | Estado | Clubs |
-|---|---|---|
-| Oceania | ✅ Creado (cid 91, slot 23) | 12 |
-| Non-FIFA Nations | ✅ Creado (cid 255, slot 24) | 8 |
-| Otros África (Otros CAF) | ✅ Existe (cid 165, slot 76) | 24 (falta completar a 48) |
-| Otros Concacaf (OTROS CONCACAF) | ✅ Existe (cid 221, slot 158) | 24 (falta completar a 48) |
-| Otros Asia | ❌ No existe | — |
-| Classics | ✅ Del juego (no borrar) | — |
+| Bloque | cid | reg | equipos | slot |
+|---|---|---|---|---|
+| Oceania | 91 | 196 | 12 | auto (206) |
+| Non-FIFA Nations | 255 | 255 | 8 | auto (207) |
+| Otros Asia | 254 | 256 | 24 | auto (249) |
+| Otros Africa (Otros CAF) | 165 | - | 24 | 76 |
+| Otros Concacaf (OTROS CONCACAF) | 221 | - | 24 | 158 |
+| Classics | - | - | - | del juego |
+
+### Como se coloca un bloque nuevo (leccion 2026-10-30)
+
+- Las tres ligas usan `slot=-1`: `fl26comptab` les da el primer slot libre. Escribelo asi en el
+  world; no inventes un numero.
+- `fl26comptab` **no miraba** los slots que el propio world ya reclama: podia dar a una liga un
+  slot de otra hermana y abortar el lote entero (`slot 80 asked for twice, by 76 and 196`).
+  Arreglado en `6c3909c`: el pool de slots libres excluye los slots de `APPEND` y de `RESHAPE`,
+  y los slots 5/6/69/70/71/72/73/75 (grupos "Other..." del exe) y 123 (oculto).
+- El mundo tiene que estar **activo**: `cpk.root = ".\livecpk\_FL26MyWorld"` sin comentar en
+  `sider.ini`. Estaba comentado (bisect de "Datos del usuario") y por eso no se veia nada.
+- Las tablas de competicion se habian corrompido al borrar filas con un stride equivocado;
+  restauradas desde `_FL26MyWorld.bak` y reconstruidas con `mkleague.add_league`.
 
 ### Pendiente
-- Completar Otros África y Otros Concacaf a 48 clubes (requiere rebuild con `mkleague clubs=48`).
-- Crear Otros Asia.
+- Completar Otros Africa y Otros Concacaf a 48 clubes.
 - Completar Classics a 48.
-- Verificar en juego que Oceania y Non-FIFA aparecen en Select Team.
+- Confirmar en pantalla que los tres bloques aparecen en Select Team.
 
 ## 5. Como se sube cada tope (receta)
 

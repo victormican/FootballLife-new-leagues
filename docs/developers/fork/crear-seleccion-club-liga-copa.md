@@ -305,3 +305,32 @@ Topes vigentes: 255 competiciones (253 efectivas con Oceania + Non-FIFA fijos), 
 123.825 jugadores, 6.800 entrenadores, 4.700 clubes en Edit. Los muros que quedan (1.300 ids de
 entrenador, `TODAY_OFF`, `fl26edit`/`.fl26x`, ML en la pantalla de entrenador) están en
 [limites-escalables.md](limites-escalables.md) §4.
+
+---
+
+## 10. Instalación real de un bloque (lo que faltaba el 2026-10-30)
+
+Crear las filas no basta. Para que el bloque se vea:
+
+1. **Activar el mundo**: en `SiderAddons\sider.ini`, `cpk.root = ".\livecpk\_FL26MyWorld"` **sin
+   comentar**. Si está `#`, el juego corre datos vanilla y ninguna de tus filas existe. (Estaba
+   comentado desde el bisect de "Datos del usuario".)
+2. **world en `modules\`**: copiar `livecpk\<mundo>\fl26world.txt` a `SiderAddons\modules\`.
+3. **`slot=-1`** en las líneas nuevas: `fl26comptab` les da un slot libre en runtime.
+4. **`fl26comptab` corregido** (`6c3909c`): el pool de slots libres no debe incluir los slots que
+   el propio world ya reclama (`APPEND`) ni los de `RESHAPE`, ni los "Other…" del exe
+   (5/6/69/70/71/72/73/75) ni el 123. Sin eso, la petición de slot libre cae en el slot de otra
+   liga y **aborta el lote completo**.
+5. **Reiniciar Sider** (no solo el juego) al cambiar un `.lua` de `modules\`: Sider carga los
+   módulos al arrancar.
+
+Prueba en `sider.log`:
+
+```
+fl26comptab: id 196 asked for a free slot -- it gets slot 206
+fl26comptab: table copied to 0x15c000000, 305 rows (165 shipped + 140 ours)
+fl26clubs: world file -- 158 leagues, ...
+```
+
+Si en vez de eso sale `slot N asked for twice ... aborting`, arregla los slots antes de mirar el
+menú: con un abort no se aplica **ninguna** línea del world.
