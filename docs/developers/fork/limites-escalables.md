@@ -296,3 +296,19 @@ Los que **no** estan en `layout.json`:
 4. **No** borrar competiciones del juego para hacer sitio: el menu se queda en blanco (ya paso).
 5. **No** dar por bueno un arranque sin leer `sider.log`: si el set aborta, todo lo demas sigue
    arrancando y el fallo aparece mucho despues, lejos de la causa.
+
+
+### Naciones y deduplicacion (2026-10-30)
+
+- Conteo real tras los arreglos: **221 selecciones** (UEFA 56, AFC 54, CONMEBOL 10, CAF 54,
+  CONCACAF 35, OFC 12) = 213 FIFA (211 + China Taipei + Sudan del Sur) + 8 no-FIFA.
+- **Sudan del Sur** (flag 312, CAF) y **China Taipei** (flag 298, AFC) tenian fila en
+  Country.bin y **ninguna** en Team.bin; 	ools/add_missing_nations.py les da una
+  (clona una seleccion de la misma confederacion, nombre en espanol y plantilla).
+- Deduplicacion: la linea 
+opool del world lleva ahora los clubes del juego que juegan en
+  nuestras ligas **mas las 12 selecciones OFC y las 8 no-FIFA**, para que no salgan tambien en
+  los grupos del juego (Asia-Oceania, confederaciones). Medido en sider.log:
+  104 club(s) kept out of the pools.
+- Nombres de bloque en espanol y tipo oracion: Otros CAF, Otros Asia, Otros Concacaf,
+  Selecciones No FIFA, Oceania.
