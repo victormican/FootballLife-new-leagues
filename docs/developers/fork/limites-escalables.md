@@ -347,3 +347,22 @@ Croacia: 150 candidatos para 20 plazas).
 
 Quedan 52 genericas, de sobra para las ligas de Other European (69), Other (71), Other Latin
 American (73) y los Classic Teams (5/6) a 48.
+
+
+### Nombres del juego, Wydad/Esperance y confederacion de las no-FIFA (2026-10-30)
+
+- Los grupos vuelven a llamarse como el juego: **"Other Clubs (Africa)"** (reg 181, slot 75) y
+  **"Other Clubs (Asia)"** (reg 256, slot 70), tambien en los 20 slots de la regulacion, la linea
+  del world y los nombres de los clubes genericos.
+- **Wydad Casablanca (9030)** estaba en DOS competiciones (Moroccan Premier Division 163 y el
+  grupo africano 165): eso lo "bloquea". Se quito de la liga marroqui. **Esperance Tunis (9033)**
+  estaba en la liga tunecina (162); se movio al grupo africano. Ahora ambos estan **solo** en
+  "Other Clubs (Africa)" (48 = Wydad + Esperance + 46 genericos). Las dos ligas reales se
+  rellenaron con un generico cada una para no cambiar su tamano (16).
+- **Confederacion de las no-FIFA**: `add_nonfifa.py` clonaba la primera fila de `Country.bin` y
+  no copiaba la confederacion, asi que las 8 salian bajo **AFC** (conf 3). Corregido en
+  `Country.bin`: Martinica, Guadalupe, Guayana Francesa, San Martin, Sint Maarten y Bonaire ->
+  **6 (CONCACAF)**; Cataluna y Padania -> **2 (UEFA)**.
+- **Banderas**: las 8 no-FIFA (96..123) y las OFC (161..184) tienen PNG en `_FL26All`; los paises
+  del juego (Marruecos 76, Tunez 92, India 9, Zimbabue 95, Sudan del Sur 312, China Taipei 298)
+  dibujan su bandera desde el cpk del juego, no necesitan PNG suelto.
