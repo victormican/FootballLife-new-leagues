@@ -516,12 +516,30 @@ function m.init(ctx)
     end
   end
   local got = {}
+  -- An explicit slot on our own line is a claim on it. The free-slot pool above only knows the
+  -- exe's rows, so without this an id asking for a free slot (slot=-1) can be handed a slot
+  -- another of our lines already names, and the "asked for twice" check aborts the whole list
+  -- (2026-10-30: Oceania, Non-FIFA and Otros Asia all took a sibling league's slot).
+  for _, a in ipairs(APPEND) do
+    if a[2] ~= -1 and a[2] ~= 123 and a[2] >= 7 then got[a[2]] = a[1] end
+  end
+  -- RESHAPE rows carry their own slot and are not in APPEND (the world file leaves id 76 to
+  -- RESHAPE), so they claim it here too.
+  for id, spec in pairs(RESHAPE) do
+    if spec.slot ~= 123 and spec.slot >= 7 then got[spec.slot] = id end
+  end
+  -- ... and the slots the exe fills itself with the "Other ..." club groups stay out of the
+  -- free-slot pool too: a league that lands on one hides that shipped group (69/71/73 are what
+  -- a free request grabbed before this). 123 is the hidden sentinel. The search runs to 249
+  -- because the low slots are the exe's and ours by now (fl26slots250 opens the range).
+  local PARKED = { [5] = true, [6] = true, [69] = true, [70] = true, [71] = true,
+                   [72] = true, [73] = true, [75] = true }
   for _, a in ipairs(APPEND) do
     local id, slot = a[1], a[2]
     if slot == -1 then
       slot = nil
-      for s = 7, 122 do
-        if not free[s] and not got[s] then slot = s; break end
+      for s = 7, 249 do
+        if s ~= 123 and not free[s] and not got[s] and not PARKED[s] then slot = s; break end
       end
       if not slot then
         log("fl26comptab: id " .. id .. " asks for a free slot and there is none left -- aborting")
