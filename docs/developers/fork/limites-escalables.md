@@ -312,3 +312,38 @@ opool del world lleva ahora los clubes del juego que juegan en
   104 club(s) kept out of the pools.
 - Nombres de bloque en espanol y tipo oracion: Otros CAF, Otros Asia, Otros Concacaf,
   Selecciones No FIFA, Oceania.
+
+
+### 12 ligas reales en lugar de genericas (2026-10-30)
+
+El mundo tenia **64 ligas "Generic League NN"** de prueba. Con `tools/build_leagues.py` se
+liberan las que hagan falta (regla: cid propio, reg mas alta primero) y se ponen en su lugar
+ligas reales; `tools/fill_group.py --seed-country N` las llena **primero con los clubes que el
+juego ya tiene** para ese pais (con plantilla y sin competicion) y solo el resto es generico.
+
+Aplicado (12 genericas liberadas; cids 92,65,48,7,6,110,109,108,107,106,105,104):
+
+| Liga | cid | reg | clubes | del juego |
+|---|---|---|---|---|
+| Copa Colombia | 92 | 378 | 48 | 24 |
+| Copa Especial Colombia | 65 | 376 | 30 | 0 |
+| Copa Argentina | 48 | 375 | 48 | 1 |
+| Italia Serie D | 7 | 374 | 30 | 0 |
+| Espana Segunda Federacion | 6 | 373 | 30 | 0 |
+| Croacia Prva NL | 110 | 372 | 20 | 20 (de 30 ocultos) |
+| Croacia Druga NL | 109 | 371 | 20 | 10 |
+| Portugal 2 | 108 | 370 | 20 | 0 |
+| Paises Bajos KKD | 107 | 369 | 20 | 0 |
+| Belgica CPL | 106 | 368 | 20 | 0 |
+| Grecia SL2 | 105 | 367 | 20 | 0 |
+| Serbia 2 | 104 | 366 | 20 | 0 |
+
+`check_world`: 255 comps, 403 regs, **3820 entradas**, 3268 equipos, 85290 jugadores, 0 errores.
+En `sider.log` los 12 ids piden slot libre y reciben 206, 207, 238..247, sin aborting.
+
+`--reset` rehace las entradas de una liga; `--seed-country N` limita los clubes del juego a los
+que caben (`--to - pool`), para que un pais con muchos ocultos no desborde la liga (paso con
+Croacia: 150 candidatos para 20 plazas).
+
+Quedan 52 genericas, de sobra para las ligas de Other European (69), Other (71), Other Latin
+American (73) y los Classic Teams (5/6) a 48.
