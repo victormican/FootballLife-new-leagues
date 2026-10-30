@@ -1,5 +1,5 @@
 """python fill_group.py --base <world pesdb> --worldfile <fl26world.txt> --reg <id>
-                      [--slot N] [--pool N] [--to 48] [--country N] [--dry]
+                      [--slot N] [--pool N] [--seed-country N] [--to 48] [--country N] [--dry]
 
 Grow one league of the world to `--to` clubs and, optionally, put it on a menu slot and seed it
 with the game's own "other clubs" pool of a group.
@@ -13,6 +13,10 @@ screen is the group's own (fl26comptab moves the exe's row out of the way).
 
 `--pool N` reads the nibble from Team.bin: 1 Classics, 2 Other European, 3 Other Asia,
 5 Other (ML defaults), 6 Other Latin American, 7 Other Clubs (Africa).
+
+`--seed-country N` seeds with the clubs the game already has for that country (Team.bin rows
+whose country is N, with a squad, and in no competition yet) before it clones anything: the
+world keeps what the game shipped and only the shortfall is generic.
 
 The clubs are the same clone `grow_leagues.py` makes: a Team.bin row copied from one club of the
 world that already has a squad, with new ids (`playeredit.free_ids` for the players), the
@@ -48,6 +52,7 @@ def main():
     want = int(get("--to", "48"))
     new_slot = int(get("--slot")) if "--slot" in a else None
     pool_nib = int(get("--pool")) if "--pool" in a else None
+    seed_country = int(get("--seed-country")) if "--seed-country" in a else None
     country = int(get("--country")) if "--country" in a else None
     dry = "--dry" in a
 
@@ -79,11 +84,17 @@ def main():
     )
     print("regulation %d: cid %d, name %r" % (reg, cid, rname))
 
+    reset = "--reset" in a
     ent_idx = [i for i in range(0, len(ents), M.ENT) if ents[i + M.E_CID] == cid]
     ent_idx.sort(key=lambda i: ents[i + M.E_ORDER])
-    have = [
-        int.from_bytes(ents[i + M.E_TEAM : i + M.E_TEAM + 4], "little") for i in ent_idx
-    ]
+    have = (
+        []
+        if reset
+        else [
+            int.from_bytes(ents[i + M.E_TEAM : i + M.E_TEAM + 4], "little")
+            for i in ent_idx
+        ]
+    )
 
     pool_ids = []
     if pool_nib is not None:
@@ -96,11 +107,39 @@ def main():
                     pool_ids.append(tid)
         print("pool nibble %d: %d club(s) to seed" % (pool_nib, len(pool_ids)))
 
-    seed = have + pool_ids
+    country_ids = []
+    if seed_country is not None:
+        squad = {}
+        for i in range(0, len(assigns), A_REC):
+            t = int.from_bytes(assigns[i + A_TID : i + A_TID + 4], "little")
+            squad[t] = squad.get(t, 0) + 1
+        in_league = {
+            int.from_bytes(ents[i + M.E_TEAM : i + M.E_TEAM + 4], "little")
+            for i in range(0, len(ents), M.ENT)
+        }
+        for o in range(0, len(raw), T_REC):
+            if raw[o + 0x53] & 0x80:
+                continue
+            tid = int.from_bytes(raw[o + T_ID : o + T_ID + 4], "little")
+            cid0 = (
+                int.from_bytes(raw[o + T_COUNTRY : o + T_COUNTRY + 2], "little") >> 2
+            ) & 0x1FF
+            if (
+                cid0 == seed_country
+                and tid not in in_league
+                and squad.get(tid, 0) >= 11
+            ):
+                country_ids.append(tid)
+        print(
+            "country %d: %d shipped club(s) with a squad to seed"
+            % (seed_country, len(country_ids))
+        )
+
+    seed = have + pool_ids + country_ids
     n_clone = max(0, want - len(seed))
     print(
-        "have %d, pool %d -> seed %d, clones %d, target %d"
-        % (len(have), len(pool_ids), len(seed), n_clone, want)
+        "have %d, pool %d, country %d -> seed %d, clones %d, target %d"
+        % (len(have), len(pool_ids), len(country_ids), len(seed), n_clone, want)
     )
 
     # country for the clones: --country or the world line's
@@ -201,9 +240,11 @@ def main():
 
     # entries: the game's own pool clubs first (they must all stay), then our existing clubs,
     # then the clones; trimmed to `want` keeping the game's clubs when they already fill it
-    keep_ours = have[: max(0, want - len(pool_ids))]
+    country_ids = country_ids[: max(0, want - len(pool_ids))]
+    fixed = pool_ids + country_ids
+    keep_ours = have[: max(0, want - len(fixed))]
     clones = list(range(top + 1, top + 1 + n_clone))
-    final = (pool_ids + keep_ours + clones)[: max(want, len(pool_ids))]
+    final = (fixed + keep_ours + clones)[: max(want, len(fixed))]
     ents = bytearray(
         b"".join(
             ents[i : i + M.ENT]
