@@ -175,8 +175,9 @@ python tools/mkplayers.py --base <pesdb> --out <livecpk\mundo>
    slots y confederación en `+5`. Si el juego no tiene fila libre, se **añade** en un id de
    bandera libre (`add_nonfifa.py` lo hace).
 3. **Bandera**: `common/render/symbol/flag/flag_<id>.png` a 128, `_l` a 256 y `_ll` a 512.
-   Las que ya pinta el juego no necesitan arte. Ojo: las banderas del cpk base tienen prioridad
-   sobre el livecpk para algunos ids; si no se ven, hay que inyectarlas en el cpk.
+   Las que ya pinta el juego no necesitan arte. Si un PNG del livecpk no se ve, la hipótesis
+   abierta es que para ese id manda el cpk base; la alternativa es inyectarlo en el cpk
+   (no verificado todavía).
 4. **Plantilla**: 23 jugadores clonados con nacionalidad = país (`add_nations.py`).
 5. **Colocarla en Select Team**: una **liga** (`type` 4) cuyas entradas sean las selecciones, en
    un slot libre. Una copa no rellena el slot (§2.4).
