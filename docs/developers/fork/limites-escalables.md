@@ -366,3 +366,37 @@ American (73) y los Classic Teams (5/6) a 48.
 - **Banderas**: las 8 no-FIFA (96..123) y las OFC (161..184) tienen PNG en `_FL26All`; los paises
   del juego (Marruecos 76, Tunez 92, India 9, Zimbabue 95, Sudan del Sur 312, China Taipei 298)
   dibujan su bandera desde el cpk del juego, no necesitan PNG suelto.
+
+
+### Los cuatro "Other" del exe con liga propia (2026-10-30)
+
+El juego separa estos bloques con el nibble alto de `Team.bin +0x4f` y los dibuja en las
+secciones que nombra el slot (ver `fl26slotnames`): 1 Classics, 2 Other European, 5 ML defaults,
+6 Other Latin American. Ninguna de esas secciones es una competicion, asi que sus clubes podian
+estar en ninguna o en una copa que los cogio por pais (los 24 `CLASSICS NN` acabaron en la Copa
+Colombia por un `fill_group --seed-country 148`). `tools/other_groups.py` les da una liga:
+
+| Grupo | slot | nibble | clubes | del juego |
+|---|---|---|---|---|
+| Classic Teams (reg 365, cid 99) | -1 -> 244 | 1 | 48 | 34 (10 "X Classics" + 24 `CLASSICS NN`) |
+| Other European Leagues (reg 364, cid 98) | 69 | 2 | 48 | 6 (Zalgiris, HJK, RFS, Ferencvaros, Qarabag, Sheriff) |
+| Other (reg 363, cid 96) | 71 | 5 | 48 | 3 (ML Default Europe/Latinamerica/Asia) |
+| Other Latin American Teams (reg 362, cid 95) | 73 | 6 | 48 | 4 (Gimnasia de Mendoza, Estudiantes Rio Cuarto, Sarmiento, Riestra) |
+
+- El script libera una generica por grupo (cid propio), crea la liga con el **nombre del juego**
+  en el slot del bloque, mete en ella los clubes del nibble y **los saca de la competicion que
+  los tuviera**; despues `fill_group --reg R --to 48` completa con genericos.
+- **Ojo con el `--pool`**: los 48 "Otros UEFA 01..24" / "OTROS UEFA 2 01..24" de pruebas
+  anteriores seguian en el nibble 2 y ensuciaban la seccion. `other_groups.py` los usa como
+  relleno hasta 48 y **saca del nibble a los que sobran** (6); ademas los 42 usados se renombran
+  a "Other European Leagues Club NN".
+- **Slot 5/6 son PROTECTED** en `fl26comptab` (seccion de selecciones y Classic Teams): una liga
+  puesta ahi "juega, pero no sale en Select Team". Por eso Classic Teams va con `slot=-1` (acaba
+  en el 244) y el bloque del exe sigue mostrando los 34 clasicos por nibble.
+- Las copas que perdieron clubes se rellenaron a su tamano: UEFA Europa League 34, Copa do
+  Brasil 41, Copa Argentina 48, Copa Argentina AXION 30, Copa Colombia 48.
+- `check_world`: 255 comps, 403 regs, **3972 entradas**, 3404 equipos, 88282 jugadores, 0 errores.
+- `sider.log`: 362->73, 363->71, 364->69, 365 libre -> 244; `fl26clubs` sirve 69<-364 y 73<-362;
+  0 `aborting`.
+- `fill_group.py` ya no revienta al final cuando la competicion no tiene linea en el world
+  (copas del juego): imprime "done" y sale con 0.
