@@ -294,7 +294,8 @@ def main():
         "done: %d entries, %d new club(s), %d new player(s)"
         % (len(final), n_clone, made)
     )
-    print("line:", lines[line_n])
+    if line_n is not None:
+        print("line:", lines[line_n])
     return 0
 
 
