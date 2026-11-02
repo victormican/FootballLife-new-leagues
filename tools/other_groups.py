@@ -30,8 +30,12 @@ import mkleague as M
 T_REC, T_NAME, T_NAME_LEN, T_POOL = 1532, 0x170, 70, 0x4F
 
 # name, slot, pool nibble, target clubs, region, country flag, conf, prototype code
+#
+# Classic Teams (nibble 1) is NOT here on purpose: its section is the game's own and lists the
+# shipped classics (10 real + 24 `CLASSICS NN`) on its own, so those clubs stay in no
+# competition. Putting a league on slot 5 or 6 would take the section away (fl26comptab keeps
+# them PROTECTED) and hide it from Select Team.
 SPECS = [
-    ("Classic Teams", 5, 1, 48, 29, 200, 2, "ENGLAND_D1_LEAGUE"),
     ("Other European Leagues", 69, 2, 48, 29, 200, 2, "ENGLAND_D1_LEAGUE"),
     ("Other", 71, 5, 48, 29, 200, 2, "ENGLAND_D1_LEAGUE"),
     ("Other Latin American Teams", 73, 6, 48, 29, 148, 4, "ENGLAND_D1_LEAGUE"),
