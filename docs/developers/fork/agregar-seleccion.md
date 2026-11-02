@@ -85,3 +85,24 @@ python tools/title_case_names.py --base <pesdb> --all-teams     # también los c
 
 Guayana Francesa, Guadalupe, Martinica, San Martín, Sint Maarten y Bonaire ya estaban desde el alta
 de las no-FIFA (ids 96-123); no se duplican: el tool aborta si el nombre o el id ya existen.
+
+## Los nueve territorios de 2026-11-03
+
+Segunda tanda, los no FIFA de Europa y Oceanía que no son miembros de confederación (o lo son con
+estatus discutido):
+
+| bandera | conf | nombre | id de equipo |
+|---|---|---|---|
+| 158 | UEFA | Groenlandia | 74242 |
+| 160 | UEFA | Ciudad del Vaticano | 74243 |
+| 173 | UEFA | Chipre del Norte | 74244 |
+| 174 | OFC | Micronesia | 74245 |
+| 175 | OFC | Islas Marshall | 74246 |
+| 177 | OFC | Nauru | 74247 |
+| 178 | OFC | Niue | 74248 |
+| 179 | OFC | Tokelau | 74249 |
+| 180 | OFC | Wallis y Futuna | 74250 |
+
+Palaos (184) y Mónaco (250) ya tenían país y selección; no se duplican.  El mundo queda en **240
+países** y **95 selecciones nuestras**, todas con bandera y escudo.
+
