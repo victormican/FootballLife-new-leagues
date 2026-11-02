@@ -36,7 +36,7 @@ Todas van en `livecpk/<mundo>/common/etc/pesdb/` y están comprimidas en WESYS
 | `Competition.bin` | 36 | `+0x00` 100/200 fijos, `+0x03` **región** (slot de país del menú), `+0x05` **cid**, `+0x06` flag, `+0x08` **código** (`ENGLAND_D1_LEAGUE`, `FL_XXXX`) |
 | `CompetitionRegulation.bin` | 2352 | `+0x02` **id de regulación**, `+0x08` **cid**, `+0x09` **tipo** (4 liga, 3 eliminatoria, 2 grupos, 1 playoff), `+0x0b` **nº equipos** (6 bits bajos), `+0x0c` plantilla de formato (bits 12-17: 1 liga, 2 copa nacional), `+0x14` **nombre** 20 slots de `0x73` (10 + 10 desde `+0x4b2`) |
 | `CompetitionEntry.bin` | 12 | `+0x00` **id de equipo**, `+0x04` id de entrada único, `+0x08` **cid**, `+0x09` **orden** (posición / siembra) |
-| `Team.bin` | 1532 | `+0x00` **id de entrenador** (Coach.bin), `+0x08` **id de equipo**, `+0x46` **país** (9 bits desde bit 2), `+0x4f` nibble alto = grupo "Other…", `+0x53` bit alto = **selección**, `+0x170` **nombre** (70 B, 20 slots), `+0x372` **abreviatura** (3 B) |
+| `Team.bin` | 1532 | `+0x00` **id de entrenador** (Coach.bin), `+0x08` **id de equipo**, `+0x46` **país** (9 bits desde bit 2), `+0x4f` nibble alto = grupo "Other…", `+0x53` bit alto = **selección**, `+0x170` **nombre** (70 B, idioma canónico), `+0x372` **abreviatura** (máx. 3 B; ver [abreviatura-de-equipo](abreviatura-de-equipo.md)) |
 | `Player.bin` | 312 | `+0x08` **id**, `+0x44` 4 slots de nombre de `0x3d`, nacionalidad en el bit 233 |
 | `PlayerAssignment.bin` | 16 | `+0x00` id de entrada, `+0x04` **jugador**, `+0x08` **equipo**, `+0x0c` empaquetado: dorsal en los 10 bits bajos (`0x3ff`), orden de plantilla arriba |
 | `Coach.bin` | 100 | `+0x00` **id**, `+0x04` nacionalidad (9 bits bajos), `+0x08` y `+0x36` nombre (46 B cada uno) |
@@ -144,7 +144,10 @@ cuesta una ronda entera de "no aparece" (pasó con `+0x4f` y con `0xAF23B3`).
    bloque vivo: el guardado de Edit es un delta sobre el base y un club sin fila base no tiene
    de qué ser delta (por eso el realojo se perdía al recargar).
 2. **Clonar la fila** con `tools/mkteams.py`: nuevo id en `+0x08`, nuevo "alt"/entrenador en
-   `+0x00`, nombre en `+0x170` (20 slots) y abreviatura en `+0x372`.
+   `+0x00`, nombre en `+0x170` (70 B) y abreviatura de como mucho 3 caracteres en `+0x372`.  Si el
+   nombre se escribe en los veinte slots de idioma, hay que reescribir el código después: el
+   slot 10 solo tiene 24 B antes de `+0x372` y un nombre largo se come la abreviatura (ver
+   [abreviatura-de-equipo](abreviatura-de-equipo.md)).
 3. **Entrenador propio**: `+0x00` es un id de `Coach.bin`. Si no existe, el juego muestra una
    copia del primer entrenador ("Jorge Jesus"). `tools/mkcoaches.py` añade un registro de 100 B
    por club con ese id, nacionalidad y nombre.
