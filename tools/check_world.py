@@ -3,7 +3,8 @@
 Check a built world against itself and against the world file the modules read.  No game.
 
 What it checks
-  Team.bin              unique team ids; a name; the national bit and country of the 211 sides
+  Team.bin              unique team ids; a name; a three-letter code at +0x372 the game can copy
+                        without aborting; the national bit and country of the 211 sides
   Player.bin            unique ids, none at or above 262144 (the 18-bit wall), a name
   PlayerAssignment.bin  every player and team exists; one row per (player, team); every club has
                         eleven players and a keeper; every national team its squad
@@ -32,12 +33,21 @@ import mkleague as M
 import playeredit as E
 
 T_REC, T_ID, T_NATIONAL, T_COUNTRY, T_NAME = 1532, 0x08, 0x53, 0x40, 0x170
+T_ABBR = 0x372
 OTHER_SLOTS = (69, 71, 73, 75)
 SLOT_MAX = 249
 
 
 def u32(b, o):
     return int.from_bytes(b[o : o + 4], "little")
+
+
+def sane_code(b):
+    """the game copies the code into four bytes: at most three characters, then a NUL"""
+    z = b.find(b"\0")
+    if z < 0:
+        return False
+    return all(0x21 <= c <= 0x7E for c in b[:z])
 
 
 def main():
@@ -65,6 +75,7 @@ def main():
             warns.append("%s is not in this world; its checks are skipped" % n)
             return b""
         return pesdb.wesys_unpack(open(path, "rb").read())
+
     teams = read("Team.bin")
     players = read("Player.bin")
     assigns = read("PlayerAssignment.bin")
@@ -85,6 +96,19 @@ def main():
         )
         if not name.strip():
             warn("team %d has no name" % tid)
+        raw_name = teams[i + T_NAME : i + T_NAME + 70].split(b"\0")[0]
+        code = teams[i + T_ABBR : i + T_ABBR + 4]
+        text = code.split(b"\0")[0]
+        if not sane_code(code):
+            err(
+                "team %d has a broken abbreviation at +0x372 (%r); the game aborts in strcpy_s"
+                % (tid, bytes(code))
+            )
+        elif text and raw_name[0x18 : 0x18 + len(text)] == text:
+            err(
+                "team %d has its own name written over the abbreviation at +0x372 (%r)"
+                % (tid, text.decode("latin-1"))
+            )
         tids[tid] = name
         if teams[i + T_NATIONAL] & 0x80:
             nats[tid] = (u32(teams, i + T_COUNTRY) >> 2) & 0x1FF  # noqa: E501
@@ -123,14 +147,16 @@ def main():
     # a club only needs a squad when it plays something: the game's classic/placeholder teams
     # (The Old Boys, World Selection) have none and are not entered anywhere
     playing = {u32(ents, i) for i in range(0, len(ents), M.ENT)} - {0}
-    for tid, name in (tids.items() if players else ()):
+    for tid, name in tids.items() if players else ():
         n = len(per_team.get(tid, []))
         if tid in nats:
             if n == 0:
                 warn("national team %d (%s) has no players" % (tid, name))
         elif n < 11 and tid in playing:
-            err("club %d (%s) plays a competition and has %d players (needs eleven)"
-                % (tid, name, n))
+            err(
+                "club %d (%s) plays a competition and has %d players (needs eleven)"
+                % (tid, name, n)
+            )
 
     # ---- competitions
     cids = {}
@@ -173,8 +199,10 @@ def main():
         ent_n[cid] = ent_n.get(cid, 0) + 1
         key = (cid, order)
         if key in ent_order and tid:
-            warn("entry: competition %d has two clubs at position %d (a shipped cup with "
-                 "several stages)" % (cid, order))
+            warn(
+                "entry: competition %d has two clubs at position %d (a shipped cup with "
+                "several stages)" % (cid, order)
+            )
         ent_order[key] = tid
 
     # a regulation may hold fewer clubs than its competition (split phases, group replicas);
@@ -272,13 +300,18 @@ def main():
                 err("line %d: lpre %d leads to cup %d, not a regulation" % (n, pre, ko))
             for k in range(8):
                 if pre and pre + 1024 * (k + 1) not in rids:
-                    err("line %d: lpre %d has no tie regulation %d (the module wants all eight)"
-                        % (n, pre, pre + 1024 * (k + 1)))
+                    err(
+                        "line %d: lpre %d has no tie regulation %d (the module wants all eight)"
+                        % (n, pre, pre + 1024 * (k + 1))
+                    )
                     break
             if "clubs" in kv:
                 cl = [int(x) for x in kv["clubs"].split(",") if x]
                 if pairs and len(cl) != pairs:
-                    err("line %d: %d invited clubs for %d tie places" % (n, len(cl), pairs))
+                    err(
+                        "line %d: %d invited clubs for %d tie places"
+                        % (n, len(cl), pairs)
+                    )
                 for c in cl:
                     if c not in tids:
                         err("line %d: lpre team %d is not in Team.bin" % (n, c))
@@ -286,7 +319,10 @@ def main():
             for pair in (w[1] if len(w) > 1 else "").split(","):
                 r, _s, f = pair.partition(":")
                 if not r.isdigit() or not f.isdigit():
-                    err("line %d: cwcchamp %r is not <regulation>:<confederation>" % (n, pair))
+                    err(
+                        "line %d: cwcchamp %r is not <regulation>:<confederation>"
+                        % (n, pair)
+                    )
                     continue
                 if int(r) not in rids:
                     err("line %d: cwcchamp regulation %s is not in the tables" % (n, r))
@@ -301,15 +337,22 @@ def main():
                     err("line %d: nopool team %s is not in Team.bin" % (n, x))
 
     # ---- the UEFA access list: a world that writes one must keep the holders' places
-    uefa = [(int(w[1]), int(w[2]), int(w[3])) for w in (l.split() for l in lines)
-            if len(w) >= 4 and w[0] == "uefa" and all(x.isdigit() for x in w[1:4])]
+    uefa = [
+        (int(w[1]), int(w[2]), int(w[3]))
+        for w in (l.split() for l in lines)
+        if len(w) >= 4 and w[0] == "uefa" and all(x.isdigit() for x in w[1:4])
+    ]
     if uefa:
-        for reg, comp, what in ((4, 0, "the Champions League winner to the Champions League"),
-                                (6, 0, "the Europa League winner to the Champions League"),
-                                (187, 1, "the Conference League winner to the Europa League")):
+        for reg, comp, what in (
+            (4, 0, "the Champions League winner to the Champions League"),
+            (6, 0, "the Europa League winner to the Champions League"),
+            (187, 1, "the Conference League winner to the Europa League"),
+        ):
             if (reg, comp) not in {(a, c) for a, _b, c in uefa}:
-                warn("the uefa list has no place %d -> competition %d (%s); a world with a list "
-                     "loses the rule the shipped table has" % (reg, comp, what))
+                warn(
+                    "the uefa list has no place %d -> competition %d (%s); a world with a list "
+                    "loses the rule the shipped table has" % (reg, comp, what)
+                )
 
     # ---- the Other pools must not also play a league
     other = set()
