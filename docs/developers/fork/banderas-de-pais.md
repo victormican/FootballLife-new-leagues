@@ -41,16 +41,19 @@ es lo que salía en su hueco.
 
 Medido sobre las banderas del juego (128, 256 y 512 comparten dibujo):
 
-- lienzo **cuadrado blanco** `(255,255,255)`, sin canal alfa, PNG en paleta (`mode P`);
+- lienzo **cuadrado transparente**, PNG en paleta (`mode P`) con tabla alfa;
 - marco gris `(222,222,222)` de `(2,40)` a `(253,215)` en la base de 256;
 - la bandera ocupa `(10,48)-(245,207)`, es decir **236×160**, y se **estira** a esa caja (no se
   respeta la proporción original: Palau, 8:5, sale algo más ancha).
 
-El PNG del juego **sí lleva tabla alfa** (`tRNS` de 256 entradas, valores 0 y 255) y un `sBIT`
-`(8,8,8)`.  Un PNG en paleta *sin* `tRNS` no tiene canal alfa y el cargador de texturas no lo
-levanta: el fichero está, el hueco sale vacío.  La herramienta escribe ya el PNG con la misma forma
-que el del juego, `IHDR / sBIT / PLTE(256) / tRNS(256) / IDAT / IEND`, para que no haya diferencias
-que el cargador pueda notar.
+Lo de fuera del marco es **alfa 0**, no blanco: las banderas del juego tienen el marco recortado en
+transparente (medido: `flag_170_l.png`, alfa 0 en `y<40` y `y>215`, y en `x<2` / `x>253`).  Si se
+pinta blanco opaco, en el menú se ve una franja blanca por arriba y por abajo.
+
+El PNG del juego lleva **tabla alfa** (`tRNS` de 256 entradas, 0 y 255) y un `sBIT` `(8,8,8)`.  Un
+PNG en paleta *sin* `tRNS` no tiene canal alfa y el cargador de texturas no lo levanta: el fichero
+está, el hueco sale vacío.  La herramienta escribe el PNG con la misma forma que el del juego,
+`IHDR / sBIT / PLTE(256) / tRNS(256) / IDAT / IEND`.
 
 En 128 el marco es `(1,20)-(126,107)` y la bandera `118×80` en `(5,24)`; en 512, `(4,80)-(507,431)`
 y `472×320` en `(20,96)`.

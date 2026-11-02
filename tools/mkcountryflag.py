@@ -71,14 +71,14 @@ def country_ids(pesdb_dir):
 
 
 def tile(flag, size):
-    """the game's square: white field, grey frame, the flag stretched inside"""
+    """the game's square: transparent outside, grey frame, the flag stretched inside"""
     from PIL import Image, ImageDraw
 
     s = size / 256.0
     x, y, w, h = (round(v * s) for v in FRAME)
     fx, fy, fw, fh = (round(v * s) for v in INSET)
-    out = Image.new("RGB", (size, size), WHITE)
-    ImageDraw.Draw(out).rectangle([x, y, x + w - 1, y + h - 1], fill=GREY)
+    out = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+    ImageDraw.Draw(out).rectangle([x, y, x + w - 1, y + h - 1], fill=GREY + (255,))
     body = flag.convert("RGB").resize((fw, fh), Image.LANCZOS)
     out.paste(body, (fx, fy))
     return out
@@ -88,17 +88,27 @@ def save_like_the_game(im, path):
     """palette PNG with a full tRNS and an sBIT, the way the shipped flags are stored
 
     The shipped flags are IHDR / sBIT / PLTE / tRNS / IDAT / IEND: 256 palette entries, an alpha
-    table of 256 (0 and 255) and the 8,8,8 significant-bits chunk.  A PNG without tRNS has no
-    alpha channel at all and the texture loader leaves the slot empty even though the file is
-    there, so this writes the same shape."""
+    table of 256 and the 8,8,8 significant-bits chunk.  Everything outside the grey frame is
+    transparent, so the UI never shows a white box around the flag; a PNG without tRNS has no
+    alpha channel at all and the texture loader leaves the slot empty."""
     import struct
     import zlib
 
     from PIL import Image
 
-    im = im.quantize(colors=256, dither=Image.NONE)
-    im.save(
-        path, optimize=True, transparency=bytes([255]) * (len(im.getpalette()) // 3)
+    rgb = im.convert("RGB")
+    q = rgb.quantize(colors=254, dither=Image.NONE)
+    pal = q.getpalette()[: 254 * 3]
+    pal += [255, 255, 255]
+    q.putpalette(pal + [0] * (768 - len(pal)) if len(pal) < 768 else pal)
+    alpha = im.getchannel("A")
+    outside = alpha.point(lambda v: 0 if v < 128 else 255)
+    out = q.copy()
+    out.paste(254, mask=outside.point(lambda v: 255 - v))
+    out.save(
+        path,
+        optimize=True,
+        transparency=bytes([255] * 254 + [0]),
     )
     raw = open(path, "rb").read()
     head, rest = raw[:8], raw[8:]

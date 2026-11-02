@@ -64,5 +64,24 @@ Las banderas planas están en `sider/flags/flag_<id>.png` (Wikimedia Commons, 76
 `_ll` se genera de ahí).  Resultado de las comprobaciones: 231 países sin textura pendiente, 86
 selecciones nuestras sin escudo pendiente, `check_world` 0 errores, 0 abreviaturas rotas.
 
+## Los nombres, en caja normal
+
+El juego guarda el nombre del equipo en la columna que enseña en Select Team y los suyos van en caja
+normal («Irlanda», «Tahití»), mientras que las altas por script salían en mayúsculas («ISLAS
+MARIANAS DEL NORTE»), que es lo que se veía feo.  `tools/title_case_names.py` las pone en caja
+normal:
+
+```
+python tools/title_case_names.py --base <pesdb del mundo> [--dry]
+python tools/title_case_names.py --base <pesdb> --all-teams     # también los clubes
+```
+
+- **Selecciones** (bit nacional de `+0x53`) y **filas de `Country.bin`** desde la 214: nombre en los
+  20 slots y en el largo de `0x37C`, más las 18 columnas y el inglés del país.  Las partículas
+  («de», «del», «y», «la»…) quedan en minúscula y los guiones se capitalizan («Saint-Pierre»).
+- **Clubes**: no se tocan por defecto, porque sus nombres ya venían bien y hay siglas que se
+  romperían («Países Bajos KKD Club 09» → «Kkd»).  `--all-teams` los incluye.
+- El código de tres letras de `0x372` no se toca, y el slot 10 sigue limitado a 24 B.
+
 Guayana Francesa, Guadalupe, Martinica, San Martín, Sint Maarten y Bonaire ya estaban desde el alta
 de las no-FIFA (ids 96-123); no se duplican: el tool aborta si el nombre o el id ya existen.
