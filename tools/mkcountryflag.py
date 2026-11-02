@@ -44,6 +44,7 @@ FLAGS = "common/render/symbol/flag"
 SIZES = ((128, ""), (256, "_l"), (512, "_ll"))
 COUNTRY_REC, COUNTRY_EN = 1420, 288
 COUNTRY_COLS = list(range(148, COUNTRY_REC - 69, 70))
+T_REC, T_ID, T_NATIONAL, T_COUNTRY, T_NAME = 1532, 0x08, 0x53, 0x46, 0x170
 
 # the drawing of a shipped flag, in the 256 square: frame box, then the flag inside it
 FRAME = (2, 40, 252, 176)
@@ -83,19 +84,130 @@ def tile(flag, size):
     return out
 
 
-def write_flag(flag_path, root, fid):
+def save_like_the_game(im, path):
+    """palette PNG with a full tRNS, the way the shipped flags are stored
+
+    Every flag of the game carries an alpha table (256 entries of 0 and 255).  A PNG with no tRNS
+    has no alpha channel at all, and the texture loader wants one: the flag then never appears even
+    though the file is there."""
     from PIL import Image
 
-    flag = Image.open(flag_path)
+    im = im.quantize(colors=255, dither=Image.NONE)
+    im.save(
+        path, optimize=True, transparency=bytes([255]) * (len(im.getpalette()) // 3)
+    )
+
+
+def load_source(path, framed=False):
+    """a plain flag picture, or the flag out of a picture already in the game's frame"""
+    from PIL import Image
+
+    im = Image.open(path)
+    if not framed:
+        return im
+    s = im.width / 256.0
+    x, y, w, h = (round(v * s) for v in INSET)
+    return im.crop((x, y, x + w, y + h))
+
+
+def write_pngs(flag, root, stem):
+    """`<stem>.png`, `_l.png` and `_ll.png` for a flag picture, in the game's format"""
     out_dir = os.path.join(root, *FLAGS.split("/"))
     os.makedirs(out_dir, exist_ok=True)
     written = []
     for size, suffix in SIZES:
-        name = "flag_%03d%s.png" % (fid, suffix)
-        im = tile(flag, size).quantize(colors=255, dither=Image.NONE)
-        im.save(os.path.join(out_dir, name), optimize=True)
+        name = stem + suffix + ".png"
+        save_like_the_game(tile(flag, size), os.path.join(out_dir, name))
         written.append(name)
     return written
+
+
+def write_flag(flag_path, root, fid):
+    return write_pngs(load_source(flag_path), root, "flag_%03d" % fid)
+
+
+def write_emblem(flag_path, root, tid, framed=False):
+    """a national team draws its emblem in Select Team: e_<team id>_r.png, also a flag picture"""
+    return write_pngs(load_source(flag_path, framed), root, "e_%06d_r" % tid)
+
+
+def national_teams(base, min_team):
+    """[(team id, flag id, name)] of the national teams at or above min_team"""
+    raw = pesdb.wesys_unpack(open(os.path.join(base, "Team.bin"), "rb").read())
+    out = []
+    for o in range(0, len(raw), T_REC):
+        r = raw[o : o + T_REC]
+        if not r[T_NATIONAL] & 0x80:
+            continue
+        tid = int.from_bytes(r[T_ID : T_ID + 4], "little")
+        if tid < min_team:
+            continue
+        fid = (int.from_bytes(r[T_COUNTRY : T_COUNTRY + 2], "little") >> 2) & 0x1FF
+        out.append((tid, fid, pesdb.cstr(r[T_NAME : T_NAME + 70])))
+    return out
+
+
+def emblems(argv, get, root, base, src_dir):
+    """give every national team of ours the flag of its country as its emblem"""
+    import shutil
+    import tempfile
+
+    import cpkread
+
+    min_team = int(get("--min-team", "71578"))
+    game = get("--game")
+    teams = national_teams(base, min_team)
+    print("national teams from %d on: %d" % (min_team, len(teams)))
+
+    own = {}
+    if src_dir:
+        for fid in {fid for _t, fid, _n in teams}:
+            p = os.path.join(src_dir, "flag_%03d.png" % fid)
+            if os.path.exists(p):
+                own[fid] = p
+
+    need = {fid for _t, fid, _n in teams} - set(own)
+    tmp = None
+    if need and game:
+        tmp = tempfile.mkdtemp(prefix="fl26emblem")
+        rels = ["%s/flag_%03d_l.png" % (FLAGS, fid) for fid in sorted(need)]
+        cpks = sorted(glob.glob(os.path.join(game, "download", "dt15*.cpk")))
+        cpks += sorted(glob.glob(os.path.join(game, "Data", "dt15*.cpk")))
+        pending = list(rels)
+        for c in cpks:
+            if not pending:
+                break
+            try:
+                cpkread.extract(c, tmp, pending)
+            except (OSError, ValueError, KeyError, IndexError):
+                continue
+            pending = [
+                r
+                for r in pending
+                if not os.path.exists(os.path.join(tmp, *r.split("/")))
+            ]
+        for fid in sorted(need):
+            p = os.path.join(tmp, *("%s/flag_%03d_l.png" % (FLAGS, fid)).split("/"))
+            if os.path.exists(p):
+                own[fid] = (True, p)
+
+    written = 0
+    for tid, fid, name in teams:
+        src = own.get(fid)
+        if not src:
+            print("  team %-6d flag %-4d %-26s sin fuente" % (tid, fid, name))
+            continue
+        if isinstance(src, tuple):
+            path, framed = src[1], True
+        else:
+            path, framed = src, False
+        files = write_emblem(path, root, tid, framed)
+        written += len(files)
+        print("  team %-6d flag %-4d %-26s %s" % (tid, fid, name, ", ".join(files)))
+    if tmp:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("emblems written: %d" % written)
+    return 0
 
 
 def find_flags(root):
@@ -185,7 +297,26 @@ def main():
                 "  WRONG NAME  flag %-4d %s -- the engine asks for flag_%03d.png"
                 % (fid, ",".join(names), fid)
             )
+        teams = []
+        if os.path.exists(os.path.join(base, "Team.bin")):
+            teams = national_teams(base, int(get("--min-team", "71578")))
+            no_emblem = [
+                (tid, fid, name)
+                for tid, fid, name in teams
+                if not os.path.exists(
+                    os.path.join(root, *FLAGS.split("/"), "e_%06d_r.png" % tid)
+                )
+            ]
+            print(
+                "national teams of ours: %d, without emblem: %d"
+                % (len(teams), len(no_emblem))
+            )
+            for tid, fid, name in no_emblem:
+                print("  NO EMBLEM   team %-6d flag %-4d %s" % (tid, fid, name))
         return 1 if (missing or unpadded) else 0
+
+    if "--emblems" in a:
+        return emblems(a, get, root, base, src_dir)
 
     if not src_dir or not ids:
         print("--from and --ids are needed to write flags")

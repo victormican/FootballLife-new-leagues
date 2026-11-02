@@ -24,6 +24,19 @@ prefijo: `e_<id6>_r.png`.
 un país con id &lt; 100 guardado sin rellenar no se encuentra y queda en blanco.  (Esto ya se había
 visto en `tools/mkcatflags.py`: el propio juego nombra `flag_012_l.png`.)
 
+**Y hay dos dibujos distintos para lo que el usuario llama «bandera»:**
+
+| qué se ve | fichero | qué es |
+|---|---|---|
+| el país en listas de nacionalidad, ligas, Edit | `flag_%03d[_l\|_ll].png` | la bandera del país |
+| la **selección** en Select Team (la fila con su escudo) | `e_<id de equipo6>_r[_l\|_ll].png` | la bandera del país otra vez |
+
+Una selección **no** dibuja `flag_<id>`: dibuja su escudo, y el de una selección del juego es la
+bandera con el mismo marco (comparado: `e_001141_r.png` de Nueva Zelanda es la bandera de Nueva
+Zelanda).  Por eso dar de alta el país no basta: el equipo nacional necesita su `e_`.  Nuestras
+selecciones nuevas tenían el escudo de relleno de `tools/mkcrests.py` (el círculo con `G00`), y eso
+es lo que salía en su hueco.
+
 ## Formato del PNG
 
 Medido sobre las banderas del juego (128, 256 y 512 comparten dibujo):
@@ -33,6 +46,11 @@ Medido sobre las banderas del juego (128, 256 y 512 comparten dibujo):
 - la bandera ocupa `(10,48)-(245,207)`, es decir **236×160**, y se **estira** a esa caja (no se
   respeta la proporción original: Palau, 8:5, sale algo más ancha).
 
+El PNG del juego **sí lleva tabla alfa** (`tRNS` de 256 entradas, valores 0 y 255) y un `sBIT`
+`(8,8,8)`.  Un PNG en paleta *sin* `tRNS` no tiene canal alfa y el cargador de texturas no lo
+levanta: el fichero está, el hueco sale vacío.  Por eso `mkcountryflag.py` escribe el `tRNS` lleno
+de 255 (todo opaco).
+
 En 128 el marco es `(1,20)-(126,107)` y la bandera `118×80` en `(5,24)`; en 512, `(4,80)-(507,431)`
 y `472×320` en `(20,96)`.
 
@@ -40,13 +58,17 @@ y `472×320` en `(20,96)`.
 
 ```
 python tools/mkcountryflag.py --root <livecpk del mundo> --from sider/flags --ids 96,97,99
+python tools/mkcountryflag.py --root <livecpk del mundo> --game <carpeta del juego> --emblems \
+       [--from <carpeta de banderas>] [--min-team 71578]
 python tools/mkcountryflag.py --root <livecpk del mundo> --check --game <carpeta del juego> [--also <otro root>]
 ```
 
 `--from` es una carpeta con banderas planas `flag_<id>.png` (el id solo dice de qué país es; la
-herramienta dibuja el marco y las tres tallas).  `--check` no escribe: lista los países del
-`Country.bin` del mundo que no tienen textura ni en los roots ni en los CPK, y los ficheros mal
-nombrados (sin relleno de tres dígitos).
+herramienta dibuja el marco y las tres tallas).  `--emblems` recorre las selecciones de `Team.bin`
+desde `--min-team` (por defecto 71578, las nuestras) y le escribe a cada una el escudo con la
+bandera de su país; la bandera la toma de `--from` o, si no está, del CPK del juego (`--game`),
+recortando el dibujo que ya trae marco.  `--check` no escribe: lista los países sin textura, los
+ficheros mal nombrados y las selecciones sin escudo propio.
 
 Las banderas de los países nuestros viven en `sider/flags/` (fuente) y se escriben en el
 `common/render/symbol/flag/` del mundo.
@@ -71,6 +93,11 @@ Las banderas de los países nuestros viven en `sider/flags/` (fuente) y se escri
   | 118 | Cataluña | `flag_118.png` sin marco | con marco |
   | 123 | Padania | `flag_123.png` sin marco | con marco |
 
-- `mkcountryflag.py --check` sobre `_FL26MyWorld`: **222 países, 0 sin textura**.
+- `mkcountryflag.py --check` sobre `_FL26MyWorld`: **222 países, 0 sin textura** y **77 selecciones
+  nuestras, 0 sin escudo**.
 - Los 57 `flag_*.png` que había en `_FL26All` están copiados en
   `SiderAddons\backup-flags-<fecha>` y borrados: ese root se queda solo con los `e_*.png`.
+- Los escudos de relleno (`G00`) de nuestras 77 selecciones estaban en `_FL26All` y **ganaban** al
+  mundo en cuanto a prioridad de carpeta no, pero sí eran lo único que había: ahora el mundo escribe
+  su `e_<tid>_r.png` con la bandera (231 ficheros) y los de relleno de esas 1527 filas se retiraron
+  a `SiderAddons\backup-emblems-<fecha>`.
