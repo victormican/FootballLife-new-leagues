@@ -48,8 +48,9 @@ Medido sobre las banderas del juego (128, 256 y 512 comparten dibujo):
 
 El PNG del juego **sí lleva tabla alfa** (`tRNS` de 256 entradas, valores 0 y 255) y un `sBIT`
 `(8,8,8)`.  Un PNG en paleta *sin* `tRNS` no tiene canal alfa y el cargador de texturas no lo
-levanta: el fichero está, el hueco sale vacío.  Por eso `mkcountryflag.py` escribe el `tRNS` lleno
-de 255 (todo opaco).
+levanta: el fichero está, el hueco sale vacío.  La herramienta escribe ya el PNG con la misma forma
+que el del juego, `IHDR / sBIT / PLTE(256) / tRNS(256) / IDAT / IEND`, para que no haya diferencias
+que el cargador pueda notar.
 
 En 128 el marco es `(1,20)-(126,107)` y la bandera `118×80` en `(5,24)`; en 512, `(4,80)-(507,431)`
 y `472×320` en `(20,96)`.
@@ -69,6 +70,22 @@ desde `--min-team` (por defecto 71578, las nuestras) y le escribe a cada una el 
 bandera de su país; la bandera la toma de `--from` o, si no está, del CPK del juego (`--game`),
 recortando el dibujo que ya trae marco.  `--check` no escribe: lista los países sin textura, los
 ficheros mal nombrados y las selecciones sin escudo propio.
+
+### Receta, de principio a fin
+
+1. **El país existe** en `Country.bin` y su primer dword lleva el id de bandera en los bits 10-18.
+2. **La bandera del país**: una imagen plana en `sider/flags/flag_<id3>.png` (el `_ll` sale de
+   aquí; cuanto más grande el original, menos blando queda el 512) y
+   `--from sider/flags --ids <ids>` escribe `flag_%03d`, `_l`, `_ll` en el mundo.
+3. **La selección**: está en `Team.bin` con el bit nacional (`+0x53` & 0x80) y su país en `+0x46`
+   (el id de bandera, 9 bits desde el bit 2).  `--emblems --game <juego>` escribe su
+   `e_<id6>_r.png` con la bandera de ese país, quitando el marco del original si viene del CPK.
+4. **Comprobar**: `--check` debe decir 0 países sin textura y 0 selecciones sin escudo.
+5. **Arrancar** y mirar Select Team; si un equipo sale con imagen y otro no, el que falla es el que
+   no tiene `e_` en ningún root.
+
+Los ficheros van al `common/render/symbol/flag/` del mundo (`_FL26MyWorld`), que es el primer
+`cpk.root`; el juego lee por fichero, así que lo que haya ahí gana a lo de `_FL26All` y a lo del CPK.
 
 Las banderas de los países nuestros viven en `sider/flags/` (fuente) y se escriben en el
 `common/render/symbol/flag/` del mundo.

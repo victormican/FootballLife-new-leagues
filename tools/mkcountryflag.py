@@ -85,17 +85,29 @@ def tile(flag, size):
 
 
 def save_like_the_game(im, path):
-    """palette PNG with a full tRNS, the way the shipped flags are stored
+    """palette PNG with a full tRNS and an sBIT, the way the shipped flags are stored
 
-    Every flag of the game carries an alpha table (256 entries of 0 and 255).  A PNG with no tRNS
-    has no alpha channel at all, and the texture loader wants one: the flag then never appears even
-    though the file is there."""
+    The shipped flags are IHDR / sBIT / PLTE / tRNS / IDAT / IEND: 256 palette entries, an alpha
+    table of 256 (0 and 255) and the 8,8,8 significant-bits chunk.  A PNG without tRNS has no
+    alpha channel at all and the texture loader leaves the slot empty even though the file is
+    there, so this writes the same shape."""
+    import struct
+    import zlib
+
     from PIL import Image
 
-    im = im.quantize(colors=255, dither=Image.NONE)
+    im = im.quantize(colors=256, dither=Image.NONE)
     im.save(
         path, optimize=True, transparency=bytes([255]) * (len(im.getpalette()) // 3)
     )
+    raw = open(path, "rb").read()
+    head, rest = raw[:8], raw[8:]
+    ln = struct.unpack(">I", rest[:4])[0]
+    ihdr = rest[: 12 + ln]
+    bits = b"\x08\x08\x08"
+    chunk = struct.pack(">I", len(bits)) + b"sBIT" + bits
+    chunk += struct.pack(">I", zlib.crc32(b"sBIT" + bits) & 0xFFFFFFFF)
+    open(path, "wb").write(head + ihdr + chunk + rest[12 + ln :])
 
 
 def load_source(path, framed=False):

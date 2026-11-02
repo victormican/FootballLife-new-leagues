@@ -215,8 +215,22 @@ league 196 cid=91 region=25 country=200 conf=7 slot=76 tier=1 promote=0 demote=0
 fl26clubs: live -- 8 slots served from our own regulations: 80<-76 72<-178 75<-181 77<-182 76<-196 70<-256 69<-364 73<-362
 ```
 
-El 76 es de los que el módulo sabe servir (la lista es `0..5, 69, 72, 73, 75, 76, 77, 80`).  Las
-demás ligas con `slot=-1` (Selecciones No FIFA, Copa Colombia, Italia Serie D…) caen en slots
-(182, 206, 207, 234-243) que esa lista **no** cubre, así que si alguna sale con equipos de más, el
-arreglo es el mismo patrón pero hay que ampliar la lista del DLL o mover la liga a 76/77/80.
+El 76 es de los que el módulo sabe servir (`SERVED` en `sider/experimental/fl26clubs.lua`:
+`0, 1, 2, 3, 69, 70, 72, 73, 75, 76, 77, 80`).  De ellos, nuestro mundo ya usa 69, 70, 72, 73, 75,
+76, 77 y 80; libres solo quedan 0-3, que son las regiones de selecciones del juego (Europa, África,
+Norteamérica, Sudamérica): **no hay un sexto slot servible**.
+
+## 2026-11-02: «Selecciones No FIFA» no puede servirse en su slot 182
+
+La liga `Selecciones No FIFA` (cid 255, 8 selecciones) pide slot libre y `fl26comptab` le da el
+**182**.  Probado a declararlo (`slot=182` en el world file y `[182] = true` en `SERVED`): el
+módulo contesta `182<-255`, pero el juego **se cae** — 2 de 3 arranques muertos (16 y 24 s,
+`c0000409` en `FL_2026+11cd2e4` y `c0000005` en otras direcciones), frente a **3 de 3 vivos** con
+el `slot=-1` de antes.  Ese slot no es como los 69-75: el exe tiene algo propio ahí y sustituirle
+la lista lo rompe.
+
+Se dejó revertido (`slot=-1`, `SERVED` sin 182).  Si algún día hay que darle grupo propio, la vía es
+la de Oceania pero con un slot **servible** libre, y ahora mismo no queda ninguno: habría que
+ampliar `SERVED` con un slot todavía sin dueño y comprobar cada uno con arranques, o mover a la liga
+a 69/70/72/73/75/76/77/80 liberando el que ocupe otra.
 
