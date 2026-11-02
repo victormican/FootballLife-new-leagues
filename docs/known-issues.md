@@ -1206,3 +1206,10 @@ calendar.
 - 2026-09-15: a saved season lost every club past the shipped count. Cause: the game
   serialises from a second copy of the tables that had kept the shipped sizes. Fixed by
   growing that copy too (`mlcopy` in the set name).
+- 2026-11-02: launching `FL_2026.exe` on its own started crashing at 12-16 s with
+  `c0000005` at a different offset every time (0x118074f5, 0xe121c55, 0x13d105f5…), in **both**
+  installations, with and without Sider and with a fresh save folder — a pure environment
+  signature, nothing to do with the world. Launching the mod's own **`FL 2026 start.exe`** instead
+  ran 3 boots out of 3 (55 s each). When the game dies in the first twenty seconds, check the
+  launcher before touching the world.
+
