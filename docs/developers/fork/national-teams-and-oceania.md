@@ -191,3 +191,32 @@ filled by the game itself and no DLL work is needed.
 Eleven is odd, so one side rests each round (eleven rounds, `legs=1`). If the game refuses an odd
 field, the next step is ten (the same tool with a team left out) or a twelve-entry field with a
 bye.
+
+## 2026-11-02: por qué Oceania enseñaba «un montón»
+
+Con las doce selecciones ya en el mundo, Select Team seguía enseñando en el grupo **Oceania** una
+lista larga en vez de esas doce.  La lista de ese panel no sale de la competición, sale del
+**slot**: `fl26clubs.dll` sustituye los dos lectores (`0x1414d62c0` cuenta, `0x1414d6290` lee) y
+solo contesta por los slots que declara el world file.
+
+La liga `Oceania` (cid 91, regulación 196) iba con `slot=-1`, así que `fl26comptab` le daba un slot
+libre en caliente — el **76** — y `fl26clubs`, que construye su tabla leyendo el world file, no
+tenía nada que servir ahí: el juego ponía su propia lista de ese slot y salían decenas de equipos.
+
+Arreglo: poner el slot en el world file, que es lo que lee el módulo.
+
+```
+league 196 cid=91 region=25 country=200 conf=7 slot=76 tier=1 promote=0 demote=0 clubs=12 legs=1 kickoff=166 name=Oceania
+```
+
+`sider.log` lo confirma al arrancar:
+
+```
+fl26clubs: live -- 8 slots served from our own regulations: 80<-76 72<-178 75<-181 77<-182 76<-196 70<-256 69<-364 73<-362
+```
+
+El 76 es de los que el módulo sabe servir (la lista es `0..5, 69, 72, 73, 75, 76, 77, 80`).  Las
+demás ligas con `slot=-1` (Selecciones No FIFA, Copa Colombia, Italia Serie D…) caen en slots
+(182, 206, 207, 234-243) que esa lista **no** cubre, así que si alguna sale con equipos de más, el
+arreglo es el mismo patrón pero hay que ampliar la lista del DLL o mover la liga a 76/77/80.
+
