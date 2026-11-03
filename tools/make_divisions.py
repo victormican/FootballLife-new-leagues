@@ -38,8 +38,8 @@ SPEC = [
     ("Torneo Federal Brasil", 146, 4, 3, 30, "FL_BRA_TF"),
     ("Segunda División Bolivia", 145, 4, 2, 48, "FL_BOL_SD"),
 ]
-DELETE_REGS = [364, 362, 363, 250, 256]
-KEEP_REG, KEEP_TAKE = 256, 0
+DELETE_REGS = [317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 336, 337, 338]
+KEEP_REG, KEEP_TAKE = 317, 0
 REGION = {144: 29, 146: 30, 145: 232}
 
 
