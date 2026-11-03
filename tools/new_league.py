@@ -268,10 +268,41 @@ LEAGUES = [
             "Matanzas",
         ],
     },
+    {
+        "cid": 249,
+        "reg": 8467,
+        "region": 24,
+        "slot": 244,
+        "country": 13,
+        "conf": 3,
+        "name": "J2 League",
+        "code": "FL_13_D2",
+        "kickoff": 18,
+        "tier": 2,
+        "clubs": [
+            "Ventforet Kofu",
+            "Montedio Yamagata",
+            "Oita Trinita",
+            "Tokushima Vortis",
+            "Renofa Yamaguchi",
+            "Roasso Kumamoto",
+            "Kagoshima United",
+            "Blaublitz Akita",
+            "Iwate Grulla Morioka",
+            "Thespa Gunma",
+            "Tochigi SC",
+            "Zweigen Kanazawa",
+            "Ehime FC",
+            "Fujieda MYFC",
+            "Iwaki FC",
+            "Kataller Toyama",
+        ],
+    },
 ]
 
 # Leagues that already exist but are full of placeholders: their clubs are renamed and the
-# surplus entries go, so the competition keeps its cid, region and slot.
+# surplus entries go, so the competition keeps its cid, region and slot. "countries" gives one
+# flag per club for a bucket that mixes countries, and no "name" leaves the shipped name alone.
 FILLS = [
     {
         "cid": 168,
@@ -292,6 +323,74 @@ FILLS = [
             "US Cagou",
             "JS Baco",
         ],
+    },
+    {
+        "cid": 221,
+        "reg": 250,
+        "clubs": [
+            "Defence Force FC",
+            "Central FC",
+            "W Connection",
+            "San Juan Jabloteh",
+            "Police FC TT",
+            "Morvant Caledonia United",
+            "Point Fortin Civic",
+            "Club Sando",
+            "Cunupia FC",
+            "La Horquetta Rangers",
+            "Bayamon FC",
+            "Metropolitan FA",
+            "Academia Quintana",
+            "Puerto Rico Sol",
+            "Dandy Town Hornets",
+            "PHC Zebras",
+            "Devonshire Cougars",
+            "Robin Hood FC",
+            "Somerset Trojans",
+            "Fruta Conquerors",
+            "Guyana Defence Force",
+            "Alpha United",
+            "Western Tigers",
+            "Buxton United",
+            "Weymouth Wales",
+            "Paradise FC",
+            "Brittons Hill",
+            "UWI Blackbirds",
+            "Liberta Blackhawks",
+            "Parham FC",
+            "SAP FC",
+            "Hoppers FC",
+            "Hard Rock FC",
+            "St Johns Sports",
+            "Fontenoy United",
+            "Village Superstars",
+            "Newtown United",
+            "Cayon FC",
+            "Dakota Aruba",
+            "RCA Aruba",
+            "Britannia FC",
+            "Bears FC",
+            "Western Warriors",
+            "System 3 FC",
+            "Avenues United",
+            "Hope International",
+            "Dublanc FC",
+            "Sagicor South East",
+        ],
+        # Trinidad y Tobago, Puerto Rico, Bermudas, Guyana, Barbados, Antigua, Granada,
+        # San Cristobal y Nieves, Aruba, Bahamas, San Vicente, Dominica
+        "countries": [133] * 10
+        + [129] * 4
+        + [109] * 5
+        + [159] * 5
+        + [107] * 4
+        + [104] * 4
+        + [117] * 3
+        + [130] * 3
+        + [105] * 3
+        + [106] * 2
+        + [132] * 3
+        + [114] * 2,
     },
 ]
 
@@ -475,7 +574,7 @@ def main():
             raise SystemExit("competition %d has no entries" % spec["cid"])
         first = int.from_bytes(ents[rows_in[0][1] : rows_in[0][1] + 4], "little")
         if name(off()[first]) == spec["clubs"][0]:
-            print("%s: ya tiene sus clubes" % spec["name"])
+            print("%s: ya tiene sus clubes" % spec.get("name", "liga"))
             continue
         if len(rows_in) < len(spec["clubs"]):
             raise SystemExit(
@@ -483,12 +582,14 @@ def main():
                 % (spec["cid"], len(rows_in), len(spec["clubs"]))
             )
         off3 = off()
-        for (_, k), club in zip(rows_in, spec["clubs"]):
+        flags = spec.get("countries") or [spec.get("country")] * len(spec["clubs"])
+        for (_, k), club, flag in zip(rows_in, spec["clubs"], flags):
             tid = int.from_bytes(ents[k : k + 4], "little")
             o = off3[tid]
             row = bytearray(teams[o : o + T_REC])
             put_team_name(row, club)
-            set_country(row, spec["country"])
+            if flag is not None:
+                set_country(row, flag)
             teams[o : o + T_REC] = row
         # the entries the league no longer uses go; the rest keep their order
         keep_teams = {
@@ -515,15 +616,17 @@ def main():
         for i in range(0, len(regs), M.REG):
             if regs[i + M.R_CID] == spec["cid"]:
                 regs[i + M.R_TEAMS] = (regs[i + M.R_TEAMS] & 0xC0) | (n_fill & 0x3F)
-                M.put_names(regs, i, spec["name"])
+                if spec.get("name"):
+                    M.put_names(regs, i, spec["name"])
                 break
-        for i in range(0, len(comp), M.COMP):
-            if comp[i + M.CID_OFF] == spec["cid"]:
-                M.put(comp, i + 0x14, spec["name"], 16)
-                break
+        if spec.get("name"):
+            for i in range(0, len(comp), M.COMP):
+                if comp[i + M.CID_OFF] == spec["cid"]:
+                    M.put(comp, i + 0x14, spec["name"], 16)
+                    break
         print(
             "%s: cid %d, %d clubes (de %d filas)"
-            % (spec["name"], spec["cid"], n_fill, len(rows_in))
+            % (spec.get("name", "liga"), spec["cid"], n_fill, len(rows_in))
         )
 
     if dry:
@@ -565,11 +668,16 @@ def main():
                     for k in range(0, len(ents), M.ENT)
                     if ents[k + M.E_CID] == spec["cid"]
                 )
-                cut = next(
-                    (i for i, p in enumerate(w) if p.startswith("name=")), len(w)
-                )
-                w = [p for p in w[:cut] if not p.startswith("clubs=")]
-                line = " ".join(w + ["clubs=%d" % n, "name=%s" % spec["name"]])
+                if spec.get("name"):
+                    cut = next(
+                        (i for i, p in enumerate(w) if p.startswith("name=")), len(w)
+                    )
+                    w = [p for p in w[:cut] if not p.startswith("clubs=")]
+                    line = " ".join(w + ["clubs=%d" % n, "name=%s" % spec["name"]])
+                else:
+                    line = " ".join(
+                        "clubs=%d" % n if p.startswith("clubs=") else p for p in w
+                    )
         out.append(line)
     for spec in pending:
         last += 1

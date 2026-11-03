@@ -124,11 +124,18 @@ lista `LEAGUES` lleva una entrada por país y **se salta las que ya existen** (s
 | Canadá (110) | 246 | 8464 | 113 | 241 |
 | México 2ª (124) | 247 | 8465 | 80 | 242 |
 | Cuba (113) | 248 | 8466 | 114 | 243 |
+| Japón 2ª (13) | 249 | 8467 | 24 | 244 |
 
 Y una liga que **ya existía llena de placeholders** se rellena en el sitio (`FILLS`), sin gastar
 `cid` ni slot: «Liga Pro OFC» (Nueva Caledonia, cid 168, reg 198, slot 180) tenía 24 clubes
 `Liga Pro OFC 01..24`; pasa a llamarse **Super Ligue** con 12 clubes reales y sus otras 12
 entradas se retiran (sus filas quedan libres), sincronizando regulación y mundo.
+
+El mismo mecanismo rellena **«Otros Concacaf»** (cid 221, reg 250, media docena de banderas
+mexicanas falsas): sus 48 plazas pasan a clubes reales de los países de CONCACAF que no tienen
+liga —Trinidad y Tobago (10), Bermudas (5), Guyana (5), Puerto Rico (4), Barbados (4), Antigua (4),
+Granada (3), San Cristóbal y Nieves (3), Aruba (3), San Vicente (3), Bahamas (2) y Dominica (2)—
+con `countries` dando una bandera por club y sin tocar el nombre de la competición.
 
 Los diez clubes de cada una salen de filas que ninguna competición usa (`Generic League NN Club
 1)`, renombradas y con la bandera de su país. Curazao, Surinam, Haití y los dos Congos no tenían
