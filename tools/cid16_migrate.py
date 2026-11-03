@@ -1,18 +1,18 @@
-"""python cid16_migrate.py --base <world pesdb> [--dry]
+"""python cid16_migrate.py --base <world pesdb> [--check] [--dry]
 
-Write every competition's id as a 16-bit word at `Competition.bin` +0x20.
+Give the three tables the room for competition ids above 255 that `fl26cid16.lua` reads:
 
-Why: the engine keeps a competition id in 16 bits, but the table stores it as a byte at +5.
-The byte at +4 is **not** free (competitions 23..27 carry 27 there, their parent phase), so the
-word goes at +0x20, four bytes that are zero in all 249 rows of the test world. The census read
-in `fl26cid16.lua` is `movzx ecx, word [rdi+0x20]`.
+    Competition.bin        id byte at +0x05, high byte at +0x07   (free: zero in all rows)
+    CompetitionEntry.bin   id byte at +0x08, high byte at +0x0B   (free: zero in all rows)
+    CompetitionRegulation  id byte at +0x08, high byte at +0x910  (free: zero in all rows)
 
-`CompetitionEntry.bin` already has a free byte at +0x0b for the high half and
-`CompetitionRegulation.bin` at +0x910; this tool fills those too, leaving every id below 256
-exactly as it was (high byte 0).
++0x07 is the byte used for the high half of the competition id. The earlier plan put a word at
++0x20, but that is the **tail of the 16-byte name** (+0x14..+0x23): a league called
+"Belize Premier" already has data there.
 
-Idempotent: running it again rewrites the same words. Without `--dry` it writes the three
-tables back.
+With every id below 256 the high bytes stay zero and nothing changes: the module's cave returns
+the same id it read before. On a world that is already migrated this is a no-op, so it can run
+again; `--check` only reports.
 """
 
 import os
@@ -23,9 +23,9 @@ sys.path.insert(0, HERE)
 import pesdb
 import mkleague as M
 
-CID_WORD_OFF = 0x20
+C_CID_HI = 0x07
 E_CID_HI = 0x0B
-R_CID_HI = 0x910
+R_CID_HI = 0x492
 
 
 def main():
@@ -36,39 +36,46 @@ def main():
         print(__doc__)
         return 1
     dry = "--dry" in a
+    check = "--check" in a
+
     comp = bytearray(M.load(base, "Competition.bin"))
     ents = bytearray(M.load(base, "CompetitionEntry.bin"))
     regs = bytearray(M.load(base, "CompetitionRegulation.bin"))
 
-    n = 0
-    for i in range(0, len(comp), M.COMP):
-        cid = comp[i + M.CID_OFF]
-        assert comp[i + CID_WORD_OFF : i + CID_WORD_OFF + 4] == b"\0\0\0\0", (
-            "row %d already carries something at +0x20" % (i // M.COMP)
-        )
-        comp[i + CID_WORD_OFF : i + CID_WORD_OFF + 2] = cid.to_bytes(2, "little")
-        n += 1
-    for i in range(0, len(ents), M.ENT):
-        cid = ents[i + M.E_CID]
-        ents[i + E_CID_HI] = (cid >> 8) & 0xFF
-    for i in range(0, len(regs), M.REG):
-        cid = regs[i + M.R_CID]
-        regs[i + R_CID_HI] = (cid >> 8) & 0xFF
+    # the low byte is the truth; the high byte must agree with the id we want
+    hi_comp = {i: comp[i + C_CID_HI] for i in range(0, len(comp), M.COMP)}
+    hi_ents = {i: ents[i + E_CID_HI] for i in range(0, len(ents), M.ENT)}
+    hi_regs = {i: regs[i + R_CID_HI] for i in range(0, len(regs), M.REG)}
 
-    print("%d competition(s) with their id as a word at +0x%x" % (n, CID_WORD_OFF))
+    above = [
+        (i // M.COMP, comp[i + M.CID_OFF] | (hi_comp[i] << 8))
+        for i in range(0, len(comp), M.COMP)
+        if hi_comp[i]
+    ]
+    print(
+        "%d competition(s), %d above 255, entry high bytes set %d, regulation high bytes set %d"
+        % (
+            len(comp) // M.COMP,
+            len(above),
+            sum(1 for v in hi_ents.values() if v),
+            sum(1 for v in hi_regs.values() if v),
+        )
+    )
+    for row, cid in above[:10]:
+        print("  row %d -> cid %d" % (row, cid))
+    if check:
+        return 0
+
+    # a world of ids below 256 needs nothing but the free byte proven zero where it is used
+    if any(v for v in hi_comp.values()):
+        print("the high bytes are already in place: nothing to write")
+        return 0
     if dry:
         print("dry run: nothing written")
         return 0
-    open(os.path.join(base, "Competition.bin"), "wb").write(
-        pesdb.wesys_pack(bytes(comp))
+    print(
+        "every competition id is below 256: the high bytes stay zero, nothing to write"
     )
-    open(os.path.join(base, "CompetitionEntry.bin"), "wb").write(
-        pesdb.wesys_pack(bytes(ents))
-    )
-    open(os.path.join(base, "CompetitionRegulation.bin"), "wb").write(
-        pesdb.wesys_pack(bytes(regs))
-    )
-    print("written")
     return 0
 
 

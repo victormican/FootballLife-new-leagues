@@ -102,8 +102,9 @@ clubes coincide con las entradas: es la puerta que detecta una copa a medio hace
 
 El `cid` de 255 no es del ejecutable (en memoria es un word y el array tiene 600 registros): es de
 las tres tablas, que lo guardan en un byte, y de la clave de las entradas
-(`id << 8 | plaza-1`). El parche a 16 bits está mapeado en
-[docs/research/competition-id-16-bit.md](../../research/competition-id-16-bit.md) pero no hecho.
+(`id << 8 | plaza-1`). El parche a 16 bits está **hecho para copas** (ver
+[cids-16-bit.md](cids-16-bit.md)): una copa nueva puede usar `cid` 256..1023 y sale en el menú; las
+ligas siguen en 255 porque el censo de Select Team indexa con un byte.
 
 ## «Una copa para cada liga»: el presupuesto
 

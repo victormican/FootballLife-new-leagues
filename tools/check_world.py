@@ -161,7 +161,7 @@ def main():
     # ---- competitions
     cids = {}
     for i in range(0, len(comps), M.COMP):
-        cid = comps[i + M.CID_OFF]
+        cid = M.comp_cid(comps, i)
         if cid in cids:
             err("competition id %d appears twice" % cid)
         cids[cid] = (
@@ -169,8 +169,8 @@ def main():
             .split(b"\0")[0]
             .decode("ascii", "replace")
         )
-    if len(cids) > 255:
-        err("%d competitions: over the 255 ids a byte holds" % len(cids))
+    if len(cids) > 1023:
+        err("%d competitions: over the 1023 ids the entry key holds" % len(cids))
 
     # ---- regulations and entries
     rids, rcid, rteams = {}, {}, {}
@@ -178,7 +178,7 @@ def main():
         rid = int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little")
         if rid in rids:
             err("regulation id %d appears twice" % rid)
-        cid = regs[i + M.R_CID]
+        cid = regs[i + M.R_CID] | (regs[i + M.R_CID_HI] << 8)
         rids[rid] = i
         rcid[rid] = cid
         rteams[rid] = regs[i + M.R_TEAMS] & 0x3F
@@ -191,7 +191,10 @@ def main():
     ent_n, ent_order = {}, {}
     for i in range(0, len(ents), M.ENT):
         tid = u32(ents, i)
-        cid, order = ents[i + M.E_CID], ents[i + M.E_ORDER]
+        cid, order = (
+            ents[i + M.E_CID] | (ents[i + M.E_CID_HI] << 8),
+            ents[i + M.E_ORDER],
+        )
         if tid and tid not in tids:
             err("entry: team %d is not in Team.bin" % tid)
         if cid not in cids:
@@ -362,7 +365,7 @@ def main():
     for rid, kv in leagues.items():
         cid = rcid.get(rid)
         for i in range(0, len(ents), M.ENT):
-            if ents[i + M.E_CID] != cid:
+            if ents[i + M.E_CID] | (ents[i + M.E_CID_HI] << 8) != cid:
                 continue
             tid = u32(ents, i)
             # a club's pool nibble lives in the team record; the world file's `others` groups are

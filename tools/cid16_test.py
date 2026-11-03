@@ -21,9 +21,9 @@ sys.path.insert(0, HERE)
 import pesdb
 import mkleague as M
 
-CID_WORD_OFF = 0x20
-E_CID_HI = 0x0B
-R_CID_HI = 0x910
+CID_OFF = M.C_CID_HI
+E_CID_HI = M.E_CID_HI
+R_CID_HI = M.R_CID_HI
 
 
 def main():
@@ -41,11 +41,11 @@ def main():
     ents = bytearray(M.load(base, "CompetitionEntry.bin"))
     regs = bytearray(M.load(base, "CompetitionRegulation.bin"))
 
-    # the row we move: by the word if it is already above 255, else by the byte
+    # the row we move: by the 16-bit id (low + high byte), else by the low byte
     row = None
     for i in range(0, len(comp), M.COMP):
-        word = int.from_bytes(comp[i + CID_WORD_OFF : i + CID_WORD_OFF + 2], "little")
-        if word == src or (word == 0 and comp[i + M.CID_OFF] == src):
+        cid = M.comp_cid(comp, i)
+        if cid == src or (comp[i + CID_OFF] == 0 and comp[i + M.CID_OFF] == src):
             row = i
             break
     if row is None:
@@ -60,16 +60,18 @@ def main():
         % (row // M.COMP, src, target, " (revert)" if revert else "")
     )
 
-    comp[row + CID_WORD_OFF : row + CID_WORD_OFF + 2] = target.to_bytes(2, "little")
     comp[row + M.CID_OFF] = target & 0xFF
+    comp[row + CID_OFF] = (target >> 8) & 0xFF
     n = 0
     for i in range(0, len(ents), M.ENT):
-        if ents[i + M.E_CID] == (src & 0xFF) and (target > 255 or src > 255):
+        if (ents[i + M.E_CID] | (ents[i + E_CID_HI] << 8)) == src or (
+            ents[i + E_CID_HI] == 0 and ents[i + M.E_CID] == src
+        ):
             ents[i + M.E_CID] = target & 0xFF
             ents[i + E_CID_HI] = (target >> 8) & 0xFF
             n += 1
     for i in range(0, len(regs), M.REG):
-        if regs[i + M.R_CID] == (src & 0xFF):
+        if (regs[i + M.R_CID] | (regs[i + R_CID_HI] << 8)) == src:
             regs[i + M.R_CID] = target & 0xFF
             regs[i + R_CID_HI] = (target >> 8) & 0xFF
     print("entries moved: %d" % n)

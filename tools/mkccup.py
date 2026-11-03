@@ -45,13 +45,14 @@ knockout and dates both, reading the `ccup` lines this prints for modules\fl26wo
 
 --dry prints the plan and writes nothing.
 """
+
 import os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import mkleague as M
 
-R_BACK, R_GROUP, R_GROUPS = 0x06, 0x0a, 0x10
+R_BACK, R_GROUP, R_GROUPS = 0x06, 0x0A, 0x10
 REPLICA_STEP, NO_GROUP = 1024, 255
 LIB_CID, LIB_GROUPS, UEL_KO = 5, 9, 6
 CONF_MASK = 7
@@ -62,17 +63,20 @@ LIKE_SIZES = set(range(2, 17)) | {18, 20, 24, 28, 30, 32, 44}
 
 
 def rid(r):
-    return int.from_bytes(r[M.R_ID:M.R_ID + 2], "little")
+    return int.from_bytes(r[M.R_ID : M.R_ID + 2], "little")
 
 
 def rows(b, size):
-    return [bytearray(b[i:i + size]) for i in range(0, len(b), size)]
+    return [bytearray(b[i : i + size]) for i in range(0, len(b), size)]
 
 
 def parse(spec):
     bits = spec.split("|")
     if len(bits) not in (7, 8, 9, 10):
-        raise SystemExit("--cup wants NAME|CODE|cid|reg|ko|groups|entry[|conf[|region[|like]]], got %r" % spec)
+        raise SystemExit(
+            "--cup wants NAME|CODE|cid|reg|ko|groups|entry[|conf[|region[|like]]], got %r"
+            % spec
+        )
     name, code, cid, reg, ko, groups, entry = bits[:7]
     conf = int(bits[7]) if len(bits) >= 8 and bits[7] else None
     region = int(bits[8]) if len(bits) >= 9 and bits[8] else None
@@ -81,8 +85,18 @@ def parse(spec):
     for e in entry.split(","):
         r, _, p = e.partition(":")
         ent.append((int(r), int(p)))
-    c = {"name": name, "code": code, "cid": int(cid), "reg": int(reg), "ko": int(ko),
-         "groups": int(groups), "entry": ent, "conf": conf, "region": region, "like": like}
+    c = {
+        "name": name,
+        "code": code,
+        "cid": int(cid),
+        "reg": int(reg),
+        "ko": int(ko),
+        "groups": int(groups),
+        "entry": ent,
+        "conf": conf,
+        "region": region,
+        "like": like,
+    }
     if conf is not None and not 2 <= conf <= 7:
         raise SystemExit("%s: confederation %d -- use 2..7" % (name, conf))
     if not 0 <= c["groups"] <= 8:
@@ -92,18 +106,26 @@ def parse(spec):
             raise SystemExit("%s: a straight knockout (groups 0) wants reg = ko" % name)
         if like is not None:
             if len(ent) not in LIKE_SIZES:
-                raise SystemExit("%s: a single-match knockout of %d clubs -- use %s"
-                                 % (name, len(ent), ", ".join(map(str, sorted(LIKE_SIZES)))))
+                raise SystemExit(
+                    "%s: a single-match knockout of %d clubs -- use %s"
+                    % (name, len(ent), ", ".join(map(str, sorted(LIKE_SIZES))))
+                )
         elif len(ent) not in (2, 4, 8, 16, 32):
-            raise SystemExit("%s: a knockout of %d clubs -- use 2, 4, 8, 16 or 32" % (name, len(ent)))
+            raise SystemExit(
+                "%s: a knockout of %d clubs -- use 2, 4, 8, 16 or 32" % (name, len(ent))
+            )
     elif like is not None:
         raise SystemExit("%s: like= is for a straight knockout (groups 0)" % name)
     elif len(ent) != 4 * c["groups"]:
-        raise SystemExit("%s: %d groups of four want %d entries, not %d"
-                         % (name, c["groups"], 4 * c["groups"], len(ent)))
+        raise SystemExit(
+            "%s: %d groups of four want %d entries, not %d"
+            % (name, c["groups"], 4 * c["groups"], len(ent))
+        )
     for k in ("reg", "ko"):
         if not 175 < c[k] < REPLICA_STEP:
-            raise SystemExit("%s: %s %d -- use a free id between 176 and 1023" % (name, k, c[k]))
+            raise SystemExit(
+                "%s: %s %d -- use a free id between 176 and 1023" % (name, k, c[k])
+            )
     return c
 
 
@@ -115,46 +137,63 @@ def main():
     if not base or not cups or (not out and "--dry" not in a):
         print(__doc__)
         return 1
-    comp, regs, ents = (M.load(base, n) for n in
-                        ("Competition.bin", "CompetitionRegulation.bin", "CompetitionEntry.bin"))
+    comp, regs, ents = (
+        M.load(base, n)
+        for n in (
+            "Competition.bin",
+            "CompetitionRegulation.bin",
+            "CompetitionEntry.bin",
+        )
+    )
     C, R, E = rows(comp, M.COMP), rows(regs, M.REG), rows(ents, M.ENT)
     used_cid = {c[M.CID_OFF] for c in C}
     used_reg = {rid(r) for r in R}
 
-    lib = [r for r in R if r[M.R_CID] == LIB_CID and rid(r) & 0x3ff == LIB_GROUPS]
+    lib = [r for r in R if r[M.R_CID] == LIB_CID and rid(r) & 0x3FF == LIB_GROUPS]
     master = [r for r in lib if r[R_GROUP] == NO_GROUP]
     reps = sorted((r for r in lib if r[R_GROUP] != NO_GROUP), key=lambda r: r[R_GROUP])
     ko_src = [r for r in R if rid(r) == UEL_KO]
     lib_comp = [c for c in C if c[M.CID_OFF] == LIB_CID]
     if len(master) != 1 or len(reps) < 8 or len(ko_src) != 1 or len(lib_comp) != 1:
-        raise SystemExit("this world has no shipped Libertadores group stage (reg 9, 8 groups) "
-                         "or Europa League knockout (reg 6) to copy")
+        raise SystemExit(
+            "this world has no shipped Libertadores group stage (reg 9, 8 groups) "
+            "or Europa League knockout (reg 6) to copy"
+        )
 
     # a league's clubs in its own entry order, for the entries written here
     cid_of_reg = {rid(r): r[M.R_CID] for r in R}
     listed = {}
     for e in E:
         listed.setdefault(e[M.E_CID], []).append(
-            (e[M.E_ORDER], int.from_bytes(e[M.E_TEAM:M.E_TEAM + 4], "little")))
-    eid = max(int.from_bytes(e[M.E_EID:M.E_EID + 4], "little") for e in E)
+            (e[M.E_ORDER], int.from_bytes(e[M.E_TEAM : M.E_TEAM + 4], "little"))
+        )
+    eid = max(int.from_bytes(e[M.E_EID : M.E_EID + 4], "little") for e in E)
 
     lines = []
     for cup in cups:
-        ids = sorted({cup["reg"], cup["ko"]}) + [cup["reg"] + (g + 1) * REPLICA_STEP for g in range(cup["groups"])]
+        ids = sorted({cup["reg"], cup["ko"]}) + [
+            cup["reg"] + (g + 1) * REPLICA_STEP for g in range(cup["groups"])
+        ]
         taken = [i for i in ids if i in used_reg]
         if cup["cid"] in used_cid or taken:
-            raise SystemExit("%s: competition %d or regulation(s) %s are taken in this world"
-                             % (cup["name"], cup["cid"], taken or ""))
+            raise SystemExit(
+                "%s: competition %d or regulation(s) %s are taken in this world"
+                % (cup["name"], cup["cid"], taken or "")
+            )
         for r, _p in cup["entry"]:
-            if r != 0 and r not in cid_of_reg:      # 0:<team id>: an invited club, not a place
-                raise SystemExit("%s: no league regulation %d in this world" % (cup["name"], r))
+            if (
+                r != 0 and r not in cid_of_reg
+            ):  # 0:<team id>: an invited club, not a place
+                raise SystemExit(
+                    "%s: no league regulation %d in this world" % (cup["name"], r)
+                )
         used_cid.add(cup["cid"])
         used_reg.update(ids)
-        cid_of_reg.update((i, cup["cid"]) for i in ids)     # a later super cup names these
+        cid_of_reg.update((i, cup["cid"]) for i in ids)  # a later super cup names these
         n = 4 * cup["groups"]
 
         c = bytearray(lib_comp[0])
-        c[M.CID_OFF:M.CID_OFF + 2] = cup["cid"].to_bytes(2, "little")
+        M.set_comp_cid(c, 0, cup["cid"])
         M.put(c, M.CODE_OFF, cup["code"], M.COMP - M.CODE_OFF)
         if cup["conf"] is not None:
             c[M.FLAG_OFF] = (c[M.FLAG_OFF] & ~CONF_MASK) | cup["conf"]
@@ -163,32 +202,37 @@ def main():
         C.append(c)
 
         new = []
-        for r in (master + reps[:cup["groups"]] if cup["groups"] else []):
+        for r in master + reps[: cup["groups"]] if cup["groups"] else []:
             g = bytearray(r)
-            g[M.R_BELOW:M.R_BELOW + 2] = bytes(2)
-            g[M.R_CID:M.R_CID + 2] = cup["cid"].to_bytes(2, "little")
+            g[M.R_BELOW : M.R_BELOW + 2] = bytes(2)
+            g[M.R_CID] = cup["cid"] & 0xFF
+            g[M.R_CID_HI] = (cup["cid"] >> 8) & 0xFF
             grp = g[R_GROUP]
-            g[M.R_ID:M.R_ID + 2] = (cup["reg"] if grp == NO_GROUP
-                                    else cup["reg"] + (grp + 1) * REPLICA_STEP).to_bytes(2, "little")
+            g[M.R_ID : M.R_ID + 2] = (
+                cup["reg"] if grp == NO_GROUP else cup["reg"] + (grp + 1) * REPLICA_STEP
+            ).to_bytes(2, "little")
             if grp == NO_GROUP:
-                g[M.R_TEAMS] = (g[M.R_TEAMS] & ~0x3f) | n
-                g[R_GROUPS] = (g[R_GROUPS] & ~0x1f) | cup["groups"]
+                g[M.R_TEAMS] = (g[M.R_TEAMS] & ~0x3F) | n
+                g[R_GROUPS] = (g[R_GROUPS] & ~0x1F) | cup["groups"]
             else:
-                g[R_BACK:R_BACK + 2] = cup["reg"].to_bytes(2, "little")
+                g[R_BACK : R_BACK + 2] = cup["reg"].to_bytes(2, "little")
             new.append(g)
-        if cup["like"] is not None:              # a shipped domestic cup's row: one match a round
+        if cup["like"] is not None:  # a shipped domestic cup's row: one match a round
             src = [r for r in R if rid(r) == cup["like"]]
             if len(src) != 1 or src[0][R_TYPE] != KNOCKOUT:
-                raise SystemExit("%s: regulation %d is not a knockout of this world to copy"
-                                 % (cup["name"], cup["like"]))
+                raise SystemExit(
+                    "%s: regulation %d is not a knockout of this world to copy"
+                    % (cup["name"], cup["like"])
+                )
             k = bytearray(src[0])
         else:
             k = bytearray(ko_src[0])
-        k[M.R_BELOW:M.R_BELOW + 2] = bytes(2)
-        k[M.R_ID:M.R_ID + 2] = cup["ko"].to_bytes(2, "little")
-        k[M.R_CID:M.R_CID + 2] = cup["cid"].to_bytes(2, "little")
+        k[M.R_BELOW : M.R_BELOW + 2] = bytes(2)
+        k[M.R_ID : M.R_ID + 2] = cup["ko"].to_bytes(2, "little")
+        k[M.R_CID] = cup["cid"] & 0xFF
+        k[M.R_CID_HI] = (cup["cid"] >> 8) & 0xFF
         nko = 2 * cup["groups"] if cup["groups"] else len(cup["entry"])
-        k[M.R_TEAMS] = (k[M.R_TEAMS] & ~0x3f) | nko
+        k[M.R_TEAMS] = (k[M.R_TEAMS] & ~0x3F) | nko
         new.append(k)
         for g in new:
             M.put_names(g, 0, cup["name"])
@@ -196,36 +240,64 @@ def main():
 
         clubs = []
         for r, p in cup["entry"]:
-            if r == 0:                  # an invited club, by team id
+            if r == 0:  # an invited club, by team id
                 if p not in clubs:
                     clubs.append(p)
                 continue
-            if p < 1:                   # a cup's winner: nobody to write before it is played
+            if p < 1:  # a cup's winner: nobody to write before it is played
                 continue
             lst = [t for _o, t in sorted(listed.get(cid_of_reg[r], []))]
-            pick = [t for t in lst[p - 1:] + lst if t not in clubs]
+            pick = [t for t in lst[p - 1 :] + lst if t not in clubs]
             if pick:
                 clubs.append(pick[0])
         for i, t in enumerate(clubs):
             e = bytearray(M.ENT)
-            e[M.E_TEAM:M.E_TEAM + 4] = t.to_bytes(4, "little")
+            e[M.E_TEAM : M.E_TEAM + 4] = t.to_bytes(4, "little")
             eid += 1
-            e[M.E_EID:M.E_EID + 4] = eid.to_bytes(4, "little")
-            e[M.E_CID:M.E_CID + 2] = cup["cid"].to_bytes(2, "little")
+            e[M.E_EID : M.E_EID + 4] = eid.to_bytes(4, "little")
+            e[M.E_CID] = cup["cid"] & 0xFF
+            e[M.E_CID_HI] = (cup["cid"] >> 8) & 0xFF
             e[M.E_ORDER] = i + 1
             E.append(e)
 
         if cup["groups"]:
-            print("%s: competition %d, groups %d (%d groups of four: %s), knockout %d (%d clubs), %d entries"
-                  % (cup["name"], cup["cid"], cup["reg"], cup["groups"],
-                     " ".join(str(i) for i in ids[2:]), cup["ko"], nko, len(clubs)))
+            print(
+                "%s: competition %d, groups %d (%d groups of four: %s), knockout %d (%d clubs), %d entries"
+                % (
+                    cup["name"],
+                    cup["cid"],
+                    cup["reg"],
+                    cup["groups"],
+                    " ".join(str(i) for i in ids[2:]),
+                    cup["ko"],
+                    nko,
+                    len(clubs),
+                )
+            )
         else:
-            print("%s: competition %d, knockout %d (%d clubs%s), %d entries"
-                  % (cup["name"], cup["cid"], cup["ko"], nko,
-                     ", one match a round as reg %d" % cup["like"] if cup["like"] is not None else "", len(clubs)))
-        lines.append("ccup %d ko=%d groups=%d entry=%s name=%s" % (
-            cup["reg"], cup["ko"], cup["groups"],
-            ",".join("%d:%d" % e for e in cup["entry"]), cup["name"]))
+            print(
+                "%s: competition %d, knockout %d (%d clubs%s), %d entries"
+                % (
+                    cup["name"],
+                    cup["cid"],
+                    cup["ko"],
+                    nko,
+                    ", one match a round as reg %d" % cup["like"]
+                    if cup["like"] is not None
+                    else "",
+                    len(clubs),
+                )
+            )
+        lines.append(
+            "ccup %d ko=%d groups=%d entry=%s name=%s"
+            % (
+                cup["reg"],
+                cup["ko"],
+                cup["groups"],
+                ",".join("%d:%d" % e for e in cup["entry"]),
+                cup["name"],
+            )
+        )
 
     print("")
     print("for modules\\fl26world.txt:")
