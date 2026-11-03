@@ -38,6 +38,12 @@ Tres cuevas, verificando antes todos los bytes del ejecutable:
 | `0x141eee27c` (6 B) | regulación buscada por `cid`: el byte alto sale de `+0x492` |
 | `0x1414f1500` (7 B) | censo de Select Team: `id = byte[+5] \| byte[+7] << 8` (ver abajo) |
 
+**Trampa medida (2026-11-03):** la cueva del empaquetado **no puede usar `edx`**. El bucle que la
+llama lo tiene vivo como puntero de escritura del vector y el `movups [rdx], xmm0` de
+`0x1414f174e` revienta: el selector de equipos del Mundial se cerraba al abrirlo. La versión buena
+mete el byte alto en `ah` (`8a 67 02`) y desplaza `ax`: `(alto<<8|bajo) << 6 = alto<<14 | bajo<<6`,
+sin tocar más registros que el `eax`/`ecx` originales.
+
 Interruptores `ENABLE = { cmp, cid, pack, reg }` para biseccionar sin editar el código.
 
 ## Lo que falta: las ligas

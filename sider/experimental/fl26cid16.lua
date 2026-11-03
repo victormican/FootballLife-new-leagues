@@ -121,8 +121,11 @@ function m.init(ctx)
 
   if ENABLE.pack then
   -- entry pack: id = byte[+8] | byte[+0xb] << 8 ; key = id << 6 | (order - 1)
-  local entry_stub = bin("0fb60f" .. "66ffc9" .. "0fb647ff" .. "0fb65702" .. "c1e208" ..
-                         "09d0" .. "66c1e006" .. "6609c1" .. "66894c2448")
+  -- only eax and ecx, like the bytes it replaces: edx is live in the caller's loop (the vector
+  -- write pointer) and clobbering it crashed the team selector.  ah carries the high byte so the
+  -- 16-bit shift drops its top two bits: (high<<8|low) << 6 = high<<14 | low<<6.
+  local entry_stub = bin("0fb60f" .. "66ffc9" .. "0fb647ff" .. "8a6702" .. "66c1e006" ..
+                         "6609c1" .. "66894c2448")
   local back = rel32(cv + 0x40 + #entry_stub + 5, PACK_NEXT)
   if not back then log("fl26cid16: entry cave out of range"); return end
   memory.write(cv + 0x40, entry_stub .. "\233" .. back)
