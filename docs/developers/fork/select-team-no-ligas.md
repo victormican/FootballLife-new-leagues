@@ -117,8 +117,30 @@ de 294 a **287 filas (165 + 122)**. Las competiciones siguen en `Competition.bin
 
 Coste: sin fila, `fl26clubs` no las sirve (ya servía 3 slots tras el primer intento) y en Master
 League esos clubes dejan de estar «en una liga», así que pueden aparecer en los pools de otros
-clubes. Si aun así salieran, el paso siguiente es retirar las competiciones enteras (fila,
-regulaciones y entradas), como se hizo con la Copa Argentina (`cid 48`).
+clubes.
+
+**Tercer intento:** el menú tampoco lee la fila, así que se cambia el **tipo** de las siete
+regulaciones de `4` (liga) a **`8` (practice)**, que los menús de liga ignoran. Las competiciones,
+sus entradas y sus clubes no se tocan; solo dejan de ser «de liga». Pendiente de confirmar en el
+menú.
+
+## La pantalla de equipos de una copa no filtra por el campo de la copa
+
+Medido: **la Leagues Cup no puede limitar sus candidatos por región** porque la pantalla que se abre
+en Cup mode es la **lista de ligas**, no la lista de entradas de la copa. Las regiones no tienen
+nada que ver entre sí:
+
+| competición | región |
+|---|---|
+| MLS (cid 40) | 23 |
+| Liga MX (cid 194) | 80 |
+| Leagues Cup (cid 228) | 8 |
+
+Por eso el Mundial sí se comporta distinto: es de **selecciones** (región 25 y confederación en
+`Country.bin`), y esa pantalla agrupa por continente. Para una copa de clubes el juego enseña la
+lista de ligas. Limitarla a MLS y Liga MX exige **filtrar esa lista** (un módulo que enganche el
+constructor `0x140c93780`, el que ordena por slot), o escribir en cada club del torneo su slot de
+competición (`+0x41c`), que en Kick Off está a 0 hasta que arranca una temporada.
 
 ## Recomendación
 
