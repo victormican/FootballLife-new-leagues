@@ -329,6 +329,110 @@ SPEC2 = [
     },
 ]
 
+# Third wave (2026-11-03): Luxembourg, the Faroe Islands and San Marino, the last three countries
+# of the batched generic leagues.
+SPEC3 = [
+    {
+        "reg": 353,
+        "cid": 80,
+        "country": 220,
+        "name": "National Division",
+        "moved": [],
+        "rename": {},
+        "take": [
+            "F91 Dudelange",
+            "Jeunesse Esch",
+            "Progres Niederkorn",
+            "FC Differdange 03",
+        ],
+        "clubs": [
+            "Racing FC Union Luxembourg",
+            "Swift Hesperange",
+            "FC Rodange 91",
+            "US Mondorf-les-Bains",
+            "US Hostert",
+            "FC Wiltz 71",
+        ],
+    },
+    {
+        "reg": 354,
+        "cid": 81,
+        "country": 206,
+        "name": "Betri deildin",
+        "moved": [],
+        "rename": {},
+        "take": [
+            "Vikingur Gota",
+            "HB Torshavn",
+            "NSI Runavik",
+            "KI Klaksvik",
+        ],
+        "clubs": [
+            "B36 Torshavn",
+            "B68 Toftir",
+            "EB/Streymur",
+            "IF Fuglafjordur",
+            "Skala IF",
+            "07 Vestur",
+        ],
+    },
+    {
+        "reg": 355,
+        "cid": 83,
+        "country": 231,
+        "name": "Campionato Sammarinese",
+        "moved": [],
+        "rename": {},
+        "take": ["Tre Fiori", "Tre Penne", "La Fiorita"],
+        "clubs": [
+            "Folgore",
+            "Virtus",
+            "Libertas",
+            "Cosmos",
+            "Domagnano",
+            "Faetano",
+            "Juvenes/Dogana",
+        ],
+    },
+]
+
+REFILL3 = [
+    ("Silkeborg IF", "DINAMARCA"),
+    ("Randers FC", "DINAMARCA"),
+    ("Vejle BK", "DINAMARCA"),
+    ("AC Horsens", "DINAMARCA"),
+    ("Dundee FC", "ESCOCIA"),
+    ("St Mirren", "ESCOCIA"),
+    ("Livingston FC", "ESCOCIA"),
+    ("Kayserispor", "TURQUÍA"),
+    ("Gaziantep FK", "TURQUÍA"),
+    ("Alanyaspor", "TURQUÍA"),
+    ("Torpedo Moscow", "RUSIA"),
+    ("Baltika Kaliningrad", "RUSIA"),
+    ("FC Orenburg", "RUSIA"),
+    ("TPS Turku", "FINLANDIA"),
+    ("IF Gnistan", "FINLANDIA"),
+    ("Birkirkara FC", "MALTA"),
+    ("UE Sant Julia", "ANDORRA"),
+    ("Speranta Nisporeni", "MOLDAVIA"),
+    ("FC Telavi", "GEORGIA"),
+    ("FC Belshina Bobruisk", "BIELORRUSIA"),
+    ("Hvidovre IF", "DINAMARCA"),
+    ("FC Helsingor", "DINAMARCA"),
+    ("Partick Thistle", "ESCOCIA"),
+    ("Raith Rovers", "ESCOCIA"),
+    ("Caykur Rizespor", "TURQUÍA"),
+    ("Goztepe", "TURQUÍA"),
+    ("Pari Nizhny Novgorod", "RUSIA"),
+    ("Fakel Voronezh", "RUSIA"),
+    ("Hamrun Spartans", "MALTA"),
+    ("Gzira United", "MALTA"),
+    ("Penya Encarnada", "ANDORRA"),
+    ("Zaria Balti", "MOLDAVIA"),
+    ("FC Samtredia", "GEORGIA"),
+    ("FC Slutsk", "BIELORRUSIA"),
+]
+
 # The donor clubs each new league does not need go to "Other European Leagues", renamed to real
 # clubs of countries that still have no league of their own.  Names already in the world are
 # skipped, so the list is longer than the clubs needed.
@@ -513,8 +617,9 @@ def main():
     dry = "--dry" in a
     latin = "--latin" in a
     wave2 = "--wave2" in a
-    spec_list = SPEC2 if wave2 else SPEC
-    refill_list = REFILL2 if wave2 else REFILL
+    wave3 = "--wave3" in a
+    spec_list = SPEC3 if wave3 else SPEC2 if wave2 else SPEC
+    refill_list = REFILL3 if wave3 else REFILL2 if wave2 else REFILL
 
     teams = bytearray(
         pesdb.wesys_unpack(open(os.path.join(base, "Team.bin"), "rb").read())

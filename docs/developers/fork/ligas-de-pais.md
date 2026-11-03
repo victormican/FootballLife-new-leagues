@@ -57,6 +57,17 @@ Cambios de diseño respecto de la primera tanda:
   viene vacío en las filas del juego). Leer 0x9E hace que `--take` no encuentre clubes como
   «FC RFS» y que el filtro de duplicados no vea los nombres reales.
 
+## Tercera tanda (2026-11-03): Luxemburgo, Feroe y San Marino
+
+`--wave3` usa `SPEC3`: las genéricas 353, 354 y 355 (cid 80, 81 y 83; slots 225, 226 y 227) pasan a
+ser **National Division** (4 reales: F91 Dudelange, Jeunesse Esch, Progrès, Differdange),
+**Betri deildin** (4 reales: Víkingur Gøta, HB Tórshavn, NSÍ Runavík, KÍ Klaksvík) y
+**Campionato Sammarinese** (3 reales: Tre Fiori, Tre Penne, La Fiorita).
+
+Es el mismo patrón: los reales se mueven desde «Other European Leagues» (cid 98) y los donantes
+sobrantes vuelven a cid 98 renombrados a clubes reales de países sin liga, así que el grupo sigue
+con 47 clubes.
+
 ## Clubes: mover, no duplicar
 
 Los clubes reales del país que ya estaban en «Other European Leagues» (`cid 98`) se **mueven** a la
