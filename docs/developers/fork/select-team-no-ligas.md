@@ -95,24 +95,30 @@ da si Oceania va en un slot **mayor que 4 y menor que 22**, y los no FIFA en el 
 
 ## Decidido y aplicado (2026-11-03)
 
-Los cinco «Others», **Oceania** y **Selecciones No FIFA** no son ligas y no salen en la lista de
-ligas: sus líneas del mundo llevan **`slot=123`**, el centinela oculto de `fl26comptab` («a league
-on slot=123 still gets a row of its own, on the hidden slot», para que conserve su recuento de
-ascensos). Con 123 no entran en Select Team, pero siguen existiendo como competiciones y sus clubes
-siguen en el juego.
+**Primer intento:** las siete líneas con `slot=123`, el centinela oculto de `fl26comptab`. El
+módulo las leyó (`id 181 -> slot 123`, `id 196 -> slot 123`) pero el menú de Ligas las seguía
+mostrando: 123 solo es «sin plaza» para el club, no para la competición.
 
-| grupo | cid | slot antes | slot ahora |
-|---|---|---|---|
-| Other European Leagues | 98 | 69 | **123** |
-| Other Clubs (Asia) | 254 | 70 | **123** |
-| Other Latin American Teams | 95 | 73 | **123** |
-| Other Clubs (Africa) | 165 | 75 | **123** |
-| Otros Concacaf | 221 | 128 | **123** |
-| Oceania | 91 | 76 | **123** |
-| Selecciones No FIFA | 255 | -1 | **123** |
+**Segundo intento:** se **quitan sus líneas del mundo**. `fl26comptab` solo añade una fila por
+línea `league`, y esas siete regulaciones (181, 196, 250, 254, 255, 256, 362, 364) no tienen fila
+de fábrica (las del ejecutable llegan a 177), así que se quedan sin fila en la tabla: la tabla baja
+de 294 a **287 filas (165 + 122)**. Las competiciones siguen en `Competition.bin`,
+`CompetitionRegulation.bin` y `CompetitionEntry.bin`, con sus clubes.
 
-`check_world` ya no cuenta 123 como slot ocupado (puede repetirse), y `fl26comptab` tampoco: su
-comprobación de «slot pedido dos veces» excluye 123.
+| grupo | cid | regulación |
+|---|---|---|
+| Other European Leagues | 98 | 364 |
+| Other Clubs (Asia) | 254 | 256 |
+| Other Latin American Teams | 95 | 362 |
+| Other Clubs (Africa) | 165 | 181 |
+| Otros Concacaf | 221 | 250 |
+| Oceania | 91 | 196 |
+| Selecciones No FIFA | 255 | 255 |
+
+Coste: sin fila, `fl26clubs` no las sirve (ya servía 3 slots tras el primer intento) y en Master
+League esos clubes dejan de estar «en una liga», así que pueden aparecer en los pools de otros
+clubes. Si aun así salieran, el paso siguiente es retirar las competiciones enteras (fila,
+regulaciones y entradas), como se hizo con la Copa Argentina (`cid 48`).
 
 ## Recomendación
 
