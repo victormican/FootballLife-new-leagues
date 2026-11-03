@@ -104,6 +104,34 @@ Detalles que costaron una pasada:
   duplicados de sí mismos, así que entran como clubes nuevos (Sliema en Malta, Lions Gibraltar en
   Gibraltar).
 
+## Liga desde cero (2026-11-03): Belice
+
+Cuando se acaban las genéricas ya no hay fila que reciclar: `tools/new_league.py` construye la liga
+con `mkleague.add_league`, que **copia una competición nuestra como prototipo** (`FL_223_D1`, 10
+clubes, división 1), le pone `cid`, código y nombre nuevos y escribe regulación y entradas.
+
+| qué | valor |
+|---|---|
+| país / bandera | Belice, `country=108` (`Country.bin`), `conf=6` |
+| cid | **239** (el primero libre por encima de las nuestras) |
+| regulación | 8457 (siguiente libre) |
+| región | 106 (nueva, fuera del bloque CONCACAF 73-105; el byte de `Competition.bin` es `enc_region(106)` = 83) |
+| slot | 234 |
+| clubes | 10, de filas sin competición (`Generic League 18 Club 01..10`) |
+
+Dos trampas del prototipo:
+
+- `add_league` escribe el código con **28 bytes** desde +0x08, así que borra el nombre de 16 bytes
+  en +0x14: hay que reescribirlo después (`M.put(comp, fila + 0x14, nombre, 16)`).
+- El `rid` de una regulación está en **+0x02**, no en +0x00 (+0x00 es el id de texto). Leerlo mal
+  devuelve 0 y la línea del mundo no se sincroniza.
+
+La misma pasada **retira las ocho copias sudamericanas** que había dentro de «Other Latin American
+Teams» (Los Chankas, Real Potosí, Universitario de Vinto, Zamora, Mushuc Runa, Técnico
+Universitario, Guayaquil City, Montevideo City Torque): son clubes que ya juegan su liga, así que
+se borran su fila de `Team.bin`, su entrada, sus 22 fichas de `PlayerAssignment.bin` y la plaza se
+renumera; el grupo queda con **40** clubes y su regulación y su línea se sincronizan.
+
 ## Clubes: mover, no duplicar
 
 Los clubes reales del país que ya estaban en «Other European Leagues» (`cid 98`) se **mueven** a la
