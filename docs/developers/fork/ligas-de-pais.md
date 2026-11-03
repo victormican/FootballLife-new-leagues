@@ -118,10 +118,13 @@ lista `LEAGUES` lleva una entrada por país y **se salta las que ya existen** (s
 | Curazao (140) | 240 | 8458 | 107 | 235 |
 | Surinam (139) | 241 | 8459 | 108 | 236 |
 | Haití (120) | 242 | 8460 | 109 | 237 |
+| RD del Congo (55) | 243 | 8461 | 110 | 238 |
+| Congo (98) | 244 | 8462 | 111 | 239 |
 
 Los diez clubes de cada una salen de filas que ninguna competición usa (`Generic League NN Club
-0N`), renombradas y con la bandera de su país. Ninguno de esos tres países tenía un solo club en el
-mundo, solo su selección.
+0N`), renombradas y con la bandera de su país. Curazao, Surinam, Haití y los dos Congos no tenían
+un solo club en el mundo, solo su selección. Las dos africanas van con lo que usan las ligas de CAF
+(`conf=5`, `kickoff=70`) y sus regiones también son nuevas (110 y 111).
 
 Dos trampas del prototipo:
 
