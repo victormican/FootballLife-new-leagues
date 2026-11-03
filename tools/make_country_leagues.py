@@ -433,6 +433,134 @@ REFILL3 = [
     ("FC Slutsk", "BIELORRUSIA"),
 ]
 
+# Fourth wave (2026-11-03): the last six generic leagues. Moldova, Andorra, Malta, Gibraltar and
+# Georgia get their league; the sixth carries Liechtenstein's cup, whose seven clubs come from the
+# old "Copa Argentina" competition (cid 48), which disappears with this wave.
+SPEC4 = [
+    {
+        "reg": 356,
+        "cid": 85,
+        "country": 223,
+        "name": "Super Liga",
+        "moved": [],
+        "rename": {},
+        "take": [
+            "FC Sheriff Tiraspol",
+            "Zimbru Chisinau",
+            "Dacia Chisinau",
+            "Speranta Nisporeni",
+        ],
+        "clubs": [
+            "Milsami Orhei",
+            "FC Balti",
+            "Petrocub Hincesti",
+            "Sfintul Gheorghe",
+            "Dinamo-Auto Tiraspol",
+            "Codru Lozova",
+        ],
+    },
+    {
+        "reg": 357,
+        "cid": 87,
+        "country": 192,
+        "name": "Primera Divisio",
+        "moved": [],
+        "rename": {},
+        "take": ["Santa Coloma", "Inter Club d'Escaldes", "UE Sant Julia"],
+        "clubs": [
+            "Penya Encarnada",
+            "FC Ordino",
+            "UE Engordany",
+            "FC Encamp",
+            "Lusitanos",
+            "Atletic Escaldes",
+            "CE Carroi",
+        ],
+    },
+    {
+        "reg": 358,
+        "cid": 88,
+        "country": 222,
+        "name": "Maltese Premier League",
+        "moved": [],
+        "rename": {},
+        "take": [
+            "Valletta",
+            "Hibernians",
+            "Floriana FC",
+            "Birkirkara FC",
+        ],
+        "clubs": [
+            "Hamrun Spartans",
+            "Gzira United",
+            "Mosta FC",
+            "Balzan FC",
+            "Sirens FC",
+            "Sliema Wanderers",
+        ],
+    },
+    {
+        "reg": 359,
+        "cid": 89,
+        "country": 245,
+        "name": "Gibraltar Football League",
+        "moved": [],
+        "rename": {},
+        "take": ["Lincoln Red Imps", "St Joseph's"],
+        "clubs": [
+            "Lynx FC",
+            "Mons Calpe",
+            "Glacis United",
+            "Britannia XI",
+            "Manchester 62",
+            "Europa Point",
+            "College 1975",
+            "Lions Gibraltar",
+        ],
+    },
+    {
+        "reg": 360,
+        "cid": 93,
+        "country": 209,
+        "name": "Erovnuli Liga",
+        "moved": [],
+        "rename": {},
+        "take": [
+            "Dinamo Tbilisi",
+            "Dinamo Batumi",
+            "Torpedo Kutaisi",
+            "Saburtalo Tbilisi",
+            "FC Telavi",
+        ],
+        "clubs": ["Iberia 1999", "Dila Gori", "Samgurali", "Gagra", "Sioni Bolnisi"],
+    },
+    {
+        "reg": 361,
+        "cid": 94,
+        "country": 218,
+        "name": "Liechtensteiner Cup",
+        "moved": [],
+        "rename": {},
+        "size": 7,
+        "take_from": 48,
+        "take": [
+            "Vaduz",
+            "USV Eschen/Mauren",
+            "FC Balzers",
+            "FC Ruggell",
+            "FC Schaan",
+            "FC Triesen",
+            "FC Triesenberg",
+        ],
+        "clubs": [],
+        "drop": (375, 48),
+    },
+]
+
+# No refills: every UEFA country has a league after this wave, so the donors that are left over are
+# let go and "Other European Leagues" ends with the clubs that nobody else wanted.
+REFILL4 = []
+
 # The donor clubs each new league does not need go to "Other European Leagues", renamed to real
 # clubs of countries that still have no league of their own.  Names already in the world are
 # skipped, so the list is longer than the clubs needed.
@@ -618,8 +746,15 @@ def main():
     latin = "--latin" in a
     wave2 = "--wave2" in a
     wave3 = "--wave3" in a
-    spec_list = SPEC3 if wave3 else SPEC2 if wave2 else SPEC
-    refill_list = REFILL3 if wave3 else REFILL2 if wave2 else REFILL
+    wave4 = "--wave4" in a
+    if wave4:
+        spec_list, refill_list = SPEC4, REFILL4
+    elif wave3:
+        spec_list, refill_list = SPEC3, REFILL3
+    elif wave2:
+        spec_list, refill_list = SPEC2, REFILL2
+    else:
+        spec_list, refill_list = SPEC, REFILL
 
     teams = bytearray(
         pesdb.wesys_unpack(open(os.path.join(base, "Team.bin"), "rb").read())
@@ -749,7 +884,7 @@ def main():
         if len(donors) < want:
             raise SystemExit("cid %d has %d clubs, needs %d" % (cid, len(donors), want))
         for tid in spec["moved"]:
-            move(tid, OTHER_EU, cid)
+            move(tid, spec.get("take_from", OTHER_EU), cid)
             # a real club that joins its country's league takes that country's flag
             rename(tid, spec["rename"].get(tid, names[tid]), fid)
         if spec.get("fresh"):
@@ -825,6 +960,28 @@ def main():
             cc[20:36] = nm.ljust(16, b"\0")
             comp[i : i + M.COMP] = cc
             break
+
+    # --- competitions this wave retires (the old Copa Argentina, whose clubs moved to Liechtenstein)
+    for spec in spec_list:
+        if not spec.get("drop"):
+            continue
+        rid, gone = spec["drop"]
+        keep = bytearray()
+        for i in range(0, len(regs), M.REG):
+            if int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little") != rid:
+                keep += regs[i : i + M.REG]
+        regs = keep
+        keep = bytearray()
+        for i in range(0, len(comp), M.COMP):
+            if comp[i + M.CID_OFF] != gone:
+                keep += comp[i : i + M.COMP]
+        comp = keep
+        keep = bytearray()
+        for k in range(0, len(ents), M.ENT):
+            if ents[k + M.E_CID] != gone:
+                keep += ents[k : k + M.ENT]
+        ents = keep
+        print("fuera la competicion %d y su regulacion %d" % (gone, rid))
 
     # --- the clubs that go the other way, into Other European Leagues
     leaving = [(spec, t) for spec in spec_list for t in spec["_leaving"]]
@@ -935,8 +1092,10 @@ def main():
             continue
         if w[0] == "league" and len(w) > 1 and w[1].isdigit():
             rid = int(w[1])
-            if rid in (382, 383):
-                print("world: fuera la gemela vacia %d" % rid)
+            if rid in (382, 383) or any(
+                s.get("drop") and s["drop"][0] == rid for s in spec_list
+            ):
+                print("world: fuera la liga %d" % rid)
                 continue
             spec = next((s for s in spec_list if s["reg"] == rid), None)
             if spec:

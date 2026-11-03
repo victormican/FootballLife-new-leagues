@@ -68,6 +68,42 @@ Es el mismo patrón: los reales se mueven desde «Other European Leagues» (cid 
 sobrantes vuelven a cid 98 renombrados a clubes reales de países sin liga, así que el grupo sigue
 con 47 clubes.
 
+## Cuarta tanda (2026-11-03): las últimas seis genéricas
+
+`--wave4` usa `SPEC4` y cierra el mapa UEFA: Moldavia, Andorra, Malta, Gibraltar, Georgia y
+Liechtenstein. Después de esta tanda **todos los países UEFA tienen liga** (Dinamarca, Turquía,
+Países Bajos y Francia ya venían en el juego).
+
+| país | reg | cid | slot | reales que entran de «Otros Europa» |
+|---|---|---|---|---|
+| Moldavia | 356 | 85 | 228 | Sheriff Tiraspol, Zimbru, Dacia, Speranta Nisporeni |
+| Andorra | 357 | 87 | 229 | Santa Coloma, Inter Club d'Escaldes, UE Sant Julià |
+| Malta | 358 | 88 | 230 | Valletta, Hibernians, Floriana, Birkirkara |
+| Gibraltar | 359 | 89 | 231 | Lincoln Red Imps, St Joseph's |
+| Georgia | 360 | 93 | 232 | Dinamo Tbilisi, Dinamo Batumi, Torpedo Kutaisi, Saburtalo, FC Telavi |
+| Liechtenstein | 361 | 94 | 233 | Vaduz, Eschen/Mauren, Balzers, Ruggell, Schaan, Triesen, Triesenberg |
+
+Dos capacidades nuevas del script:
+
+- **`take_from`**: la liga toma sus clubes reales de una competición distinta de «Other European
+  Leagues». Liechtenstein la usa con `take_from: 48` para llevarse sus siete clubes desde la vieja
+  **Copa Argentina** (`cid 48`), que solo existía como contenedor de esos equipos.
+- **`drop`**: la competición vieja desaparece. `drop: (375, 48)` borra la regulación 375, la fila de
+  `Competition.bin` del cid 48, todas sus entradas y su línea `league` del mundo (el fichero pasa de
+  502 a 501 líneas). Sin `drop` quedaría una copa fantasma sin clubes.
+
+Detalles que costaron una pasada:
+
+- Liechtenstein no es una liga: es la **copa**. El `cid` 48 lo conoce el ejecutable como «Copa
+  Argentina» y no se lista bajo Liechtenstein, así que reutilizar la fila era la única forma de que
+  apareciera; los siete clubes son de verdad y llevan la bandera 218.
+- Sin refills: no queda ningún país UEFA sin liga al que mudar los donantes, así que los 25
+  sobrantes se dejan fuera y «Other European Leagues» baja a **29** clubes (regulación y línea del
+  mundo sincronizadas).
+- «Sliema Wanderers» y «Europa FC» no existen en el mundo: el filtro `core()` los descarta como
+  duplicados de sí mismos, así que entran como clubes nuevos (Sliema en Malta, Lions Gibraltar en
+  Gibraltar).
+
 ## Clubes: mover, no duplicar
 
 Los clubes reales del país que ya estaban en «Other European Leagues» (`cid 98`) se **mueven** a la
@@ -103,3 +139,7 @@ check_world                0 errores, 1 aviso (copa del juego con dos clubes en 
 FL 2026 start.exe          2 de 2 arranques vivos 55 s
 fl26clubs                 69<-364 y 73<-362 siguen sirviendo los dos grupos
 ```
+
+Tras la cuarta tanda `check_world` informa de **238 competiciones, 383 regulaciones y 3802
+entradas** (28 menos: las de la copa retirada) y `sider.log` sirve en `fl26comptab` los slots
+**228..233** (ids 356..361), sin `aborting` ni `no slot in the list`.
