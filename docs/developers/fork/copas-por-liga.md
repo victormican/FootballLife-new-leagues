@@ -94,17 +94,35 @@ clubes coincide con las entradas: es la puerta que detecta una copa a medio hace
 
 | límite | valor | consecuencia |
 |---|---|---|
-| `cid` | **1 byte**, 249 usados de 255 → **6 libres** (48, 96, 250-253) | 6 copas más, ni una más |
+| `cid` | **1 byte**, 250 usados de 255 → **5 libres** (96, 250-253) | 5 copas más |
+| **lista del menú** | **13 items** (8 del juego + **5** nuestras) | las demás no se ven |
 | fase de grupos | > 32 clubes | esa copa **no** sale en Kick Off > Cup |
-| `fl26chain` | `MAX_CUPS = 128` | tope de copas encadenadas a ligas |
 | entradas | obligatorias | sin `CompetitionEntry` la copa se abre vacía |
-| lista del menú | se agranda sola | no es el cuello de botella |
 
-El `cid` de 255 no es del ejecutable (en memoria es un word y el array tiene 600 registros): es de
-las tres tablas, que lo guardan en un byte, y de la clave de las entradas
-(`id << 8 | plaza-1`). El parche a 16 bits está **hecho para copas** (ver
-[cids-16-bit.md](cids-16-bit.md)): una copa nueva puede usar `cid` 256..1023 y sale en el menú; las
-ligas siguen en 255 porque el censo de Select Team indexa con un byte.
+### La lista del menú: 13 huecos (medido con Frida)
+
+Capturado en vivo, el vector contiene items de 12 bytes `{cid, 0xffff, 0}`:
+
+```
+21 05 08 1b 24 22 23 25   (8 copas del juego)
+e4 e5 e7 e8 e9            (nuestras: las 5 primeras líneas ccup)
+```
+
+`fl26swiss` añade las del mundo **en el orden del archivo** y se para al llenar:
+`5 world cup(s) added, no room for the rest (list 13 of 13)`. El ensanche que trae el
+módulo (`VirtualAlloc`) no actúa: el vector está en el heap y el código solo agranda si está
+dentro del objeto (`the list is a heap vector, left alone`).
+
+**Intentos de agrandarlo (2026-11-03), los dos tumban el juego:** envolver el `init` del menú
+(`0x140b1c990`) con un stub que mueve la lista a un buffer de 64 items revienta al llamar a
+cualquier asignador desde ese contexto — con el del ejecutable (`0x140227930`) cae en
+`FL_2026.exe+0x3fd394`, con `ucrtbase!malloc` en `ucrtbase.dll+0xd50c`. La reserva de los 13
+items ocurre **al arrancar** (la captura de `malloc` estando dentro del menú no ve ninguna), así
+que el camino correcto es localizar en el constructor la constante `13` del `reserve` y subirla,
+no asignar desde nuestro código.
+
+Mientras no se haga, **las 5 primeras líneas `ccup` del mundo son las que se ven**: hoy
+Leagues Cup, Cupa Moldovei, Oceania, Selecciones No FIFA y Carabao Cup.
 
 ## «Una copa para cada liga»: el presupuesto
 
