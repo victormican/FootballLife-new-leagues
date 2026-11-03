@@ -104,20 +104,24 @@ Detalles que costaron una pasada:
   duplicados de sí mismos, así que entran como clubes nuevos (Sliema en Malta, Lions Gibraltar en
   Gibraltar).
 
-## Liga desde cero (2026-11-03): Belice
+## Liga desde cero (2026-11-03): Belice, Curazao, Surinam y Haití
 
-Cuando se acaban las genéricas ya no hay fila que reciclar: `tools/new_league.py` construye la liga
+Cuando se acaban las genéricas ya no hay fila que reciclar: `tools/new_league.py` construye cada liga
 con `mkleague.add_league`, que **copia una competición nuestra como prototipo** (`FL_223_D1`, 10
-clubes, división 1), le pone `cid`, código y nombre nuevos y escribe regulación y entradas.
+clubes, división 1), le pone `cid`, código y nombre nuevos y escribe regulación y entradas. La
+lista `LEAGUES` lleva una entrada por país y **se salta las que ya existen** (si el `cid` está en
+`Competition.bin` no hace nada), así que se puede volver a ejecutar.
 
-| qué | valor |
-|---|---|
-| país / bandera | Belice, `country=108` (`Country.bin`), `conf=6` |
-| cid | **239** (el primero libre por encima de las nuestras) |
-| regulación | 8457 (siguiente libre) |
-| región | 106 (nueva, fuera del bloque CONCACAF 73-105; el byte de `Competition.bin` es `enc_region(106)` = 83) |
-| slot | 234 |
-| clubes | 10, de filas sin competición (`Generic League 18 Club 01..10`) |
+| país | cid | reg | región | slot |
+|---|---|---|---|---|
+| Belice (108) | 239 | 8457 | 106 | 234 |
+| Curazao (140) | 240 | 8458 | 107 | 235 |
+| Surinam (139) | 241 | 8459 | 108 | 236 |
+| Haití (120) | 242 | 8460 | 109 | 237 |
+
+Los diez clubes de cada una salen de filas que ninguna competición usa (`Generic League NN Club
+0N`), renombradas y con la bandera de su país. Ninguno de esos tres países tenía un solo club en el
+mundo, solo su selección.
 
 Dos trampas del prototipo:
 
@@ -126,7 +130,7 @@ Dos trampas del prototipo:
 - El `rid` de una regulación está en **+0x02**, no en +0x00 (+0x00 es el id de texto). Leerlo mal
   devuelve 0 y la línea del mundo no se sincroniza.
 
-La misma pasada **retira las ocho copias sudamericanas** que había dentro de «Other Latin American
+La primera pasada **retiró las ocho copias sudamericanas** que había dentro de «Other Latin American
 Teams» (Los Chankas, Real Potosí, Universitario de Vinto, Zamora, Mushuc Runa, Técnico
 Universitario, Guayaquil City, Montevideo City Torque): son clubes que ya juegan su liga, así que
 se borran su fila de `Team.bin`, su entrada, sus 22 fichas de `PlayerAssignment.bin` y la plaza se
