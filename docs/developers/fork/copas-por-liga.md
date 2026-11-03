@@ -133,6 +133,26 @@ tabla. Es la estructura `{cid, 0xffff, 0}` que devuelve el menú, pero la **capa
 está en ese código: se reserva antes, en el constructor del contenedor, y con el proceso arrancado
 bajo Frida (spawn) los hooks de asignación de 0x80..0x400 bytes no ven ninguna reserva de 156 B.
 
+**Pila capturada (2026-11-03, attach + breakpoint en los ayudantes):**
+
+```
+0x140b1cd2d   dentro de 0x140b1cc60   (recorre la lista y mete cada item en el mapa)
+0x140b1c9a6   init del menú 0x140b1c990 + 0x16
+0x7ffe72ec55a6  handler de fl26swiss.dll
+0x140e43462 · 0x1401fa111d · 0x140149fdf2 ...
+```
+
+`0x140b1cc60` **no reserva**: recorre `[self+0x90]..[self+0x98]` y por cada item (divide por 12 con
+la magia `0x2AAAAAAAAAAAAAAB`) llama a `0x140b1cda0` y `0x140b1c290`/`0x140b1c540` para insertarlo
+en el contenedor de `+0xd0`. La lista ya tenía los 8 items antes de que corra el init, así que quien
+la llena y reserva **no está en esta pila**: es el código que prepara el menú antes de llamar a su
+vtable (o el propio constructor del objeto, que no toca `+0x90`).
+
+**Siguiente paso exacto:** breakpoint en el **constructor del menú** (`0x140b1c6f0`, el que escribe
+la vtable en `[rdi]`) y, desde ahí, en el primer escritor de `[self+0x90]`; o buscar la tabla de
+cids de las 8 copas del juego (no es un array de dwords consecutivos: no aparece en `.rdata`) para
+llegar a su lector. Con eso se ve el `reserve` y basta cambiar su constante.
+
 Mientras no se haga, **las 5 primeras líneas `ccup` del mundo son las que se ven**: hoy
 Leagues Cup, Cupa Moldovei, Oceania, Selecciones No FIFA y Carabao Cup.
 
