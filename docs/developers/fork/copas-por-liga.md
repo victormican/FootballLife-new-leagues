@@ -121,6 +121,18 @@ items ocurre **al arrancar** (la captura de `malloc` estando dentro del menú no
 que el camino correcto es localizar en el constructor la constante `13` del `reserve` y subirla,
 no asignar desde nuestro código.
 
+**Dónde se construyen los items (encontrado el 2026-11-03):** hay un único sitio en todo el
+ejecutable que escribe el centinela `0xffff` del item:
+
+```
+0x140b1c27c  mov qword [r9+4], 0xffff     (r9 = nodo de 0x1c bytes, cid en +0, byte 0 en +0xc)
+```
+
+junto a dos ayudantes (`0x140b1c240` y `0x140b1c290`) que crean el nodo con el cid leído de la
+tabla. Es la estructura `{cid, 0xffff, 0}` que devuelve el menú, pero la **capacidad de 13** no
+está en ese código: se reserva antes, en el constructor del contenedor, y con el proceso arrancado
+bajo Frida (spawn) los hooks de asignación de 0x80..0x400 bytes no ven ninguna reserva de 156 B.
+
 Mientras no se haga, **las 5 primeras líneas `ccup` del mundo son las que se ven**: hoy
 Leagues Cup, Cupa Moldovei, Oceania, Selecciones No FIFA y Carabao Cup.
 
