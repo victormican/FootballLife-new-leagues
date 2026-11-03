@@ -41,6 +41,23 @@ competición por ese id y toma la regulación de la temporada. Las regulaciones 
 `cid` que ya existen (reg 34, 1058, 2082… del Mundial) son **copias por temporada**, no copas
 distintas.
 
+## Estado del RE (2026-11-03)
+
+Andado hasta aquí:
+
+- **El mapa VA→fichero del ejecutable no es lineal.** Secciones: `.trace` (RVA 0x1000, fichero
+  0x600), `.rdata` (0x252f000 / 0x252de00), `.data` (0x339b000 / 0x3399a00)… Usar
+  `VA - 0x140000a00` vale para el código (`.trace`) y **no** para `.rdata`/`.data`: por eso la
+  tabla de parámetros parecía vacía. Leída bien, su fila 0 es `id 1 -> slot 79`.
+- **La vtable de `MenuModeCupSelect` está en `0x142692c40`** (fichero `0x2691a40`); el slot que
+  engancha `fl26swiss` (`+0xd8`) apunta a **`0x140b1c990`**, el init del menú. La lista vive en
+  **`+0x90` (begin), `+0x98` (end), `+0xa0` (capacidad)**: `0x140ca1a50` hace `end - begin`
+  (tamaño) y `0x140e42f80` recorre otra estructura en `+0x88`.
+- **Pendiente**: quién lee el item seleccionado. No sale con un `imul …, 0xc` cerca del menú (los
+  50 `imul 12` del binario están en tablas), así que el recorrido de 12 en 12 es con puntero
+  (`add reg, 0xc`). El siguiente paso es instrumentar el confirm del menú: volcar los 12 bytes del
+  item al elegir una copa, ver qué campo puede llevar la regulación y quién lo consume.
+
 ## Lo que habría que enganchar para duplicar copas
 
 1. **Llevar la regulación en el item.** Los 12 bytes son `cid` + 8 de plantilla (nombre/escudo).
