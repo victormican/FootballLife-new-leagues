@@ -121,6 +121,9 @@ lista `LEAGUES` lleva una entrada por país y **se salta las que ya existen** (s
 | RD del Congo (55) | 243 | 8461 | 110 | 238 |
 | Congo (98) | 244 | 8462 | 111 | 239 |
 | Fiyi (164) | 245 | 8463 | 112 | 240 |
+| Canadá (110) | 246 | 8464 | 113 | 241 |
+| México 2ª (124) | 247 | 8465 | 80 | 242 |
+| Cuba (113) | 248 | 8466 | 114 | 243 |
 
 Y una liga que **ya existía llena de placeholders** se rellena en el sitio (`FILLS`), sin gastar
 `cid` ni slot: «Liga Pro OFC» (Nueva Caledonia, cid 168, reg 198, slot 180) tenía 24 clubes
@@ -128,9 +131,13 @@ Y una liga que **ya existía llena de placeholders** se rellena en el sitio (`FI
 entradas se retiran (sus filas quedan libres), sincronizando regulación y mundo.
 
 Los diez clubes de cada una salen de filas que ninguna competición usa (`Generic League NN Club
-0N`), renombradas y con la bandera de su país. Curazao, Surinam, Haití y los dos Congos no tenían
+1)`, renombradas y con la bandera de su país. Curazao, Surinam, Haití y los dos Congos no tenían
 un solo club en el mundo, solo su selección. Las dos africanas van con lo que usan las ligas de CAF
 (`conf=5`, `kickoff=70`) y sus regiones también son nuevas (110 y 111).
+
+El campo `tier` de cada entrada permite una segunda división: la de México (`cid 247`) va con
+`tier=2` y comparte región con la primera (80), así que el juego la ve como categoría inferior del
+mismo país.
 
 Dos trampas del prototipo:
 

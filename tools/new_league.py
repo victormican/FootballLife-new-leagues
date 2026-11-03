@@ -200,6 +200,74 @@ LEAGUES = [
             "Tailevu Naitasiri",
         ],
     },
+    {
+        "cid": 246,
+        "reg": 8464,
+        "region": 113,
+        "slot": 241,
+        "country": 110,
+        "conf": 6,
+        "name": "Canadian Premier League",
+        "code": "FL_110_D1",
+        "kickoff": 17,
+        "clubs": [
+            "Forge FC",
+            "Cavalry FC",
+            "York United FC",
+            "Atletico Ottawa",
+            "Pacific FC",
+            "HFX Wanderers",
+            "Valour FC",
+            "Vancouver FC",
+        ],
+    },
+    {
+        "cid": 247,
+        "reg": 8465,
+        "region": 80,
+        "slot": 242,
+        "country": 124,
+        "conf": 6,
+        "name": "Liga de Expansion MX",
+        "code": "FL_124_D2",
+        "kickoff": 17,
+        "tier": 2,
+        "clubs": [
+            "Leones Negros",
+            "Atlante FC",
+            "Tapatio",
+            "Mineros de Zacatecas",
+            "Correcaminos UAT",
+            "Venados FC",
+            "Dorados de Sinaloa",
+            "Cancun FC",
+            "Tlaxcala FC",
+            "Alebrijes de Oaxaca",
+        ],
+    },
+    {
+        "cid": 248,
+        "reg": 8466,
+        "region": 114,
+        "slot": 243,
+        "country": 113,
+        "conf": 6,
+        "name": "Liga Cubana",
+        "code": "FL_113_D1",
+        "kickoff": 17,
+        "clubs": [
+            "Villa Clara",
+            "Cienfuegos",
+            "Santiago de Cuba",
+            "La Habana",
+            "Pinar del Rio",
+            "Camaguey",
+            "Las Tunas",
+            "Holguin",
+            "Granma",
+            "Matanzas",
+        ],
+    },
 ]
 
 # Leagues that already exist but are full of placeholders: their clubs are renamed and the
@@ -371,7 +439,7 @@ def main():
             spec["code"],
             use,
             proto_code="FL_223_D1",
-            tier=1,
+            tier=spec.get("tier", 1),
         )
         # add_league writes a 28-byte code, which also clears the 16-byte name at +0x14
         M.put(comp, (len(comp) // M.COMP - 1) * M.COMP + 0x14, spec["name"], 16)
@@ -507,7 +575,7 @@ def main():
         last += 1
         out.insert(
             last,
-            "league %d cid=%d region=%d country=%d conf=%d slot=%d tier=1 promote=0 "
+            "league %d cid=%d region=%d country=%d conf=%d slot=%d tier=%d promote=0 "
             "demote=0 clubs=%d legs=2 kickoff=%d name=%s"
             % (
                 spec["reg"],
@@ -516,6 +584,7 @@ def main():
                 spec["country"],
                 spec["conf"],
                 spec["slot"],
+                spec.get("tier", 1),
                 len(spec["clubs"]),
                 spec["kickoff"],
                 spec["name"],
