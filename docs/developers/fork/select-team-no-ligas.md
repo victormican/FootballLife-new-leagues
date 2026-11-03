@@ -142,6 +142,23 @@ lista de ligas. Limitarla a MLS y Liga MX exige **filtrar esa lista** (un módul
 constructor `0x140c93780`, el que ordena por slot), o escribir en cada club del torneo su slot de
 competición (`+0x41c`), que en Kick Off está a 0 hasta que arranca una temporada.
 
+## Oceania y No FIFA como competiciones de selecciones (2026-11-03)
+
+Se marcan igual que el Mundial, que es lo que hace que su selector agrupe por continente:
+
+| qué | Oceania (cid 91) | No FIFA (cid 255) |
+|---|---|---|
+| región del `Competition.bin` | **25** (`enc_region(25)` = 200) | **25** |
+| confederación (bits bajos del flag) | **7** (OFC) | **6** (CONCACAF) |
+| regulación | 196, tipo **3** (eliminatoria) | 255, tipo **3** |
+| equipos | 12 | 8 |
+| línea del mundo | `ccup 196 ... cid=91 conf=7 region=25 national=1 like=23` | `ccup 255 ... cid=255 conf=6 region=25 national=1 like=23` |
+
+Con eso salen en **Kick Off > Cup** como copas de selecciones (`national=1`, forma de FA Cup con
+byes, `like=23`) y el selector debe agruparlas por continente, como el Mundial. `sider.log` lo
+confirma: `cup 196 ... a single-match knockout of 12` y `cup 255 ... of 8`, y `Cup mode: 13
+competition(s) of the world to expose`.
+
 ## Recomendación
 
 1. **Ya:** dejar de liberar 69, 73 y 75 → los tres «Other» vuelven a leerse como categorías (A).
