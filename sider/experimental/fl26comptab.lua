@@ -477,6 +477,12 @@ function m.init(ctx)
     log(string.format("fl26comptab: world file -- %d leagues, %d with a slot of their own", #OUR_IDS, own))
   end
 
+  -- Shipped leagues the executable's own 23 {slot, country} answers leave without a flag:
+  -- Germany, the USA and Japan are regions the engine maps to "no country" (2026-11-03).
+  ID_COUNTRY[50] = 210   -- Bundesliga (cid 39)
+  ID_COUNTRY[51] = 135   -- Major League Soccer (cid 40)
+  ID_COUNTRY[52] = 13    -- J1 League (cid 41)
+
   -- 1. read the shipped table, index rows by id
   local rows, byid = {}, {}
   for i = 0, NROWS - 1 do
