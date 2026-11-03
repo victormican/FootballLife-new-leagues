@@ -28,9 +28,12 @@ import mkleague as M
 
 T_REC, T_ID, T_COUNTRY, T_NATIONAL = 1532, 0x08, 0x46, 0x53
 T_NAME, T_NAME_LEN, T_NAME_SLOTS, T_NAME_STEP = 0x9E, 70, 20, 70
+T_CANON = 0x170
 T_ABBR, T_SHORT = 0x372, 0x35A
 T_LONG, T_LONG_LEN = 0x37C, 22
 OTHER_EU = 98
+OTHER_EU_REG = 364
+GAME_CLUB_MAX = 71578
 
 SPEC = [
     {
@@ -128,6 +131,242 @@ SPEC = [
             "Diósgyőri VTK",
         ],
     },
+]
+
+# Second wave (2026-11-03): Belarus, Kazakhstan, Estonia, Armenia, Latvia, Lithuania, Kosovo,
+# Northern Ireland and Finland, plus the Liechtenstein cup, which takes the place of Copa
+# Argentina: its competition id carries a competition that country really has.
+SPEC2 = [
+    {
+        "reg": 344,
+        "cid": 55,
+        "country": 196,
+        "name": "Vysheyshaya Liga",
+        "moved": [],
+        "rename": {},
+        "take": ["BATE Borisov", "Dinamo Minsk", "Shakhtyor Soligorsk"],
+        "clubs": [
+            "Neman Grodno",
+            "Torpedo-BelAZ Zhodino",
+            "Dinamo Brest",
+            "Isloch Minsk",
+            "Slavia Mozyr",
+            "FC Vitebsk",
+            "FC Gomel",
+        ],
+    },
+    {
+        "reg": 345,
+        "cid": 57,
+        "country": 216,
+        "name": "Kazakhstan Premier League",
+        "moved": [],
+        "rename": {},
+        "take": ["Kairat Almaty", "FC Astana"],
+        "clubs": [
+            "FK Aktobe",
+            "Tobol Kostanay",
+            "Ordabasy Shymkent",
+            "Kyzylzhar Petropavlovsk",
+            "FC Atyrau",
+            "Kaspy Aktau",
+            "Zhetysu Taldykorgan",
+            "Okzhetpes Kokshetau",
+        ],
+    },
+    {
+        "reg": 346,
+        "cid": 58,
+        "country": 205,
+        "name": "Meistriliiga",
+        "moved": [],
+        "rename": {},
+        "take": ["Flora Tallinn"],
+        "clubs": [
+            "Levadia Tallinn",
+            "Nomme Kalju",
+            "Paide Linnameeskond",
+            "Trans Narva",
+            "FC Kuressaare",
+            "Tammeka Tartu",
+            "Parnu Vaprus",
+            "Harju JK Laagri",
+            "Kalev Tallinn",
+        ],
+    },
+    {
+        "reg": 347,
+        "cid": 59,
+        "country": 193,
+        "name": "Armenian Premier League",
+        "moved": [],
+        "rename": {},
+        "take": ["Ararat-Armenia", "Pyunik Yerevan"],
+        "clubs": [
+            "FC Urartu",
+            "Ararat Yerevan",
+            "Alashkert",
+            "FC Noah",
+            "Van Charentsavan",
+            "BKMA Yerevan",
+            "West Armenia",
+            "Shirak Gyumri",
+        ],
+    },
+    {
+        "reg": 348,
+        "cid": 60,
+        "country": 217,
+        "name": "Virsliga",
+        "moved": [],
+        "rename": {},
+        "take": ["Riga FC", "FC RFS"],
+        "clubs": [
+            "Valmiera FC",
+            "FK Liepaja",
+            "FK Ventspils",
+            "BFC Daugavpils",
+            "Metta",
+            "Super Nova",
+            "Tukums 2000",
+            "Auda",
+        ],
+    },
+    {
+        "reg": 349,
+        "cid": 61,
+        "country": 219,
+        "name": "A Lyga",
+        "moved": [],
+        "rename": {},
+        "take": ["Zalgiris Vilnius", "Suduva"],
+        "clubs": [
+            "Kauno Zalgiris",
+            "FK Panevezys",
+            "Hegelmann",
+            "FA Siauliai",
+            "Banga Gargzdai",
+            "Dziugas Telsiai",
+            "TransINVEST",
+            "Dainava Alytus",
+        ],
+    },
+    {
+        "reg": 350,
+        "cid": 62,
+        "country": 311,
+        "name": "Superliga e Kosoves",
+        "moved": [],
+        "rename": {},
+        "take": ["FC Ballkani", "KF Prishtina"],
+        "clubs": [
+            "Drita Gjilan",
+            "SC Gjilani",
+            "KF Feronikeli",
+            "KF Llapi",
+            "KF Dukagjini",
+            "KF Malisheva",
+            "KF Vushtrria",
+            "KF Istogu",
+        ],
+    },
+    {
+        "reg": 351,
+        "cid": 63,
+        "country": 225,
+        "name": "NIFL Premiership",
+        "moved": [],
+        "rename": {},
+        "take": [],
+        "clubs": [
+            "Linfield",
+            "Glentoran",
+            "Crusaders",
+            "Cliftonville",
+            "Coleraine",
+            "Glenavon",
+            "Ballymena United",
+            "Portadown",
+            "Dungannon Swifts",
+            "Carrick Rangers",
+        ],
+    },
+    {
+        "reg": 352,
+        "cid": 64,
+        "country": 207,
+        "name": "Veikkausliiga",
+        "moved": [],
+        "rename": {},
+        "take": ["HJK Helsinki", "KuPS", "Inter Turku", "Ilves"],
+        "clubs": [
+            "HIFK",
+            "FC Honka",
+            "FC Lahti",
+            "IFK Mariehamn",
+            "SJK Seinajoki",
+            "VPS Vaasa",
+        ],
+    },
+    {
+        "reg": 375,
+        "cid": 48,
+        "country": 218,
+        "name": "Liechtensteiner Cup",
+        "moved": [],
+        "rename": {},
+        "take": ["Vaduz"],
+        "size": 7,
+        "fresh": True,
+        "clubs": [
+            "USV Eschen/Mauren",
+            "FC Balzers",
+            "FC Ruggell",
+            "FC Schaan",
+            "FC Triesen",
+            "FC Triesenberg",
+        ],
+    },
+]
+
+# The donor clubs each new league does not need go to "Other European Leagues", renamed to real
+# clubs of countries that still have no league of their own.  Names already in the world are
+# skipped, so the list is longer than the clubs needed.
+REFILL2 = [
+    ("FC Copenhagen", "DINAMARCA"),
+    ("FC Nordsjaelland", "DINAMARCA"),
+    ("FC Midtjylland", "DINAMARCA"),
+    ("Motherwell", "ESCOCIA"),
+    ("St Johnstone", "ESCOCIA"),
+    ("Kilmarnock", "ESCOCIA"),
+    ("Ross County", "ESCOCIA"),
+    ("Fenerbahce", "TURQUÍA"),
+    ("Besiktas", "TURQUÍA"),
+    ("Kasimpasa", "TURQUÍA"),
+    ("Antalyaspor", "TURQUÍA"),
+    ("Dynamo Moscow", "RUSIA"),
+    ("Ural Yekaterinburg", "RUSIA"),
+    ("FC Haka", "FINLANDIA"),
+    ("Saburtalo Tbilisi", "GEORGIA"),
+    ("Sliema Wanderers", "MALTA"),
+    ("Floriana FC", "MALTA"),
+    ("Progres Niederkorn", "LUXEMBURGO"),
+    ("FC Differdange 03", "LUXEMBURGO"),
+    ("Vikingur Gota", "ISLAS FEROE"),
+    ("HB Torshavn", "ISLAS FEROE"),
+    ("NSI Runavik", "ISLAS FEROE"),
+    ("Europa FC", "GIBRALTAR"),
+    ("St Joseph's", "GIBRALTAR"),
+    ("Inter Club d'Escaldes", "ANDORRA"),
+    ("Tre Fiori", "SAN MARINO"),
+    ("Tre Penne", "SAN MARINO"),
+    ("Zimbru Chisinau", "MOLDAVIA"),
+    ("Silkeborg IF", "DINAMARCA"),
+    ("Randers FC", "DINAMARCA"),
+    ("Konyaspor", "TURQUÍA"),
+    ("Krylia Sovetov", "RUSIA"),
+    ("FC Sochi", "RUSIA"),
+    ("Dacia Chisinau", "MOLDAVIA"),
 ]
 
 # real clubs of countries that still have no league of their own, to keep Other European at 48
@@ -273,6 +512,9 @@ def main():
         return 2
     dry = "--dry" in a
     latin = "--latin" in a
+    wave2 = "--wave2" in a
+    spec_list = SPEC2 if wave2 else SPEC
+    refill_list = REFILL2 if wave2 else REFILL
 
     teams = bytearray(
         pesdb.wesys_unpack(open(os.path.join(base, "Team.bin"), "rb").read())
@@ -314,7 +556,7 @@ def main():
         rowoff[int.from_bytes(teams[o + T_ID : o + T_ID + 4], "little")] = o
 
     names = {
-        tid: pesdb.cstr(teams[o + T_NAME : o + T_NAME + T_NAME_LEN]).strip()
+        tid: pesdb.cstr(teams[o + T_CANON : o + T_CANON + T_NAME_LEN]).strip()
         for tid, o in rowoff.items()
     }
 
@@ -335,6 +577,12 @@ def main():
         teams[o : o + T_REC] = row
         names[tid] = text
 
+    def tid_of(name):
+        for tid, n in names.items():
+            if n.strip().lower() == name.strip().lower():
+                return tid
+        raise SystemExit("no esta en el mundo: %r" % name)
+
     def move(tid, src, dst):
         k = ent_index(tid, src)
         if k is None:
@@ -344,33 +592,47 @@ def main():
         ents[k + M.E_CID] = dst
 
     # --- checks before writing
-    for spec in SPEC:
-        if len(spec["moved"]) + len(spec["clubs"]) != 10:
+    for spec in spec_list:
+        spec["moved"] = list(spec["moved"]) + [tid_of(n) for n in spec.get("take", [])]
+        if len(spec["moved"]) + len(spec["clubs"]) != spec.get("size", 10):
             raise SystemExit(
-                "league %s: %d moved + %d clubs != 10"
-                % (spec["name"], len(spec["moved"]), len(spec["clubs"]))
+                "league %s: %d moved + %d clubs != %d"
+                % (
+                    spec["name"],
+                    len(spec["moved"]),
+                    len(spec["clubs"]),
+                    spec.get("size", 10),
+                )
             )
     used = {}
     for tid, n in names.items():
         used.setdefault(n.lower(), []).append(tid)
     problems = []
-    for spec in SPEC:
+    for spec in spec_list:
         for n in spec["clubs"]:
             hit = used.get(n.lower())
             if hit:
                 problems.append("%s: already in the world as %s" % (n, hit))
-    for n, _ in REFILL:
-        hit = used.get(n.lower())
-        if hit:
-            problems.append("%s: already in the world as %s" % (n, hit))
     if problems:
         print("nombres duplicados:")
         for p in problems:
             print("  " + p)
         return 1
 
-    # --- the five leagues
-    for spec in SPEC:
+    # --- one league per country
+    in_entry = {
+        int.from_bytes(ents[k : k + 4], "little") for k in range(0, len(ents), M.ENT)
+    }
+    fresh_pool = sorted(
+        t
+        for t in rowoff
+        if t >= GAME_CLUB_MAX
+        and t not in in_entry
+        and "CLASSICS" not in names.get(t, "").upper()
+    )
+    fresh_taken = set()
+    trim = []
+    for spec in spec_list:
         cid, reg = spec["cid"], spec["reg"]
         fid = spec["country"]
         donors = [
@@ -378,27 +640,61 @@ def main():
             for k in range(0, len(ents), M.ENT)
             if ents[k + M.E_CID] == cid
         ]
-        if len(donors) != 10:
-            raise SystemExit("cid %d has %d clubs, expected 10" % (cid, len(donors)))
+        want = len(spec["clubs"]) + len(spec["moved"])
+        if len(donors) < want:
+            raise SystemExit("cid %d has %d clubs, needs %d" % (cid, len(donors), want))
         for tid in spec["moved"]:
             move(tid, OTHER_EU, cid)
-            if tid in spec["rename"]:
-                rename(tid, spec["rename"][tid], fid)
-        free = [t for t in donors if ent_index(t, cid) is not None]
-        staying = free[: len(spec["clubs"])]
-        leaving = free[len(spec["clubs"]) :]
-        if len(leaving) != len(spec["moved"]):
-            raise SystemExit(
-                "league %s: %d leaving for %d moved"
-                % (spec["name"], len(leaving), len(spec["moved"]))
+            # a real club that joins its country's league takes that country's flag
+            rename(tid, spec["rename"].get(tid, names[tid]), fid)
+        if spec.get("fresh"):
+            # the competition's own entries belong to clubs that play elsewhere (the old Copa
+            # Argentina): they go, and the new clubs come from team rows nobody uses
+            trim += [(t, cid) for t in donors]
+            pool = [t for t in fresh_pool if t not in fresh_taken]
+            pick = pool[: len(spec["clubs"])]
+            if len(pick) < len(spec["clubs"]):
+                raise SystemExit(
+                    "no hay clubes genericos libres para %s" % spec["name"]
+                )
+            fresh_taken |= set(pick)
+            for tid, name in zip(pick, spec["clubs"]):
+                rename(tid, name, fid)
+            eid = max(
+                int.from_bytes(ents[k + M.E_EID : k + M.E_EID + 4], "little")
+                for k in range(0, len(ents), M.ENT)
             )
-        for tid, name in zip(staying, spec["clubs"]):
-            rename(tid, name, fid)
-        print(
-            "reg %-3d cid %-2d %-38s %d clubes (%d movidos)"
-            % (reg, cid, spec["name"], 10, len(spec["moved"]))
-        )
-        spec["_leaving"] = leaving
+            for k, tid in enumerate(pick):
+                e = bytearray(M.ENT)
+                e[M.E_TEAM : M.E_TEAM + 4] = tid.to_bytes(4, "little")
+                e[M.E_EID : M.E_EID + 4] = (eid + 1 + k).to_bytes(4, "little")
+                e[M.E_CID] = cid
+                e[M.E_ORDER] = k + 1
+                ents += e
+            print(
+                "reg %-3d cid %-2d %-38s %d clubes (%d nuevos, %d fuera)"
+                % (reg, cid, spec["name"], want, len(pick), len(donors))
+            )
+            spec["_leaving"] = []
+        else:
+            free = [t for t in donors if ent_index(t, cid) is not None]
+            staying = free[: len(spec["clubs"])]
+            leaving = free[len(spec["clubs"]) : len(spec["clubs"]) + len(spec["moved"])]
+            trim += [(t, cid) for t in free[len(spec["clubs"]) + len(spec["moved"]) :]]
+            for tid, name in zip(staying, spec["clubs"]):
+                rename(tid, name, fid)
+            print(
+                "reg %-3d cid %-2d %-38s %d clubes (%d movidos%s)"
+                % (
+                    reg,
+                    cid,
+                    spec["name"],
+                    want,
+                    len(spec["moved"]),
+                    ", %d fuera" % (len(free) - want) if len(free) > want else "",
+                )
+            )
+            spec["_leaving"] = leaving
 
         # regulation name and teams
         for i in range(0, len(regs), M.REG):
@@ -406,7 +702,7 @@ def main():
                 continue
             rc = bytearray(regs[i : i + M.REG])
             M.put_names(rc, 0, spec["name"])
-            rc[M.R_TEAMS] = (rc[M.R_TEAMS] & ~0x3F) | 10
+            rc[M.R_TEAMS] = (rc[M.R_TEAMS] & ~0x3F) | (want & 0x3F)
             regs[i : i + M.REG] = rc
             break
         else:
@@ -426,19 +722,26 @@ def main():
             break
 
     # --- the clubs that go the other way, into Other European Leagues
-    leaving = [t for spec in SPEC for t in spec["_leaving"]]
-    if len(leaving) != len(REFILL):
-        raise SystemExit("%d leaving for %d refills" % (len(leaving), len(REFILL)))
-    for tid, (name, country) in zip(leaving, REFILL):
-        for spec in SPEC:
-            if tid in spec["_leaving"]:
-                move(tid, spec["cid"], OTHER_EU)
-                break
+    leaving = [(spec, t) for spec in spec_list for t in spec["_leaving"]]
+    seen_core = {core(v) for v in names.values()}
+    refills = []
+    for name, country in refill_list:
+        if len(refills) == len(leaving):
+            break
+        if name.lower() in used or core(name) in seen_core:
+            continue
+        refills.append((name, country))
+    for (spec, tid), (name, country) in zip(leaving, refills):
+        move(tid, spec["cid"], OTHER_EU)
         rename(tid, name, flag_of(country))
-    print(
-        "Other European: %d clubes nuevos -> %s"
-        % (len(leaving), ", ".join(n for n, _ in REFILL))
-    )
+        print("Other European: %-24s %s" % (name, country))
+    for spec, tid in leaving[len(refills) :]:
+        trim.append((tid, spec["cid"]))
+    if len(leaving) > len(refills):
+        print(
+            "Other European: %d sobrantes fuera (no hay club real con plaza libre)"
+            % (len(leaving) - len(refills))
+        )
 
     # --- Other Latin American Teams
     if latin:
@@ -469,15 +772,38 @@ def main():
         for name, country in picked:
             print("    %-26s %s" % (name, country))
 
+    if trim:
+        drop = set(trim)
+        keep = bytearray()
+        for k in range(0, len(ents), M.ENT):
+            key = (int.from_bytes(ents[k : k + 4], "little"), ents[k + M.E_CID])
+            if key not in drop:
+                keep += ents[k : k + M.ENT]
+        ents = keep
+        print("fuera %d entradas sobrantes" % len(drop))
+
     # --- renumber the order of every competition we touched
-    touched = {s["cid"] for s in SPEC} | ({95} if latin else set()) | {OTHER_EU}
-    for cid in touched:
+    touched = {s["cid"] for s in spec_list} | ({95} if latin else set()) | {OTHER_EU}
+    for cid in sorted(touched):
         n = 0
         for k in range(0, len(ents), M.ENT):
             if ents[k + M.E_CID] == cid:
                 n += 1
                 ents[k + M.E_ORDER] = n
         print("  cid %-3d order 1..%d" % (cid, n))
+
+    # --- "Other European Leagues" keeps whatever clubs have no league of their own
+    eu_count = sum(
+        1 for k in range(0, len(ents), M.ENT) if ents[k + M.E_CID] == OTHER_EU
+    )
+    for i in range(0, len(regs), M.REG):
+        if int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little") != OTHER_EU_REG:
+            continue
+        rc = bytearray(regs[i : i + M.REG])
+        rc[M.R_TEAMS] = (rc[M.R_TEAMS] & ~0x3F) | (eu_count & 0x3F)
+        regs[i : i + M.REG] = rc
+        print("Other European: %d clubes" % eu_count)
+        break
 
     if dry:
         print("dry run: nothing written")
@@ -507,23 +833,30 @@ def main():
             if rid in (382, 383):
                 print("world: fuera la gemela vacia %d" % rid)
                 continue
-            spec = next((s for s in SPEC if s["reg"] == rid), None)
+            spec = next((s for s in spec_list if s["reg"] == rid), None)
             if spec:
                 kv = dict(x.split("=", 1) for x in w[2:] if "=" in x)
                 out.append(
                     "league %d cid=%s region=%s country=%d conf=2 slot=%s tier=1 "
-                    "promote=0 demote=0 clubs=10 legs=%s kickoff=%s name=%s"
+                    "promote=0 demote=0 clubs=%d legs=%s kickoff=%s name=%s"
                     % (
                         rid,
                         kv.get("cid", spec["cid"]),
                         kv.get("region", "29"),
                         spec["country"],
                         kv.get("slot", "-1"),
+                        len(spec["clubs"]) + len(spec["moved"]),
                         kv.get("legs", "2"),
                         kv.get("kickoff", "99"),
                         spec["name"],
                     )
                 )
+                continue
+            if rid == OTHER_EU_REG:
+                parts = [
+                    "clubs=%d" % eu_count if p.startswith("clubs=") else p for p in w
+                ]
+                out.append(" ".join(parts))
                 continue
         out.append(line)
     io.open(wf, "w", encoding="utf-8", newline="\n").write("\n".join(out) + "\n")

@@ -23,6 +23,40 @@ asignación de rebanada más larga (`cc[20:20+48] = ...`) **alarga la fila** y d
 competiciones: `check_world` suelta 998 errores «competition 238 is not in Competition.bin». Hay
 que escribir `cc[20:36]`.
 
+## Segunda tanda (2026-11-03): nueve países y la copa de Liechtenstein
+
+`--wave2` usa `SPEC2` en vez de `SPEC` y hace tres cosas nuevas:
+
+| país | reg | cid | slot | reales que entran de «Otros Europa» |
+|---|---|---|---|---|
+| Bielorrusia | 344 | 55 | 216 | BATE, Dinamo Minsk, Shakhtyor Soligorsk |
+| Kazajistán | 345 | 57 | 217 | Kairat, Astana |
+| Estonia | 346 | 58 | 218 | Flora Tallinn |
+| Armenia | 347 | 59 | 219 | Ararat-Armenia, Pyunik |
+| Letonia | 348 | 60 | 220 | Riga FC, FC RFS |
+| Lituania | 349 | 61 | 221 | Žalgiris, Sūduva |
+| Kosovo | 350 | 62 | 222 | Ballkani, Prishtina |
+| Irlanda del Norte | 351 | 63 | 223 | — (diez clubes nuevos) |
+| Finlandia | 352 | 64 | 224 | HJK, KuPS, Inter Turku, Ilves |
+| Copa de Liechtenstein | 375 | 48 | -1 | Vaduz |
+
+Cambios de diseño respecto de la primera tanda:
+
+- **La copa de Liechtenstein ocupa el sitio de la Copa Argentina** (reg 375, cid 48). Los 48
+  clubes de esa copa son clubes argentinos de verdad que **siguen en sus divisiones**: sus
+  entradas de copa se borran y no se renombran, porque renombrar la fila del club lo cambiaría
+  también en su liga. Los seis clubes que faltan salen de filas de equipo **sin competición**
+  (`fresh`: genéricos sueltos), se renombran y se les añade su entrada en `CompetitionEntry.bin`
+  con un `eid` nuevo.
+- **Los donantes sobrantes** de cada liga (los que la liga no necesita porque entran reales) no se
+  pierden: van a «Other European Leagues» renombrados a clubes reales de países que aún no tienen
+  liga (Dinamarca, Escocia, Turquía, Rusia, Malta, Luxemburgo, Feroe, Gibraltar, Andorra, San
+  Marino, Moldavia). El grupo queda con **47** clubes y su regulación y su línea del mundo se
+  sincronizan con ese número.
+- **Trampa del nombre**: el nombre canónico del club está en el slot **0x170**, no en el 0x9E (que
+  viene vacío en las filas del juego). Leer 0x9E hace que `--take` no encuentre clubes como
+  «FC RFS» y que el filtro de duplicados no vea los nombres reales.
+
 ## Clubes: mover, no duplicar
 
 Los clubes reales del país que ya estaban en «Other European Leagues» (`cid 98`) se **mueven** a la
