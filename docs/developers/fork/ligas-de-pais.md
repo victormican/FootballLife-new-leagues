@@ -120,6 +120,12 @@ lista `LEAGUES` lleva una entrada por país y **se salta las que ya existen** (s
 | Haití (120) | 242 | 8460 | 109 | 237 |
 | RD del Congo (55) | 243 | 8461 | 110 | 238 |
 | Congo (98) | 244 | 8462 | 111 | 239 |
+| Fiyi (164) | 245 | 8463 | 112 | 240 |
+
+Y una liga que **ya existía llena de placeholders** se rellena en el sitio (`FILLS`), sin gastar
+`cid` ni slot: «Liga Pro OFC» (Nueva Caledonia, cid 168, reg 198, slot 180) tenía 24 clubes
+`Liga Pro OFC 01..24`; pasa a llamarse **Super Ligue** con 12 clubes reales y sus otras 12
+entradas se retiran (sus filas quedan libres), sincronizando regulación y mundo.
 
 Los diez clubes de cada una salen de filas que ninguna competición usa (`Generic League NN Club
 0N`), renombradas y con la bandera de su país. Curazao, Surinam, Haití y los dos Congos no tenían

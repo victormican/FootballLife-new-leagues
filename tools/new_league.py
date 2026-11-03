@@ -177,6 +177,54 @@ LEAGUES = [
             "AS Cheminots",
         ],
     },
+    {
+        "cid": 245,
+        "reg": 8463,
+        "region": 112,
+        "slot": 240,
+        "country": 164,
+        "conf": 7,
+        "name": "Fiji Premier League",
+        "code": "FL_164_D1",
+        "kickoff": 70,
+        "clubs": [
+            "Rewa FC",
+            "Ba FC",
+            "Suva FC",
+            "Lautoka FC",
+            "Nadi FC",
+            "Labasa FC",
+            "Nadroga FC",
+            "Navua FC",
+            "Nasinu FC",
+            "Tailevu Naitasiri",
+        ],
+    },
+]
+
+# Leagues that already exist but are full of placeholders: their clubs are renamed and the
+# surplus entries go, so the competition keeps its cid, region and slot.
+FILLS = [
+    {
+        "cid": 168,
+        "reg": 198,
+        "country": 165,
+        "name": "Super Ligue",
+        "clubs": [
+            "AS Magenta",
+            "Hienghène Sport",
+            "AS Tiga Sport",
+            "AS Lössi",
+            "SC Ne Drehu",
+            "Horizon Patho",
+            "AS Mont-Dore",
+            "CA Saint-Louis",
+            "ES Wé Luécilla",
+            "AS Wetr",
+            "US Cagou",
+            "JS Baco",
+        ],
+    },
 ]
 
 
@@ -346,6 +394,70 @@ def main():
     if not pending:
         print("no queda ninguna liga por crear")
 
+    # --- leagues that exist but are full of placeholders
+    for spec in FILLS:
+        rows_in = sorted(
+            (
+                (ents[k + M.E_ORDER], k)
+                for k in range(0, len(ents), M.ENT)
+                if ents[k + M.E_CID] == spec["cid"]
+            )
+        )
+        if not rows_in:
+            raise SystemExit("competition %d has no entries" % spec["cid"])
+        first = int.from_bytes(ents[rows_in[0][1] : rows_in[0][1] + 4], "little")
+        if name(off()[first]) == spec["clubs"][0]:
+            print("%s: ya tiene sus clubes" % spec["name"])
+            continue
+        if len(rows_in) < len(spec["clubs"]):
+            raise SystemExit(
+                "competition %d has %d entries, not %d"
+                % (spec["cid"], len(rows_in), len(spec["clubs"]))
+            )
+        off3 = off()
+        for (_, k), club in zip(rows_in, spec["clubs"]):
+            tid = int.from_bytes(ents[k : k + 4], "little")
+            o = off3[tid]
+            row = bytearray(teams[o : o + T_REC])
+            put_team_name(row, club)
+            set_country(row, spec["country"])
+            teams[o : o + T_REC] = row
+        # the entries the league no longer uses go; the rest keep their order
+        keep_teams = {
+            int.from_bytes(ents[k : k + 4], "little")
+            for _, k in rows_in[: len(spec["clubs"])]
+        }
+        keep = bytearray()
+        for k in range(0, len(ents), M.ENT):
+            tid = int.from_bytes(ents[k : k + 4], "little")
+            if ents[k + M.E_CID] == spec["cid"] and tid not in keep_teams:
+                continue
+            keep += ents[k : k + M.ENT]
+        ents = keep
+        order = sorted(
+            (
+                (int.from_bytes(ents[k + 4 : k + 8], "little"), k)
+                for k in range(0, len(ents), M.ENT)
+                if ents[k + M.E_CID] == spec["cid"]
+            )
+        )
+        for i, (_, k) in enumerate(order, 1):
+            ents[k + M.E_ORDER] = i
+        n_fill = len(order)
+        for i in range(0, len(regs), M.REG):
+            if regs[i + M.R_CID] == spec["cid"]:
+                regs[i + M.R_TEAMS] = (regs[i + M.R_TEAMS] & 0xC0) | (n_fill & 0x3F)
+                M.put_names(regs, i, spec["name"])
+                break
+        for i in range(0, len(comp), M.COMP):
+            if comp[i + M.CID_OFF] == spec["cid"]:
+                M.put(comp, i + 0x14, spec["name"], 16)
+                break
+        print(
+            "%s: cid %d, %d clubes (de %d filas)"
+            % (spec["name"], spec["cid"], n_fill, len(rows_in))
+        )
+
     if dry:
         print("dry run: nothing written")
         return 0
@@ -367,15 +479,29 @@ def main():
         if regs[i + M.R_CID] == OTHER_LAT
     )
     lines = io.open(wf, encoding="utf-8", errors="replace").read().splitlines()
+    fill_cid = {s["cid"]: s for s in FILLS}
     out, last = [], 0
     for line in lines:
         w = line.split()
         if w and w[0] == "league":
             last = len(out)
+            kv = dict(p.split("=", 1) for p in w[2:] if "=" in p)
             if w[1].isdigit() and int(w[1]) == lat_reg:
                 line = " ".join(
                     "clubs=%d" % n_lat if p.startswith("clubs=") else p for p in w
                 )
+            elif "cid" in kv and int(kv["cid"]) in fill_cid:
+                spec = fill_cid[int(kv["cid"])]
+                n = sum(
+                    1
+                    for k in range(0, len(ents), M.ENT)
+                    if ents[k + M.E_CID] == spec["cid"]
+                )
+                cut = next(
+                    (i for i, p in enumerate(w) if p.startswith("name=")), len(w)
+                )
+                w = [p for p in w[:cut] if not p.startswith("clubs=")]
+                line = " ".join(w + ["clubs=%d" % n, "name=%s" % spec["name"]])
         out.append(line)
     for spec in pending:
         last += 1
