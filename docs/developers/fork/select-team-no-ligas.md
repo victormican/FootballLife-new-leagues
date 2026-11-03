@@ -93,6 +93,27 @@ da si Oceania va en un slot **mayor que 4 y menor que 22**, y los no FIFA en el 
 75 Other Clubs (Africa)
 ```
 
+## Decidido y aplicado (2026-11-03)
+
+Los cinco «Others», **Oceania** y **Selecciones No FIFA** no son ligas y no salen en la lista de
+ligas: sus líneas del mundo llevan **`slot=123`**, el centinela oculto de `fl26comptab` («a league
+on slot=123 still gets a row of its own, on the hidden slot», para que conserve su recuento de
+ascensos). Con 123 no entran en Select Team, pero siguen existiendo como competiciones y sus clubes
+siguen en el juego.
+
+| grupo | cid | slot antes | slot ahora |
+|---|---|---|---|
+| Other European Leagues | 98 | 69 | **123** |
+| Other Clubs (Asia) | 254 | 70 | **123** |
+| Other Latin American Teams | 95 | 73 | **123** |
+| Other Clubs (Africa) | 165 | 75 | **123** |
+| Otros Concacaf | 221 | 128 | **123** |
+| Oceania | 91 | 76 | **123** |
+| Selecciones No FIFA | 255 | -1 | **123** |
+
+`check_world` ya no cuenta 123 como slot ocupado (puede repetirse), y `fl26comptab` tampoco: su
+comprobación de «slot pedido dos veces» excluye 123.
+
 ## Recomendación
 
 1. **Ya:** dejar de liberar 69, 73 y 75 → los tres «Other» vuelven a leerse como categorías (A).
