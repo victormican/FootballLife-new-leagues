@@ -53,3 +53,27 @@ start in one.
    - `fl26swiss: Cup mode -- N world cup(s) added, all in (list X of Y)`
    - if it says `no room for the rest`, the Cup vector is full and the remaining cups are not
      offered; the log gives the size.
+
+## Más de 13 copas: `fl26cupgrow.lua`
+
+La lista del menú es un vector con sitio para 13 items (156 bytes), y con las dos competiciones
+que se quitan por grupos de 36/34 clubes solo quedaban **5 huecos** para las nuestras: de las 19
+del mundo entraban 5 y el log decía `no room for the rest (list 13 of 13)`.
+
+`fl26cupgrow.lua` (activo desde 2026-11-04) envuelve el slot de la vtable donde `fl26swiss` dejó
+su handler: antes de llamarlo, copia los items que ya hay a un buffer de **64 items** (de un anillo
+de 16 buffers de 768 B), repunta `begin/end/cap` (`self+0x90/+0x98/+0xa0`) y salta al handler
+anterior. Así el handler encuentra sitio y añade todas. El destructor (`0x140b1c810`) se neutraliza
+para que no libere un buffer ajeno.
+
+Dos fallos del stub, medidos a base de crashes del 2026-11-04 y ya corregidos:
+
+1. `begin` se guardaba en `rax` y luego `rax` se reutilizaba como índice del anillo: el
+   `rep movsb` copiaba desde la dirección 0 (crash `0x16110026f`). Ahora `begin` va en `rdx`, con
+   su `push`/`pop`.
+2. El SIB de `mov r11,[r10+rax*8]` llevaba REX.X y leía `[r10+r8*8]`.
+
+Resultado en vivo: `Cup mode -- 19 world cup(s) added, all in (list 27 of 64)`.
+
+Y la línea de log final usaba `%#x`, que el `format` de LuaJIT no acepta: el módulo se quedaba en
+"NOT activated" con el parche ya escrito. Ahora concatena con `string.format("%x", …)`.
