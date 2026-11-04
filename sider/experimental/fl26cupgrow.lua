@@ -1,30 +1,39 @@
 ﻿--[[
-fl26cupgrow -- que quepan mas de 13 copas en Kick Off > Cup.
+fl26cupgrow -- mas de 13 copas en Kick Off > Cup.
 
-Medido el 2026-11-03: la lista del menu es un vector de items de 12 bytes {cid, 0xffff, 0} con
-capacidad 13. Ocho los pone el juego y fl26swiss añade los del mundo hasta llenarla. Su ensanche
-propio (VirtualAlloc) solo actua si el array vive dentro del objeto; con el vector en el heap lo
-deja quieto, y eso cambia de un arranque a otro.
+Autopsia (2026-11-03): cupsel_handler (fl26swiss) quita las copas con grupos de mas de 32 clubes,
+AÑADE las del mundo y solo al final llama al init del menu. Por eso el init llega tarde: cuando
+corre, las que no cupieron ya se descartaron.
 
-Esto quita la loteria: al arrancar se piden 16 buffers de 768 bytes (64 items) al CRT del juego y
-se guardan en un anillo. El constructor del menu (0x140b1c6f0) recibe un stub que, si la lista esta
-vacia, la pone sobre uno de esos buffers. El propio juego y fl26swiss llenan la lista despues con
-sitio de sobra, y el destructor la libera con su mismo heap.
+Se envuelve el slot de la vtable (0x142692d18), donde fl26swiss dejo su handler. El stub mueve la
+lista (los 8 items que ya puso el juego) a un buffer de 64 items del anillo y SALTA al handler
+(tail call: sin marco propio, sin call, rsp intacta). El handler encuentra sitio y añade las 19.
 
-Nada se escribe si los buffers no se consiguen. Necesita luajit.ext.enabled = 1 (ffi global).
+El destructor (0x140b1c810) anula begin/end/cap antes de que la clase base libere la lista: free(NULL)
+no hace nada y no se libera un buffer ajeno.
+
+Los buffers son 16 x 768 B de VirtualAlloc. Nada se escribe si los bytes no son los esperados.
+Necesita luajit.ext.enabled = 1 (ffi global).
 --]]
 
 local m = {}
 
-local CTOR  = 0x140b1c6f0
-local CTOR_OLD = "48894c2408"     -- mov [rsp+8], rcx
-local WANT  = 64
-local RING  = 16
+local VT = 0x142692d18
+local DTOR, DTOR_NEXT = 0x140b1c810, 0x140b1c824
+local DTOR_OLD = "40574883ec3048c7442420feffffff48895c2448488bf9"
+local WANT, RING = 64, 16
 
-local STUB = "48894c240848890d000000004883b990000000000f854b000000" ..
-             "48b800000000000000004c8b90800000004983fa100f8330000000" ..
-             "4e8b1cd04d85db0f842300000048ff80800000004c8999900000004c" ..
-             "899998000000498d8300030000488981a0000000e900000000"
+-- 176 bytes: crece la lista y salta al handler previo. Huecos: anillo en 49, prev en 166.
+local VSTUB = "51565741574989cf498b87900000004885c00f84870000004d8b9fa00000004929c34981" ..
+              "fb000300000f837000000049ba0000000000000000498b82800000004883f8100f8355" ..
+              "00000049838280000000014f8b1cc24d85db0f8440000000498b8f980000004829c148" ..
+              "89c64c89dff3a4498b8798000000492b87900000004d899f90000000498d0c0349898f" ..
+              "98000000498d8b0003000049898fa0000000415f5f5e5948b85052455650524556ffe0"
+
+-- 60 bytes: prologo del destructor y anulacion de la lista
+local DSTUB = "40574883ec3048c7442420feffffff48895c2448488bf9" ..
+              "48c7819000000000000000" .. "48c7819800000000000000" ..
+              "48c781a000000000000000" .. "e900000000"
 
 local function bin(h) return (h:gsub("%x%x", function(b) return string.char(tonumber(b, 16)) end)) end
 local function u32(v)
@@ -37,19 +46,17 @@ local function u64(v)
   for i = 0, 7 do t[#t + 1] = string.char(math.floor(v / 2 ^ (8 * i)) % 256) end
   return table.concat(t)
 end
+local function hex(s) return (s:gsub(".", function(c) return string.format("%02x", c:byte()) end)) end
 
 function m.init(ctx)
   if ffi == nil then log("fl26cupgrow: global ffi is nil -- set luajit.ext.enabled = 1"); return end
-  ffi.cdef([[ void* VirtualAlloc(void*, unsigned long, unsigned long, unsigned long);
-              void* LoadLibraryA(const char*);
-              void* GetProcAddress(void*, const char*); ]])
-  local got = memory.read(CTOR, #CTOR_OLD / 2)
-  if got == nil or got:gsub(".", function(c) return string.format("%02x", c:byte()) end) ~= CTOR_OLD then
-    log("fl26cupgrow: the menu constructor is not the expected code -- nothing written"); return
+  ffi.cdef([[ void* VirtualAlloc(void*, unsigned long, unsigned long, unsigned long); ]])
+  local prev = tonumber(ffi.cast("uint64_t*", VT)[0])
+  if not prev or prev == 0 then log("fl26cupgrow: the vtable slot is empty -- nothing written"); return end
+  local b = memory.read(DTOR, #DTOR_OLD / 2)
+  if b == nil or hex(b) ~= DTOR_OLD then
+    log("fl26cupgrow: the menu destructor is not the expected code -- nothing written"); return
   end
-  -- el asignador del propio ejecutable (0x140227930 -> 0x1403fb2e0, tamaño en rcx):
-  -- es el que despues libera el destructor del menu, asi que el bloque tiene que venir de ahi
-  local malloc = ffi.cast("void* (*)(unsigned long)", 0x140227930)
 
   local page = nil
   for _, pref in ipairs({ 0x15e100000, 0x15f100000, 0x161100000, 0x171100000 }) do
@@ -58,30 +65,34 @@ function m.init(ctx)
   end
   if page == nil then log("fl26cupgrow: no page"); return end
   local base = tonumber(ffi.cast("uint64_t", page))
-  local selfptr, ring, idx, code = base, base + 0x100, base + 0x180, base + 0x200
+  local ring, idx, vstub, dstub = base + 0x100, base + 0x180, base + 0x200, base + 0x400
 
   local n = 0
   for i = 0, RING - 1 do
-    local b = malloc(WANT * 12)
-    if b == nil then break end
-    ffi.cast("uint64_t*", ring + i * 8)[0] = ffi.cast("uint64_t", b)
+    local bufp = ffi.C.VirtualAlloc(nil, WANT * 12, 0x3000, 0x04)
+    if bufp == nil then break end
+    ffi.cast("uint64_t*", ring + i * 8)[0] = ffi.cast("uint64_t", bufp)
     n = n + 1
   end
   if n < 2 then log(string.format("fl26cupgrow: only %d buffer(s)", n)); return end
   ffi.cast("uint64_t*", idx)[0] = 0
 
-  local s = bin(STUB)
-  s = s:sub(1, 8) .. u32(selfptr - (code + 12)) .. s:sub(13)
-  s = s:sub(1, 28) .. u64(ring) .. s:sub(37)
-  s = s:sub(1, 102) .. u32((CTOR + 5) - (code + 0x65 + 5)) .. s:sub(107)
-  memory.write(code, s)
-  local j = u32((code) - (CTOR + 5))
-  memory.write(CTOR, "\233" .. j)
+  local s = bin(VSTUB)
+  s = s:sub(1, 49) .. u64(ring) .. s:sub(58)      -- anillo en 49..56
+  s = s:sub(1, 166) .. u64(prev) .. s:sub(175)    -- handler previo en 166..173
+  memory.write(vstub, s)
+  memory.write(VT, u64(vstub))
 
-  if memory.read(CTOR, 1):byte(1) ~= 0xE9 then
-    log("fl26cupgrow: the jump did not stick"); return
+  local d = bin(DSTUB)
+  d = d:sub(1, 56) .. u32(DTOR_NEXT - (dstub + 60)) .. d:sub(61)
+  memory.write(dstub, d)
+  memory.write(DTOR, "\233" .. u32(dstub - (DTOR + 5)))
+
+  if tonumber(ffi.cast("uint64_t*", VT)[0]) ~= vstub or memory.read(DTOR, 1):byte(1) ~= 0xE9 then
+    log("fl26cupgrow: a patch did not stick"); return
   end
-  log(string.format("fl26cupgrow: %d buffers of %d items, constructor hooked (stub %#x)", n, WANT, code))
+  log(string.format("fl26cupgrow: %d buffers of %d items; vtable wrapped (%#x -> %#x), destructor neutralised",
+                    n, WANT, prev, vstub))
 end
 
 return m
