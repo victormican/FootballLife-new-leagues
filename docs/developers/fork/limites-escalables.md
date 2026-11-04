@@ -511,3 +511,26 @@ cpk.root = ".\livecpk\FL26 Regen Faces"
 Y hay **dos** `fl26world.txt`: el del mundo (`_FL26MyWorld\fl26world.txt`, el que editan las
 herramientas) y el que leen los módulos (`SiderAddons\modules\fl26world.txt`). **Hay que
 copiar el primero sobre el segundo** o los cambios no se ven.
+
+### Revertido el mismo día (2026-11-04)
+
+Las 8 ligas **se quitaron** a peticion del usuario. Restaurado desde
+`*.before-8ligas-20261104-075733` (las cuatro tablas) y `fl26world.txt.before-8ligas-*`:
+**256 competiciones, 142 ligas, 19 lineas `ccup`, 0 errores**; ningun `cid 258..265` y ninguna
+linea `900..907`. `Team.bin` vuelve al backup, asi que los nombres de los grupos "Other" quedan
+intactos.
+
+Tambien se deshizo el experimento de regiones: Oceania y No Selecciones FIFA vuelven a
+**region 25** y `fl26regnames.lua` queda desactivado.
+
+**Por que salio mal** (para no repetirlo):
+
+- las 8 ligas se pusieron en `slot=1..8`, que son los slots de los **pools del juego**
+  (`fl26clubs` sirve esos slots desde la regulacion de la liga): el pool dejo de mostrar sus
+  clubes, que es lo que el usuario echo en falta;
+- al moverlas a `slot=9..16`, `fl26comptab` **aborto** ("slot 16 is already competition 50, not
+  free"): los slots 9..16 ya tienen competicion en la tabla del juego, aunque el mundo no las
+  nombre. Un slot libre de verdad solo lo sabe `fl26comptab`: se pide con **`slot=-1`** y el
+  modulo lo asigna en el arranque.
+- y el selector de filas de club tomaba filas de los pools (`Team.bin +0x4f` nibble alto), que
+  no tienen entrada: hay que exigir `(r[0x4f] >> 4) == 0`.
