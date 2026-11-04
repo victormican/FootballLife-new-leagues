@@ -1,38 +1,37 @@
 ﻿--[[
-fl26cupgrow -- mas de 13 copas en Kick Off > Cup, sin depender del heap.
+fl26cupgrow -- que quepan mas de 13 copas en Kick Off > Cup.
 
 Medido el 2026-11-03: la lista del menu es un vector de items de 12 bytes {cid, 0xffff, 0} con
-capacidad 13. Ocho los pone el juego y fl26swiss añade los del mundo hasta llenarla, descartando el
-resto. Su propio ensanche (VirtualAlloc) solo actua cuando el array vive dentro del objeto; si el
-vector acaba en el heap lo deja quieto, y eso cambia de un arranque a otro.
+capacidad 13. Ocho los pone el juego y fl26swiss añade los del mundo hasta llenarla. Su ensanche
+propio (VirtualAlloc) solo actua si el array vive dentro del objeto; con el vector en el heap lo
+deja quieto, y eso cambia de un arranque a otro.
 
-Esto lo hace determinista: al arrancar se piden 16 buffers de 768 bytes (64 items) al mismo CRT que
-usa el juego y se guardan en un anillo. El stub que envuelve el init del menu (slot de la vtable
-0x142692d18) toma el siguiente buffer, copia la lista y repunta begin/end/cap. El destructor del
-menu libera ese buffer con su propio heap, y cada apertura gasta uno del anillo.
+Esto quita la loteria: al arrancar se piden 16 buffers de 768 bytes (64 items) al CRT del juego y
+se guardan en un anillo. El constructor del menu (0x140b1c6f0) recibe un stub que, si la lista esta
+vacia, la pone sobre uno de esos buffers. El propio juego y fl26swiss llenan la lista despues con
+sitio de sobra, y el destructor la libera con su mismo heap.
 
-Nada se escribe si el slot de la vtable esta vacio o los buffers no se consiguen.
-Necesita luajit.ext.enabled = 1 (ffi global).
+Nada se escribe si los buffers no se consiguen. Necesita luajit.ext.enabled = 1 (ffi global).
 --]]
 
 local m = {}
 
-local VT    = 0x142692d18      -- vtable slot de fl26swiss (handler del menu de copas)
-local WANT  = 64               -- items por buffer
-local RING  = 16               -- buffers del anillo
+local CTOR  = 0x140b1c6f0
+local CTOR_OLD = "48894c2408"     -- mov [rsp+8], rcx
+local WANT  = 64
+local RING  = 16
 
-local STUB = "535657415441554883ec28488bd95241504151" ..
-             "488b8398000000482b83900000004885c00f8493000000488b93a0000000482b93900000" ..
-             "004881fa000300000f8378000000" ..
-             "49beRINGRING" ..
-             "498b86800000004883f8100f835d00000049838680000000014d8b24c64d85e40f84" ..
-             "48000000" ..
-             "4c8bab90000000488b8b980000004c29e94c89ee4c89e7f3a4488b9398000000482b93" ..
-             "900000004c89a390000000498d041448898398000000498d842400030000488983a000" ..
-             "0000" ..
-             "415941585a4889d948b8PREVPREVffd04883c428415d415c5f5e5bc3"
+local STUB = "48894c240848890d000000004883b990000000000f854b000000" ..
+             "48b800000000000000004c8b90800000004983fa100f8330000000" ..
+             "4e8b1cd04d85db0f842300000048ff80800000004c8999900000004c" ..
+             "899998000000498d8300030000488981a0000000e900000000"
 
 local function bin(h) return (h:gsub("%x%x", function(b) return string.char(tonumber(b, 16)) end)) end
+local function u32(v)
+  v = v % 0x100000000
+  return string.char(v % 256, math.floor(v / 256) % 256,
+                     math.floor(v / 65536) % 256, math.floor(v / 16777216) % 256)
+end
 local function u64(v)
   local t = {}
   for i = 0, 7 do t[#t + 1] = string.char(math.floor(v / 2 ^ (8 * i)) % 256) end
@@ -44,12 +43,13 @@ function m.init(ctx)
   ffi.cdef([[ void* VirtualAlloc(void*, unsigned long, unsigned long, unsigned long);
               void* LoadLibraryA(const char*);
               void* GetProcAddress(void*, const char*); ]])
-  local prev = tonumber(ffi.cast("uint64_t*", VT)[0])
-  if not prev or prev == 0 then log("fl26cupgrow: the vtable slot is empty -- nothing written"); return end
-  local h = ffi.C.LoadLibraryA("ucrtbase.dll")
-  local pm = h ~= nil and ffi.C.GetProcAddress(h, "malloc") or nil
-  if pm == nil then log("fl26cupgrow: no ucrtbase malloc -- nothing written"); return end
-  local malloc = ffi.cast("void* (*)(unsigned long)", pm)
+  local got = memory.read(CTOR, #CTOR_OLD / 2)
+  if got == nil or got:gsub(".", function(c) return string.format("%02x", c:byte()) end) ~= CTOR_OLD then
+    log("fl26cupgrow: the menu constructor is not the expected code -- nothing written"); return
+  end
+  -- el asignador del propio ejecutable (0x140227930 -> 0x1403fb2e0, tamaño en rcx):
+  -- es el que despues libera el destructor del menu, asi que el bloque tiene que venir de ahi
+  local malloc = ffi.cast("void* (*)(unsigned long)", 0x140227930)
 
   local page = nil
   for _, pref in ipairs({ 0x15e100000, 0x15f100000, 0x161100000, 0x171100000 }) do
@@ -58,27 +58,30 @@ function m.init(ctx)
   end
   if page == nil then log("fl26cupgrow: no page"); return end
   local base = tonumber(ffi.cast("uint64_t", page))
-  local ring, idx, code = base + 0x100, base + 0x180, base + 0x200
+  local selfptr, ring, idx, code = base, base + 0x100, base + 0x180, base + 0x200
 
-  local got = 0
+  local n = 0
   for i = 0, RING - 1 do
     local b = malloc(WANT * 12)
     if b == nil then break end
     ffi.cast("uint64_t*", ring + i * 8)[0] = ffi.cast("uint64_t", b)
-    got = got + 1
+    n = n + 1
   end
-  if got < 2 then log(string.format("fl26cupgrow: only %d buffer(s) -- nothing written", got)); return end
+  if n < 2 then log(string.format("fl26cupgrow: only %d buffer(s)", n)); return end
   ffi.cast("uint64_t*", idx)[0] = 0
 
-  local bytes = bin((STUB:gsub("RINGRING", function() return u64(ring):gsub(".", function(c) return string.format("%02x", c:byte()) end) end)
-                         :gsub("PREVPREV", u64(prev))))
-  memory.write(code, bytes)
-  memory.write(VT, u64(code))
-  if tonumber(ffi.cast("uint64_t*", VT)[0]) ~= code then
-    log("fl26cupgrow: the vtable write did not stick"); return
+  local s = bin(STUB)
+  s = s:sub(1, 8) .. u32(selfptr - (code + 12)) .. s:sub(13)
+  s = s:sub(1, 28) .. u64(ring) .. s:sub(37)
+  s = s:sub(1, 102) .. u32((CTOR + 5) - (code + 0x65 + 5)) .. s:sub(107)
+  memory.write(code, s)
+  local j = u32((code) - (CTOR + 5))
+  memory.write(CTOR, "\233" .. j)
+
+  if memory.read(CTOR, 1):byte(1) ~= 0xE9 then
+    log("fl26cupgrow: the jump did not stick"); return
   end
-  log(string.format("fl26cupgrow: %d buffers of %d items, menu init wrapped (%#x -> %#x)",
-                    got, WANT, prev, code))
+  log(string.format("fl26cupgrow: %d buffers of %d items, constructor hooked (stub %#x)", n, WANT, code))
 end
 
 return m
