@@ -270,3 +270,39 @@ fuente de la copia es el que generó el binario que corre**.
   binarios (el de siempre incluido). Es del mundo/instalación, no del ensanche. Para ver la pila
   hace falta un depurador **elevado**: `DebugActiveProcess` sobre `FL_2026.exe` da *Acceso
   denegado* desde una consola sin admin.
+
+### Solución aplicada: tapar el `free` del destructor (2026-11-04)
+
+Recompilar el DLL no hizo falta. El `free` que corrompe el pool se desactiva con **siete bytes**
+desde Lua, al arrancar, en el módulo `fl26cupfree.lua` (`sider/experimental/`, copiado a
+`SiderAddons/modules/` y cargado en `sider.ini` justo después de `fl26swiss.lua`):
+
+```
+0x140c6b207   48 8B 91 90 00 00 00   mov rdx, qword [rcx+0x90]     <- destructor base 0x140c6b1e0
+           -> 31 D2 90 90 90 90 90   xor edx, edx / 5 nops
+```
+
+Con `rdx` a cero, `test rdx,rdx` / `jz` salta el bloque del `pool_free(&2, begin)`, que es el que
+desenganchaba de un árbol rojo-negro un puntero que no era un bloque del pool (`[p-8]` basura).
+El resto del destructor (liberar `+0xb8` y `+0xd0` y saltar a `0x140e39230`) sigue igual, y la
+lista, que solo se lee, se va con el objeto.
+
+El módulo verifica los siete bytes antes de escribir y comprueba que el parche quedó; si no
+coinciden, no toca nada. **Coste**: el buffer de la lista se filtra una vez por destrucción del
+menú (156 B, o 516 B cuando `fl26swiss` lo ensanchó a 43).
+
+Sesión de validación (2026-11-04, DLL `CD9D6537…` sin recompilar):
+
+```
+[fl26cupfree.lua] fl26cupfree: the cup list is no longer freed by the menu destructor (0x140c6b207)
+[fl26swiss.lua] fl26swiss: CUPVEC … begin=self+0x180 cap=self+0x21C have=8 room=13
+[fl26swiss.lua] fl26swiss: Cup mode -- list enlarged from 8 to 43 entries
+[fl26swiss.lua] fl26swiss: Cup mode -- 18 world cup(s) added, all in (list 26 of 43)
+```
+
+**19 copas en Kick Off > Cup y cierre limpio** (`Posted message for sider.exe to quit` /
+`All done.`, sin evento 1000).
+
+Queda **abierta** una caída intermitente en el menú principal **sin abrir Copas**
+(`FL_2026+0x3fd2b2`), que apareció con los DLL recompilados y una vez con el de siempre: es otra
+causa (corrupción de heap del mundo/instalación), no este ensanche.
