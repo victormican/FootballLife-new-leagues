@@ -114,6 +114,7 @@ static volatile uint32_t g_stat[5];
 
 /* ---- small text log, drained by the Lua loader into sider.log ---- */
 static char g_log[65536]; static volatile int g_log_len = 0;
+static volatile uint64_t g_edit_base_seen = 0;
 static void logf(const char* fmt, ...)
 {
   char line[256]; va_list ap; va_start(ap, fmt);
@@ -11824,12 +11825,31 @@ uint64_t date_handler(uint64_t reg, void* vec)
  * holds more than 32 clubs. */
 #define CUPSEL_VT_RVA   0x2692d18   /* vtable 0x142692c40 + 0xd8 */
 #define CUPSEL_INIT_RVA 0xb1c990
+#define CUPSEL_POOL_RVA_ALLOC 0x3fb330   /* void* pool_alloc(int* pool, size_t bytes, size_t align, size_t extra) */
+#define CUPSEL_POOL_RVA_FREE  0x3fb5b0   /* void  pool_free (int* pool, void* p) */
+#define CUPSEL_POOL 2                    /* the pool the menu's list belongs to (0x140c6b1e0) */
 typedef char (*cupsel_fn)(void* self, uint64_t a, uint64_t b, uint64_t c);
+typedef void* (*pool_alloc_fn)(int* pool, size_t bytes, size_t align, size_t extra);
+typedef void (*pool_free_fn)(int* pool, void* p);
 static uint32_t g_cupsel_n = 0;
 /* the competitions the world built (the ccup lines' cid=): Cup mode lists the shipped cups
    only, so these are added to its list when there is room. */
 static uint16_t g_cupcid[MAX_CCUP];
 static int g_ncupcid = 0;
+
+/* Buffers the game will free itself have to come from the game's own pool allocator: its
+   heap unlinks blocks through a red-black tree, so anything else walks garbage. */
+static void* fl_pool_alloc(int pool, size_t bytes)
+{
+  int tag = pool;
+  return ((pool_alloc_fn)(uintptr_t)(g_base + CUPSEL_POOL_RVA_ALLOC))(&tag, bytes, 0x10, 0x10);
+}
+
+static void fl_pool_free(int pool, void* p)
+{
+  int tag = pool;
+  if (p) ((pool_free_fn)(uintptr_t)(g_base + CUPSEL_POOL_RVA_FREE))(&tag, p);
+}
 __declspec(dllexport) int fl26_swiss_cup_cids(const uint16_t* v, int n)
 {
   g_ncupcid = 0;
@@ -11870,26 +11890,29 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
     logf("fl26swiss: CUPVEC self=%p begin=%p end=%p cap=%p have=%u room=%u caller=%p",
          (void*)self, (void*)*pb, (void*)w, (void*)*cap, (unsigned)have, (unsigned)room,
          __builtin_return_address(0));
-    /* The menu reserves its list in an array of its own (13 items in this build).  If that
-       array lives inside the object -- which is what an 0xa0 less than a few KB from self
-       means -- it is not freed on destruction, so the list can be pointed at a bigger one.
-       A heap buffer is left alone: its destructor would free our pointer. */
+    /* The menu reserves its list in an array of its own (13 items in this build).  The grown
+       buffer comes from the game's own pool allocator (pool 2, the one the menu's base
+       destructor 0x140c6b1e0 hands the list back to), so repointing the vector at it survives
+       the teardown.  A buffer from elsewhere -- VirtualAlloc, the CRT -- is what made the
+       teardown walk a block that is not in the pool and crash at 0x1403fd5db.  The old buffer
+       is released only when it is not the array inside the object. */
     if (g_ncupcid > 0 && room < have + (size_t)g_ncupcid) {
-      unsigned char* in_object = (unsigned char*)self;
-      if (*cap && *cap > in_object && *cap < in_object + 0x2000) {
-        size_t want = have + (size_t)g_ncupcid + 16;
-        unsigned char* big = (unsigned char*)VirtualAlloc(NULL, want * 12, 0x3000, 0x04);
-        if (big) {
-          memcpy(big, *pb, have * 12);
-          *pb = big;
-          *pe = big + have * 12;
-          *cap = big + want * 12;
-          w = *pe;
-          room = want;
-          logf("fl26swiss: Cup mode -- list enlarged from %u to %u entries", (unsigned)(have), (unsigned)want);
-        }
+      size_t want = have + (size_t)g_ncupcid + 16;
+      unsigned char* big = (unsigned char*)fl_pool_alloc(CUPSEL_POOL, want * 12);
+      if (big) {
+        unsigned char* old = *pb;
+        if (have) memcpy(big, old, have * 12);
+        (void)old;  /* the old array is left where it is: whether it belongs to pool 2, to another
+                       pool or to the object, handing it back risks a double free or a block that
+                       is not this pool's.  156 bytes per visit is not worth the gamble. */
+        *pb = big;
+        *pe = big + have * 12;
+        *cap = big + want * 12;
+        w = *pe;
+        room = want;
+        logf("fl26swiss: Cup mode -- list enlarged from %u to %u entries", (unsigned)(have), (unsigned)want);
       } else {
-        logf("fl26swiss: Cup mode -- the list is a heap vector, left alone (room %u)", (unsigned)room);
+        logf("fl26swiss: Cup mode -- the list could not be enlarged (room %u)", (unsigned)room);
       }
     }
     int added = 0, short_ = 0;
@@ -12011,26 +12034,49 @@ static unsigned char* g_player_cave;
 static void player_table_probe(uint64_t exe_base)
 {
   unsigned char* site = (unsigned char*)(uintptr_t)(exe_base + PLAYER_TABLE_RVA);
-  static const unsigned char want[7] = { 0x48, 0x8D, 0x81, 0xD0, 0x53, 0xEE, 0x00 };
-  for (int i = 0; i < 7; i++)
+  static const unsigned char want[3] = { 0x48, 0x8D, 0x81 };
+  for (int i = 0; i < 3; i++)
     if (site[i] != want[i]) { logf("fl26swiss: player table probe NOT installed (byte %d = %02x)", i, site[i]); return; }
+  uint32_t disp = *(uint32_t*)(site + 3);
   g_player_cave = (unsigned char*)VirtualAlloc(0, 256, 0x3000, 0x04);
   if (!g_player_cave) { logf("fl26swiss: player table cave failed"); return; }
   unsigned char* c = g_player_cave;
-  /* mov [rip+8], rcx   (guarda el bloque) ; mov rax,[rip+8] ; lea rax,[rax+0xEE53D0] ; jmp back */
+  /* mov [rip+8], rcx   (guarda el bloque) ; mov rax,[rip+8] ; lea rax,[rax+disp] ; jmp back */
   *c++ = 0x48; *c++ = 0x89; *c++ = 0x0D; *(uint32_t*)c = 0; c += 4;
   *c++ = 0x48; *c++ = 0x8B; *c++ = 0x05; *(uint32_t*)c = 0; c += 4;
-  *c++ = 0x48; *c++ = 0x8D; *c++ = 0x80; *(uint32_t*)c = 0xEE53D0; c += 4;
+  *c++ = 0x48; *c++ = 0x8D; *c++ = 0x80; *(uint32_t*)c = disp; c += 4;
   *c++ = 0xE9; *(uint32_t*)c = 0; c += 4;
   DWORD prot;
   if (!VirtualProtect(site, 8, PAGE_EXECUTE_READWRITE, &prot)) { logf("fl26swiss: player table prot failed"); return; }
   site[0] = 0xE9; *(uint32_t*)(site + 1) = (uint32_t)((uintptr_t)g_player_cave - ((uintptr_t)site + 5));
   for (int i = 5; i < 7; i++) site[i] = 0x90;
   VirtualProtect(site, 8, prot, &prot);
-  logf("fl26swiss: player table probe live (cave %p)", (void*)g_player_cave);
+  logf("fl26swiss: player table probe live (cave %p, disp 0x%x)", (void*)g_player_cave, (unsigned)disp);
 }
 
 
+
+static void CALLBACK poll_edit_base(HWND hwnd, UINT msg, UINT_PTR id, DWORD time)
+{
+  if (g_edit_base_seen) { KillTimer(NULL, id); return; }
+  uint64_t* owner_ptr = (uint64_t*)(0x140000000ULL + 0x3705e10);
+  uint64_t owner = *owner_ptr;
+  if (!owner) return;
+  uint64_t edit = *(uint64_t*)(owner + 0x48);
+  if (!edit) return;
+  uint64_t gs = edit + 0x2cfe6e0;
+  uint32_t total = *(uint32_t*)(gs + 0x1d510);
+  if (total > 30000) return;          /* edit block not constructed yet */
+  g_edit_base_seen = edit;
+  uint64_t base10 = gs + 0x1d4c0;
+  logf("fl26swiss: player table probe: edit base %llx, groupset %llx, base10 %llx, total %u",
+       (unsigned long long)edit, (unsigned long long)gs, (unsigned long long)base10, (unsigned)total);
+  for (int i = 0; i < 10; i++) {
+    uint64_t ptr = *(uint64_t*)(base10 + i * 8);
+    logf("fl26swiss: player table probe: base[10][%d] = %llx", i, (unsigned long long)ptr);
+  }
+  KillTimer(NULL, id);
+}
 
 static int cupsel_install(uint64_t exe_base)
 {
@@ -13531,6 +13577,8 @@ __declspec(dllexport) int fl26_swiss_install(uint64_t exe_base, const uint16_t* 
     logf("fl26swiss: Cup mode list live (no league phase of 36 in Kick Off > Cup)");
   else
     logf("fl26swiss: Cup mode list NOT installed (vtable slot)");
+  SetTimer(NULL, 0, 500, poll_edit_base);
+  logf("fl26swiss: player table probe timer armed (500 ms)");
   logf("fl26swiss: hooks live (schedule@%llx dates@%llx) for %d regulation(s)",
        (unsigned long long)(exe_base + GEN_RVA), (unsigned long long)(exe_base + DATE_RVA), nregs);
   return 0;
@@ -13539,6 +13587,27 @@ __declspec(dllexport) int fl26_swiss_install(uint64_t exe_base, const uint16_t* 
 /* copy and clear the pending log text; returns bytes copied */
 __declspec(dllexport) int fl26_swiss_log(char* out, int cap)
 {
+  if (!g_edit_base_seen) {
+    uint64_t* owner_ptr = (uint64_t*)(0x140000000ULL + 0x3705e10);
+    uint64_t owner = *owner_ptr;
+    if (owner) {
+      uint64_t edit = *(uint64_t*)(owner + 0x48);
+      if (edit) {
+        uint64_t gs = edit + 0x2cfe6e0;          /* group set (lower tail, patched) */
+        uint32_t total = *(uint32_t*)(gs + 0x1d510);
+        if (total <= 30000) {                     /* edit block actually constructed */
+          g_edit_base_seen = edit;
+          uint64_t base10 = gs + 0x1d4c0;         /* base[10]: 10 pointers */
+          logf("fl26swiss: player table probe: edit base %llx, groupset %llx, base10 %llx, total %u",
+               (unsigned long long)edit, (unsigned long long)gs, (unsigned long long)base10, (unsigned)total);
+          for (int i = 0; i < 10; i++) {
+            uint64_t ptr = *(uint64_t*)(base10 + i * 8);
+            logf("fl26swiss: player table probe: base[10][%d] = %llx", i, (unsigned long long)ptr);
+          }
+        }
+      }
+    }
+  }
   int n = g_log_len; if (n > cap - 1) n = cap - 1; if (n < 0) n = 0;
   if (n < g_log_len) { int k = n; while (k > 0 && g_log[k - 1] != '\n') k--; if (k > 0) n = k; }  /* whole lines only */
   memcpy(out, g_log, n); out[n] = 0;

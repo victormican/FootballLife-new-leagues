@@ -221,3 +221,52 @@ pero una con grupos de 36 (el formato suizo nuevo) queda fuera del menú.
    `Cup mode -- 1 world cup(s) added, all in`.
 4. **Kick Off > Cup** → la copa aparece por su nombre al lado de las del juego; elegir club y jugar
    la primera ronda.
+
+## Por qué la lista aguanta 13 y por qué el ensanche revienta al cerrar (2026-11-04)
+
+La lista del menú vive **dentro del objeto** (`MenuModeCupSelect`, vtable `0x142692c40`):
+
+```
+self+0x90  begin     self+0x98  end      self+0xa0  cap
+```
+
+En una sesión real: `begin=self+0x1C0`, `cap=self+0x25C` → **13 huecos**. `cupsel_handler`
+(`fl26swiss.c`) los amplía cuando la lista no da para las copas del mundo.
+
+El ensanche con `VirtualAlloc` (lo que hacía hasta hoy) **hace que el juego se caiga al cerrar**,
+y la razón está en el destructor:
+
+| dirección | qué hace |
+|---|---|
+| `0x140b1c810` | destructor del menú: pone vtables, libera `+0xd0` y `+0xb8`, y salta a la base |
+| `0x140c6b1e0` | destructor base: `rdx=[rcx+0x90]; si no es 0 -> pool_free(&2, rdx); +0x90/+0x98/+0xa0=0` |
+| `0x1403fb5b0` | `pool_free(int* pool, void* p)`: `id=[pool]; if(!id) ...; desc=tabla[id<<6]; desc->free(p)` |
+| `0x1403fb330` | `pool_alloc(int* pool, size_t bytes, size_t align, size_t extra)`: mismo `id<<6` |
+| `0x140227930` | `operator delete`: `jmp 0x1403fb2e0` -> `pool_free(&0, p)` |
+
+El `free` del pool desengancha el bloque de un **árbol rojo-negro** leyendo su cabecera en
+`[p-8]`. Con un puntero de `VirtualAlloc` esa cabecera no existe -> `0xc0000005` en
+`FL_2026+0x3fd5db` (`mov [rax+0x18], rcx`) o `+0x3fd2b2` (`mov r14,[rbx-8]`).
+
+**Regla**: si la lista se reapunta a otro sitio, el buffer tiene que venir de **`pool_alloc` del
+pool 2**, que es el que el destructor devuelve. Está implementado en `cupsel_handler`
+(`CUPSEL_POOL_RVA_ALLOC` / `CUPSEL_POOL_RVA_FREE`), sin liberar el array viejo: se pierden 156 B
+por visita y no se arriesga un `free` de otro pool.
+
+### Trampa de compilación (importante)
+
+`fl26swiss.dll` **se compila con zig 0.16.0**, como dice `building.md`. Compilado con 0.13.0 el
+binario sale con otra base de imagen (`0x100000000` en vez de `0x180000000`) y **el juego se cae
+solo**, sin tocar copas, en el mismo `0x3fd2b2`. No es el parche: es el compilador. El `.dll`
+publicado tampoco coincide con el que compila el fuente de `HEAD` (429.056 B en `modules\` frente
+a 428.544 B de `HEAD`), así que **antes de publicar un DLL recompilado hay que confirmar que el
+fuente de la copia es el que generó el binario que corre**.
+
+### Estado
+
+- El `.dll` desplegado es el de siempre (`CD9D6537…`, 429.056 B). El parche del pool está en el
+  fuente, **sin desplegar**: falta una sesión estable para validarlo.
+- Queda una caída intermitente en el menú principal, **sin abrir Copas**, con cualquiera de los
+  binarios (el de siempre incluido). Es del mundo/instalación, no del ensanche. Para ver la pila
+  hace falta un depurador **elevado**: `DebugActiveProcess` sobre `FL_2026.exe` da *Acceso
+  denegado* desde una consola sin admin.
