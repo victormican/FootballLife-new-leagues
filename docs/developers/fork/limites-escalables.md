@@ -452,3 +452,10 @@ Herramientas que quedan de la prueba (sin usar por ahora): `tools/mk_conf_cups.p
 copas con sus `ccup` y elige clubes por confederación) y `mkccup.py` lee ya el `cid` de 16 bits
 completo al buscar la Libertadores y las entradas, para que un `cid` alto no se confunda con el
 de byte bajo.
+
+### Oceania y Non-FIFA ya no son copas (2026-11-04)
+
+Se quitan sus dos lineas `ccup` (`196 cid=91`, `255 cid=255`): dejan de salir en Kick Off > Cup.
+Las filas de competicion, sus regulaciones y sus entradas se quedan como estaban (nada mas las
+referencia desde el menu), asi que no se libera ningun `cid`: son 17 lineas `ccup` y el mundo
+sigue en 255 competiciones. `check_world`: 0 errores.
