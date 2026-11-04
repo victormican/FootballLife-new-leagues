@@ -50,7 +50,7 @@ local function world_cids(ctx)
   return map
 end
 
-local map, done = nil, false
+local map, done, told = nil, false, false
 local ticks = 0
 
 local function fix()
@@ -69,6 +69,10 @@ local function fix()
            + blk:byte(6) * 1099511627776 + blk:byte(7) * 281474976710656
            + blk:byte(8) * 72057594037927936
   if bb == 0 then return end
+  if not told then
+    told = true
+    log(string.format("fl26regcid: owner=%#x block=%#x", ob, bb))
+  end
   local cntb = memory.read(bb + COUNT_OFF, 4)
   if not cntb then return end
   local n = u32(cntb, 0)
