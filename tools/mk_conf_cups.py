@@ -46,7 +46,7 @@ import pesdb
 #   source: ("conf", conf, skip) picks clubs from that confederation, skipping `skip` clubs;
 #           ("mix", [conf, ...]) picks the champion of each confederation.
 CUPS = [
-    ("Copa Sudamericana", "FL_SUDAMER", 256, 4, 26, 8, 32, ("conf", 4, 5)),
+    ("Copa Sudamericana", "FL_SUDAMER", 257, 4, 26, 8, 32, ("conf", 4, 5)),
     ("Copa Intercontinental", "FL_INTERC", 257, 1, 1, 0, 4, ("mix", [2, 4, 6, 5])),
     ("CAF Champions League", "FL_CAFCL", 258, 5, 1, 4, 16, ("conf", 5, 1)),
     ("CAF Confederation Cup", "FL_CAFCC", 259, 5, 1, 4, 16, ("conf", 5, 2)),
