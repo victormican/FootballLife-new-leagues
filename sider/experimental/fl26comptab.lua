@@ -696,6 +696,7 @@ function m.init(ctx)
                       .. "League Info text on %d", cleared, texts))
   end
 
+
   -- 2d. season awards (#86): +0x29 = 0 means "this competition has no awards" (getter
   -- 0x1414cfb90). Competition Info then leaves out Individual Titles and Team of the Season,
   -- and the season-end builders (0x140fbfbe0) skip the competition, so the Best XI stayed
