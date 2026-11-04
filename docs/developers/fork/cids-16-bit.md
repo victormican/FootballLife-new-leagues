@@ -46,17 +46,39 @@ sin tocar más registros que el `eax`/`ecx` originales.
 
 Interruptores `ENABLE = { cmp, cid, pack, reg }` para biseccionar sin editar el código.
 
-## Lo que falta: las ligas
+## El censo: resuelto el 2026-11-04 (tabla plana, no se toca el mapa)
 
-El censo de Select Team guarda la clave del mapa en un nodo con un **byte** (`cmp byte [rax+0x20],
-cl`). El plan original lo cambiaba a dword igual que el almacén (`89 4d 68`); con esos dos parches
-el juego **muere a los 25 s** siempre: la cola del nodo no es cero y las comparaciones se vuelven
-basura. Por eso `cmp` y `cid` quedan **apagados** y una liga con `cid > 255` no aparecería en
-Select Team: los datos se escribirían bien, pero el censo la agruparía por el byte bajo.
+El censo de Select Team guarda un **`std::map<byte, fila*>`** y sus dos bucles buscan la
+competición de cada entrada por ese mapa. Ahí estaba la trampa: el `insert` (`0x1414e36f0`)
+**deduplica por ese único byte**, así que dos competiciones que comparten byte bajo no pueden
+coexistir en él. Por eso el intento anterior (ensanchar los `cmp` a dword) moría a los 25 s: la
+clave de 16 bits nunca se guardaba en el nodo y el árbol comparaba basura.
 
-Para cerrarlo hace falta rehacer ese mapa (clave de 16 bits de verdad: nodo más ancho o un mapa
-auxiliar), y comprobar si algún otro lector del id de `Competition.bin` sigue leyendo +5 a pelo.
-Con las copas no hace falta: no pasan por Select Team.
+La solución que funciona deja el mapa quieto y **puentea las búsquedas** a una tabla propia de
+1024 punteros:
+
+| sitio | qué hace ahora |
+|---|---|
+| `0x1414f1d6a`, `0x1414f1e5a` | la clave pasa a `byte[+8] \| byte[+0x0b] << 8` (mismo campo que el empaquetado) |
+| `0x1414f1576` | al insertar, además `tabla[cid] = fila` |
+| `0x1414f1d8b`, `0x1414f1ea1` | las búsquedas devuelven `&tabla[cid] - 0x28` |
+
+Dos cosas medidas a base de crashes, que hay que respetar si se reescribe:
+
+1. **Lo que el llamante espera es un puntero al hueco, no la fila.** Hace `r8 = iterador + 0x28`
+   y luego `0x1414f7e80` ejecuta `mov rax,[r15]; mov ecx,[rax+4]`. Devolver la fila hace que lea
+   su primer campo como puntero → `0xc0000005` en `0x1414f7ffc`.
+2. **Un cid sin fila no puede devolver 0**: el hueco vacío se detecta con
+   `cmp qword [tabla+cid*8], 0` y se cae al `find` original del mapa, que es el comportamiento de
+   antes. Sin ese fallback, también `0xc0000005` en el mismo sitio.
+
+La tabla vive en la cueva (`+0x1000`), el cid se enmascara a `0x3ff` y el módulo verifica los cinco
+sitios antes de escribir nada. Con esto **desaparece el techo de los doce bytes bajos**: una liga o
+una copa con `cid` 256..1023 tiene su lista de clubes propia. Probado en vivo el 2026-11-04
+(`map=true`, sin crash).
+
+Queda pendiente, si algún día molesta: el **emblema** se sigue pidiendo por el byte bajo
+(`emb_<cid & 0xFF>`), que es otra ruta distinta de esta.
 
 ## Cómo se usa
 
