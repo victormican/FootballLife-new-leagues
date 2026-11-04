@@ -160,6 +160,12 @@ Los `call` a la IAT del CRT (free `0x15b9601a8`, malloc `0x15b9601b0`, calloc `0
 realloc `0x15b9601b8`) **no son `FF15`/`FF25` directos**: van por thunk, así que hay que seguir el
 `jmp` del thunk hasta el sitio que llama al `free`. Con eso: capacidad 64 y las 19 copas sin caídas.
 
+Añadido después de dejarlo escrito: el parseo sí dio la IAT de
+`api-ms-win-crt-heap-l1-1-0.dll` (free `0x15b9601a8`, malloc `0x15b9601b0`, calloc `0x15b9601a0`,
+realloc `0x15b9601b8`), pero **no hay ningún `FF15`/`FF25` que apunte a ella** en todo el
+ejecutable, y tampoco ningún `call` directo a `0x140227930`/`0x1403fb2e0`/`0x1403fb5b0`: el heap se
+usa por thunks o por registros, así que la búsqueda por bytes no aísla el `free` de `+0x90`.
+
 Mientras no se haga, **las 6 primeras líneas `ccup` del mundo son las que se ven**: hoy Copa
 Sudamericana, Gold Cup, OFC Nations, OFC World Cup Qualifying, UEFA Nations League y CONCACAF
 Nations League.
