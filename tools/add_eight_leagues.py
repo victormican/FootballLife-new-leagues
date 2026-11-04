@@ -29,6 +29,7 @@ LEAGUES = [
     ("Scottish Championship", "FL_SC_D2", 263, 905, 232, 2, 120, -1, 2, 30, 10),
     ("Swiss Challenge League", "FL_CH_D2", 264, 906, 238, 2, 121, -1, 2, 25, 10),
     ("Yokary Liga", "FL_TM_D1", 265, 907, 42, 3, 122, -1, 2, 40, 8),
+    ("USL Championship", "FL_USL_CH", 266, 908, 135, 6, 123, -1, 2, 25, 10),
 ]
 
 CLUBS = {
@@ -143,6 +144,18 @@ CLUBS = {
         "Shagadam",
         "Energetik",
         "Asgabat",
+    ],
+    "USL Championship": [
+        "Sacramento Republic",
+        "Indy Eleven",
+        "Louisville City",
+        "Tampa Bay Rowdies",
+        "Phoenix Rising",
+        "San Antonio FC",
+        "Detroit City",
+        "Birmingham Legion",
+        "New Mexico United",
+        "Pittsburgh Riverhounds",
     ],
 }
 
