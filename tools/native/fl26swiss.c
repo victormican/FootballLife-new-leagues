@@ -11916,6 +11916,15 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
       }
     }
     int added = 0, short_ = 0;
+    /* 2026-11-04: the appended item copies 12 bytes of the first one -- cid at +0 plus two more
+       fields the menu uses for the name/logo.  Dump them so we can see which one carries the
+       name: the first item (the template, FIFA Club World Cup), every existing item, and ours. */
+    {
+      int k = 0;
+      for (unsigned char* p = *pb; p + 12 <= w && k < 40; p += 12, k++)
+        logf("fl26swiss: CUPITEM %d cid=%u bytes=%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
+             k, (unsigned)*(uint32_t*)p, p[0],p[1],p[2],p[3], p[4],p[5],p[6],p[7], p[8],p[9],p[10],p[11]);
+    }
     for (int i = 0; i < g_ncupcid; i++) {
       uint32_t cid = g_cupcid[i];
       int there = 0;
@@ -11925,6 +11934,9 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
       if (have >= room) { short_ = 1; break; }
       if (w > *pb) memcpy(w, *pb, 12); else memset(w, 0, 12);
       *(uint32_t*)w = cid;
+      if (added < 6)
+        logf("fl26swiss: CUPADD cid=%u bytes=%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
+             cid, w[0],w[1],w[2],w[3], w[4],w[5],w[6],w[7], w[8],w[9],w[10],w[11]);
       w += 12; have++; added++;
     }
     if (added || short_)
