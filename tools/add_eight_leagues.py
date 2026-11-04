@@ -21,14 +21,14 @@ T_REC, T_ID, T_NAME = 1532, 0x08, 0x170
 
 # name, code, cid, reg, country(flag), conf, region(id), slot, legs, kickoff, reply
 LEAGUES = [
-    ("TT Premier Football League", "FL_TT_D1", 258, 900, 133, 6, 115, 1, 2, 20, 10),
-    ("TFF 1. Lig", "FL_TR_D2", 259, 901, 190, 2, 116, 2, 2, 25, 18),
-    ("Aruba Division di Honor", "FL_AW_D1", 260, 902, 105, 6, 117, 3, 2, 30, 10),
-    ("Russian First League", "FL_RU_D2", 261, 903, 230, 2, 118, 4, 2, 22, 18),
-    ("Danish 1. Division", "FL_DK_D2", 262, 904, 203, 2, 119, 5, 2, 28, 12),
-    ("Scottish Championship", "FL_SC_D2", 263, 905, 232, 2, 120, 6, 2, 30, 10),
-    ("Swiss Challenge League", "FL_CH_D2", 264, 906, 238, 2, 121, 7, 2, 25, 10),
-    ("Yokary Liga", "FL_TM_D1", 265, 907, 42, 3, 122, 8, 2, 40, 8),
+    ("TT Premier Football League", "FL_TT_D1", 258, 900, 133, 6, 115, -1, 2, 20, 10),
+    ("TFF 1. Lig", "FL_TR_D2", 259, 901, 190, 2, 116, -1, 2, 25, 18),
+    ("Aruba Division di Honor", "FL_AW_D1", 260, 902, 105, 6, 117, -1, 2, 30, 10),
+    ("Russian First League", "FL_RU_D2", 261, 903, 230, 2, 118, -1, 2, 22, 18),
+    ("Danish 1. Division", "FL_DK_D2", 262, 904, 203, 2, 119, -1, 2, 28, 12),
+    ("Scottish Championship", "FL_SC_D2", 263, 905, 232, 2, 120, -1, 2, 30, 10),
+    ("Swiss Challenge League", "FL_CH_D2", 264, 906, 238, 2, 121, -1, 2, 25, 10),
+    ("Yokary Liga", "FL_TM_D1", 265, 907, 42, 3, 122, -1, 2, 40, 8),
 ]
 
 CLUBS = {
