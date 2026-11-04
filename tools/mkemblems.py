@@ -31,6 +31,7 @@ Scotland and Saudi Arabia. --from and --only override that.
 
 --preview writes the 512s into a plain folder for eyeballing and nothing into the game tree.
 """
+
 import colorsys, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,11 +41,18 @@ from PIL import Image, ImageDraw, ImageFont
 
 COMP, REG = 36, 2352
 C_ID, C_CODE = 0x05, 0x08
-R_ID, R_CID, R_GROUP, R_NAME = 0x02, 0x08, 0x0a, 0x14
+R_ID, R_CID, R_GROUP, R_NAME = 0x02, 0x08, 0x0A, 0x14
+R_CID_HI = 0x492
 NO_GROUP = 255
 FONT = r"C:\Windows\Fonts\arialbd.ttf"
-VARIANTS = [("_l", 256), ("_ll", 512), ("_b_l", 256), ("_b_ll", 512),
-            ("_w_l", 256), ("_w_ll", 512)]
+VARIANTS = [
+    ("_l", 256),
+    ("_ll", 512),
+    ("_b_l", 256),
+    ("_b_ll", 512),
+    ("_w_l", 256),
+    ("_w_ll", 512),
+]
 
 
 def load(base, name):
@@ -56,20 +64,25 @@ def competitions(base):
     comp, reg = load(base, "Competition.bin"), load(base, "CompetitionRegulation.bin")
     names = {}
     for i in range(len(reg) // REG):
-        r = reg[i * REG:(i + 1) * REG]
+        r = reg[i * REG : (i + 1) * REG]
         if r[R_GROUP] == NO_GROUP:
-            names.setdefault(r[R_CID],
-                             r[R_NAME:R_NAME + 0x73].split(bytes(1))[0].decode("utf-8", "replace"))
+            names.setdefault(
+                r[R_CID] | (r[R_CID_HI] << 8),
+                r[R_NAME : R_NAME + 0x73].split(bytes(1))[0].decode("utf-8", "replace"),
+            )
     out = []
     for i in range(len(comp) // COMP):
-        r = comp[i * COMP:(i + 1) * COMP]
-        cid = r[C_ID]
-        out.append((cid, r[C_CODE:].split(bytes(1))[0].decode("latin1"), names.get(cid, "")))
+        r = comp[i * COMP : (i + 1) * COMP]
+        # the id is 16 bits since the cid-16 world: low byte at +0x05, high byte at +0x07
+        cid = r[C_ID] | (r[C_ID + 2] << 8)
+        out.append(
+            (cid, r[C_CODE:].split(bytes(1))[0].decode("latin1"), names.get(cid, ""))
+        )
     return out
 
 
 def colours(cid):
-    h = (cid * 0.61803398875) % 1.0                  # golden-ratio hue walk, same as mkcrests
+    h = (cid * 0.61803398875) % 1.0  # golden-ratio hue walk, same as mkcrests
     dark = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(h, 0.70, 0.45))
     light = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(h, 0.35, 0.96))
     lum = 0.299 * light[0] + 0.587 * light[1] + 0.114 * light[2]
@@ -87,6 +100,7 @@ def initials(name, code, cid):
         # "Croatia D1" -> CRO, "Bosnia and Herzegovina D1" -> BIH. The country tag says more
         # than the first letter of every word: "CD" tells nobody anything.
         import countries as C
+
         return C.short(m.group(1))
     words = [w for w in name.replace("-", " ").split() if w[:1].isalpha()]
     if not words:
@@ -99,7 +113,7 @@ def initials(name, code, cid):
 
 
 def tier(name):
-    """The division digit of "France D4", the trailing number of "FL League 07", or "".""" 
+    """The division digit of "France D4", the trailing number of "FL League 07", or ""."""
     m = DIV.match(name.strip())
     if m:
         return m.group(2)
@@ -127,8 +141,13 @@ def emblem(cid, label, sub, size, mode):
     pts = [(m, top), (S - m, top), (S - m, shoulder), (S / 2, bot), (m, shoulder)]
     d.polygon(pts, fill=dark + (255,))
     k = S * 0.045
-    inner = [(m + k, top + k), (S - m - k, top + k), (S - m - k, shoulder - k * 0.5),
-             (S / 2, bot - k * 1.6), (m + k, shoulder - k * 0.5)]
+    inner = [
+        (m + k, top + k),
+        (S - m - k, top + k),
+        (S - m - k, shoulder - k * 0.5),
+        (S / 2, bot - k * 1.6),
+        (m + k, shoulder - k * 0.5),
+    ]
     d.polygon(inner, fill=light + (255,))
 
     def fit(text, px, y):
@@ -144,7 +163,12 @@ def emblem(cid, label, sub, size, mode):
                 break
             px *= 0.93
         tb = d.textbbox((0, 0), text, font=font)
-        d.text(((S - (tb[2] - tb[0])) / 2 - tb[0], y - tb[1]), text, font=font, fill=ink + (255,))
+        d.text(
+            ((S - (tb[2] - tb[0])) / 2 - tb[0], y - tb[1]),
+            text,
+            font=font,
+            fill=ink + (255,),
+        )
 
     fit(label, S * (0.30 if len(label) > 3 else 0.38), S * 0.24)
     if sub:
@@ -172,12 +196,15 @@ def main():
         # 130 to 145 are Scotland and Saudi Arabia -- so the leagues that need an emblem are
         # the ones the shipped tables do not have, and that is a comparison, not a threshold.
         import modscan
+
         shipped = load(modscan.base_dir(), "Competition.bin")
         have = {shipped[i * COMP + C_ID] for i in range(len(shipped) // COMP)}
         pick = [c for c in comps if c[0] not in have]
     if not pick:
-        raise SystemExit("this pesdb folder adds no competition to the shipped 91 -- is it "
-                         "the base rather than one of our worlds?")
+        raise SystemExit(
+            "this pesdb folder adds no competition to the shipped 91 -- is it "
+            "the base rather than one of our worlds?"
+        )
     print("%d competitions in %s, %d of them ours" % (len(comps), base, len(pick)))
 
     d = preview or os.path.join(out, "common", "render", "symbol", "emblemLc")
@@ -185,17 +212,23 @@ def main():
     for cid, code, name in pick:
         lab, sub = initials(name, code, cid), tier(name)
         if preview:
-            emblem(cid, lab, sub, 512, "").save(os.path.join(d, "emb_%04d_ll.png" % cid))
+            emblem(cid, lab, sub, 512, "").save(
+                os.path.join(d, "emb_%04d_ll.png" % cid)
+            )
             continue
         for suf, px in VARIANTS:
             mode = "b" if "_b" in suf else ("w" if "_w" in suf else "")
-            emblem(cid, lab, sub, px, mode).save(os.path.join(d, "emb_%04d%s.png" % (cid, suf)))
+            emblem(cid, lab, sub, px, mode).save(
+                os.path.join(d, "emb_%04d%s.png" % (cid, suf))
+            )
     print("wrote %d competition emblems to %s" % (len(pick), d))
     for cid, code, name in pick[:5]:
         print("   emb_%04d  %-22s %s" % (cid, code, name))
     if not preview:
-        print("Keyed by competition id, and only ids the shipped tables do not use, so nothing "
-              "shipped is touched. Activate the root and look at the competition list.")
+        print(
+            "Keyed by competition id, and only ids the shipped tables do not use, so nothing "
+            "shipped is touched. Activate the root and look at the competition list."
+        )
     return 0
 
 

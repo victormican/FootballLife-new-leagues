@@ -76,7 +76,9 @@ def main():
         for i in range(0, len(regs), M.REG)
         if int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little") == reg
     )
-    cid = regs[ri + M.R_CID]
+    # the id is 16 bits since the cid-16 world (a byte read sent the entries of competition
+    # 10 -- Serie A -- into the new league on 2026-11-04)
+    cid = regs[ri + M.R_CID] | (regs[ri + M.R_CID_HI] << 8)
     rname = (
         regs[ri + M.R_NAME : ri + M.R_NAME + 0x73]
         .split(b"\0")[0]
@@ -85,7 +87,7 @@ def main():
     print("regulation %d: cid %d, name %r" % (reg, cid, rname))
 
     reset = "--reset" in a
-    ent_idx = [i for i in range(0, len(ents), M.ENT) if ents[i + M.E_CID] == cid]
+    ent_idx = [i for i in range(0, len(ents), M.ENT) if (ents[i + M.E_CID] | (ents[i + M.E_CID_HI] << 8)) == cid]
     ent_idx.sort(key=lambda i: ents[i + M.E_ORDER])
     have = (
         []
@@ -249,7 +251,7 @@ def main():
         b"".join(
             ents[i : i + M.ENT]
             for i in range(0, len(ents), M.ENT)
-            if ents[i + M.E_CID] != cid
+            if (ents[i + M.E_CID] | (ents[i + M.E_CID_HI] << 8)) != cid
         )
     )
     eid = max(
@@ -260,7 +262,7 @@ def main():
         e = bytearray(M.ENT)
         e[M.E_TEAM : M.E_TEAM + 4] = t.to_bytes(4, "little")
         e[M.E_EID : M.E_EID + 4] = (eid + 1 + k).to_bytes(4, "little")
-        e[M.E_CID], e[M.E_ORDER] = cid, k + 1
+        e[M.E_CID], e[M.E_CID_HI], e[M.E_ORDER] = cid & 0xFF, (cid >> 8) & 0xFF, k + 1
         ents += e
     regs[ri + M.R_TEAMS] = (regs[ri + M.R_TEAMS] & 0xC0) | (len(final) & 0x3F)
 
