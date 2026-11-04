@@ -21,8 +21,8 @@ and on F10. It keeps a small observation ring in the code section's spare tail a
 
 The world file. When SiderAddons\modules\fl26world.txt exists (written by FL26 Mod Studio's
 League Builder), CHAINS and PROTECT below are ignored and both are built from the file:
-every league in it is protected, and a chain pair is made for every league on division 3, 5,
-6 or 7 that names the league above it -- exactly the pairs the game's mover skips -- with the
+every league in it is protected, and a chain pair is made for every league on division 3, 5
+or 7 that names the league above it -- exactly the pairs the game's mover skips -- with the
 league's promote count (3 if it gives none) both ways. Without the file the built-in lists
 below are used, as before.
 
@@ -88,9 +88,7 @@ end
 -- From the world file: every league is protected, and a chain entry is made for each pair the
 -- game's mover skips. The mover exchanges a league with the one below it every other pair,
 -- starting at the top (1<->2, 3<->4, ...), so the pairs it skips are the ones whose lower
--- league is division 3, 5 or 7 -- and 6 (B256: the mover never wrote 5<->6 either; the DLL
--- leaves a pair the game did move as it is): {league above, league, its promote count both
--- ways}. The league
+-- league is division 3, 5 or 7: {league above, league, its promote count both ways}. The league
 -- above may be a shipped one (Ligue 2 above a French third division) -- it is named by id, not
 -- looked up.
 -- A league line with cup= is a second division under a shipped top flight that had none:
@@ -117,9 +115,7 @@ local function from_world(world)
     -- A league below a split one (GitHub #79/#81, Egypt 2026-10-06): the game's mover writes
     -- nothing between a split league's total and the league below, so no club moved at all.
     -- The pair goes to the DLL like a skipped one; the total's season table is the standings.
-    -- B256 (jibibi 2026-10-27): a sixth tier too -- the pass writes the fifth as the low end of
-    -- the pair above it and never as the top of the one below, so nobody moved between them
-    if L.above and L.tier and ((L.tier >= 3 and (L.tier % 2 == 1 or L.tier >= 6)) or L.splitabove) then
+    if L.above and L.tier and ((L.tier >= 3 and L.tier % 2 == 1) or L.splitabove) then
       local n = L.promote or 3
       -- the split's regular phase rides along: it plays the season the total's list decides
       chains[#chains + 1] = { L.above, L.id, n, n, L.splitabove or 0 }
@@ -131,9 +127,7 @@ local function from_world(world)
       chains[#chains + 1] = { L.splittotal, L.id, n, n, L.above }
     end
     if L.cup and L.cuptop and L.cuplow then
-      -- cupthird= (B228): the first clubs of this league, a new third division, join the two
-      -- shipped ones in the cup, cupn in all (the Coupe de France of L1, L2 and National, 48)
-      cups[#cups + 1] = { L.cup, L.cuptop, L.cuplow, L.cupall ~= 0, L.cupn, L.cupthird }
+      cups[#cups + 1] = { L.cup, L.cuptop, L.cuplow, L.cupall ~= 0, L.cupn }
     elseif L.cup and L.above then
       cups[#cups + 1] = { L.cup, L.above, L.id, L.cupall == 1, L.cupn }
     end
@@ -148,13 +142,13 @@ local function from_world(world)
     -- below a shipped second division the clubs put back come from the top flight (cuptop=)
     if L.scup and L.above then scups[#scups + 1] = { L.scup, L.cuptop or L.above, L.id } end
   end
-  -- the league cups after every national cup: fl26chain.dll keeps MAX_CUPS (128) and drops the
+  -- the league cups after every national cup: fl26chain.dll keeps MAX_CUPS (16) and drops the
   -- rest, so a world with more keeps the national cups it kept before the league cups came
   for _, c in ipairs(lcups) do cups[#cups + 1] = c end
   return chains, protect, cups, scups
 end
 
-local MAX_CUPS = 128                                 -- fl26chain.c MAX_CUPS (16 before B178)
+local MAX_CUPS = 16                                  -- fl26chain.c MAX_CUPS
 local MAX_CHAINS = 32                               -- fl26chain.c MAX_CHAINS (8 before B186)
 
 local CAVE_VA, CAVE_PAGE, CAVE_LEN = 0x14252e900, 0x14252e000, 0x108
@@ -201,7 +195,6 @@ function m.init(ctx)
     typedef int  (*fl26_chain_protect_t)(const uint16_t*, int);
     typedef int  (*fl26_chain_cups_t)(const uint16_t*, int);
     typedef int  (*fl26_chain_cupsize_t)(const uint16_t*, int);
-    typedef int  (*fl26_chain_cupthird_t)(const uint16_t*, int);
     typedef int  (*fl26_chain_apclau_t)(const uint16_t*, int);
   ]])
 
@@ -282,21 +275,6 @@ function m.init(ctx)
             ffi.cast("fl26_chain_cupsize_t", pz)(z, #sized)
           else
             log("fl26chain: this fl26chain.dll cannot cap a cup's field (no fl26_chain_cupsize) -- rebuild it")
-          end
-        end
-        local third = {}
-        for _, c in ipairs(CUPS) do if c[6] and c[6] > 0 then third[#third + 1] = c end end
-        if #third > 0 then
-          local p3 = ffi.C.GetProcAddress(h, "fl26_chain_cupthird")
-          if p3 ~= nil then
-            local z = ffi.new("uint16_t[?]", 2 * #third)
-            for i, c in ipairs(third) do
-              z[2 * i - 2], z[2 * i - 1] = c[1], c[6]
-              log(string.format("fl26chain: live -- cup %d also takes the first clubs of %d", c[1], c[6]))
-            end
-            ffi.cast("fl26_chain_cupthird_t", p3)(z, #third)
-          else
-            log("fl26chain: this fl26chain.dll cannot put a third division in a cup (no fl26_chain_cupthird) -- rebuild it")
           end
         end
       else

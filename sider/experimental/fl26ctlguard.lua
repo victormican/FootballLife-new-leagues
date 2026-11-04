@@ -25,18 +25,10 @@ a trampoline at 0x14252ef00. The trampoline makes the original call and then swe
 array:
 
     user   = [block+0x1798ab0]             the user club's handle (0x1414bb650 reads it)
-    only if that club exists and is itself at 0 (a Master League career, and Become a
-    Legend too: the player's club is at 0 there as well)
+    only if that club exists and is itself at 0 (a Master League career, not BAL)
     for every team at 0 that is not the user club:
         skip the two match-context teams, but only when the user club is one of them
         (the match screen may put the pad on the other side of the user's own match)
-        skip every national team (bit 2 of byte +0x423 of the team record, set on all 141
-        national teams of a loaded career and on none of its 1797 clubs): a manager who
-        takes a national job keeps it at 0 (B20, 0.2.5), and so does a Become a Legend
-        player's country when it calls him up (B261, BouhMiDov 28.10.2026); handing it to
-        the computer drops its friendlies and qualifiers from the user's day schedule, so
-        the hub never stops for them and the game plays them without the user. Only a club
-        can be the old club of a club change.
         otherwise set it to 0xff, and mark the user's day schedule as stale
 
 The day schedule. The hub's fixture strip ("Next") does not read the controller bytes. It
@@ -55,7 +47,7 @@ are. The teams base and count are read from the relocated lookup 0x1414bca80 aft
 fl26caps has run, so the guard follows whatever set is installed. This module must be
 listed AFTER fl26caps in sider.ini.
 
-Cave 0x14252ef00..0x14252eff9 (0xef bytes used), the last free stretch before .rdata (0x14252f000), after
+Cave 0x14252ef00..0x14252eff9, the last free stretch before .rdata (0x14252f000), after
 fl26seasonend's flag byte at 0x14252eef0.
 
 Same apply rule as every fl26 module: verify all sites first, write only if all match.
@@ -65,12 +57,13 @@ local m = {}
 
 local CAVE = 0x14252ef00
 -- built for teams at +0x1877070 and the count at +0x3b20880; both are replaced below
-local TRAMP = "4883ec28e877e7dcfe488b05006f1d014885c00f84d10000004c8b40484d85c00f84c400000041bbffff"
-  .. "ffffbaffffffff4c8b50504d85d2740e458b9a985a0300418b9228610300458b88b08a79014539cb7410"
-  .. "4439ca740b41bbffffffffbaffffffff4489c825ff3f00003dfd3f000073774869c090060000498d8c00"
-  .. "70708701443909756380b91d04000000755a498d8870708701418b808008b20385c074483d0040000077"
-  .. "4180b91d04000000752d448b114539ca74254539da74204139d2741bf68123040000047512c6811d0400"
-  .. "00ff41c780f4159101ffffffff4881c190060000ffc875bf4883c428c3"
+local TRAMP = "4883ec28e877e7dcfe488b05006f1d014885c00f84dc0000004c8b40484d85c00f84cf00000041bbff"
+  .. "ffffffbaffffffff4c8b50504d85d2740e458b9a985a0300418b9228610300458b88b08a79014539cb"
+  .. "74104439ca740b41bbffffffffbaffffffff4489c825ff3f00003dfd3f00000f837e0000004869c090"
+  .. "060000498d8c00707087014439090f856600000080b91d040000000f8559000000498d887070870141"
+  .. "8b808008b20385c00f84430000003d004000000f873800000080b91d040000007524448b114539ca74"
+  .. "1c4539da74174139d27412c6811d040000ff41c780f4159101ffffffff4881c190060000ffc875c848"
+  .. "83c428c3"
 local TEAMS_LE, COUNT_LE = "70708701", "8008b203"
 
 local function unhex(s)
@@ -106,7 +99,7 @@ function m.init(ctx)
 
   local patches = {
     {va=CAVE, old=string.rep("00", #tramp / 2), new=tramp,
-     why="trampoline: call 0x1412fd680, then give every club at controller 0 except the user's back to the computer (national teams are never touched)"},
+     why="trampoline: call 0x1412fd680, then give every club at controller 0 except the user's back to the computer"},
     {va=0x1413071ff, old="e87c64ffff", new="e8fc7c2201",
      why="the day loop's call to 0x1412fd680 -> the trampoline at 0x14252ef00"},
   }
@@ -151,7 +144,7 @@ function m.init(ctx)
   end
 
   if failed == 0 then
-    log(string.format("fl26ctlguard: applied all %d patches -- only the user's club and the national teams keep the user's controller", written))
+    log(string.format("fl26ctlguard: applied all %d patches -- only the user's club keeps the user's controller", written))
   else
     log(string.format("fl26ctlguard: PARTIAL: %d written, %d failed. The game is now in an "
                       .. "inconsistent state -- quit and report the addresses above.",
