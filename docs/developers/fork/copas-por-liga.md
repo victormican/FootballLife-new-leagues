@@ -129,9 +129,40 @@ ejecutable que escribe el centinela `0xffff` del item:
 ```
 
 junto a dos ayudantes (`0x140b1c240` y `0x140b1c290`) que crean el nodo con el cid leído de la
-tabla. Es la estructura `{cid, 0xffff, 0}` que devuelve el menú, pero la **capacidad de 13** no
-está en ese código: se reserva antes, en el constructor del contenedor, y con el proceso arrancado
-bajo Frida (spawn) los hooks de asignación de 0x80..0x400 bytes no ven ninguna reserva de 156 B.
+tabla. Es la estructura `{cid, 0xffff, 0}` que devuelve el menú.
+
+**La lista nace vacía en el constructor base** (`0x140c6a540`):
+
+```
+0x140c6a5cc  lea rdi, [r13 + 0x90]
+0x140c6a5d7  mov [rdi], r15                ; begin = 0
+0x140c6a5da  mov [rdi+8], r15              ; end   = 0
+0x140c6a5de  mov [rdi+0x10], r15           ; cap   = 0
+```
+
+No hay `reserve(13)`: la capacidad aparece entre ese constructor y el momento en que `fl26swiss`
+añade las copas, y los 8 items iniciales los decide antes de que corra el `init`. Los dos
+`mov edx, 0xd` de `0x140b1a955` son **búsquedas de un id 13**, no una reserva.
+
+**Intentos de agrandarla (2026-11-03), todo medido en juego:**
+
+| intento | resultado |
+|---|---|
+| Enganchar el `init` y ensanchar en un tick | no se ejecuta: el hook ya corre dentro del `init` |
+| Stub en el `init` que mueve la lista antes de `fl26swiss` | revienta al asignar (`FL_2026+0x3fd394`) |
+| Stub en el `init` con `ucrtbase!malloc` | revienta (`ucrtbase+0xd50c`) |
+| Stub en el **constructor** (`0x140b1c6f0`) con buffer de `ucrtbase` | **se ven todas las copas**, cae al cerrar: el destructor libera el buffer con su asignador (`FL_2026+0x3fd5db`), heap distinto |
+| Stub en el constructor con el asignador del juego | **cuelga el arranque**: no está listo cuando carga Sider |
+| Frida, hooks de asignación (attach y spawn) | dispara (62 MB al arrancar) pero **ninguna reserva de 156 B**; `spawn` de `FL_2026.exe` pelado muere a los 10 s; spawn gating no existe en Windows |
+
+**Queda:** buffers de `VirtualAlloc` (seguros) + **anular el `free`** de la lista en el destructor.
+Los `call` a la IAT del CRT (free `0x15b9601a8`, malloc `0x15b9601b0`, calloc `0x15b9601a0`,
+realloc `0x15b9601b8`) **no son `FF15`/`FF25` directos**: van por thunk, así que hay que seguir el
+`jmp` del thunk hasta el sitio que llama al `free`. Con eso: capacidad 64 y las 19 copas sin caídas.
+
+Mientras no se haga, **las 6 primeras líneas `ccup` del mundo son las que se ven**: hoy Copa
+Sudamericana, Gold Cup, OFC Nations, OFC World Cup Qualifying, UEFA Nations League y CONCACAF
+Nations League.
 
 **Pila capturada (2026-11-03, attach + breakpoint en los ayudantes):**
 
