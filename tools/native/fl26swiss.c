@@ -11934,9 +11934,19 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
       if (have >= room) { short_ = 1; break; }
       if (w > *pb) memcpy(w, *pb, 12); else memset(w, 0, 12);
       *(uint32_t*)w = cid;
-      if (added < 6)
+      if (added < 6) {
         logf("fl26swiss: CUPADD cid=%u bytes=%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
              cid, w[0],w[1],w[2],w[3], w[4],w[5],w[6],w[7], w[8],w[9],w[10],w[11]);
+        /* what the game's own resolver says about this cid: the group id, whether a live
+           regulation came back, and the name it carries at +0x14 */
+        uint32_t k2 = cid;
+        uint16_t g2 = (uint16_t)((phkind_fn)(uintptr_t)(g_base + PHKIND_RVA))(&k2, 2);
+        unsigned char* r2 = g2 != 0xffff ? find_rec(g2) : 0;
+        char nm2[48]; int j2 = 0;
+        if (r2) for (; j2 < 40 && r2[0x14 + j2]; j2++) nm2[j2] = (char)r2[0x14 + j2];
+        nm2[j2] = 0;
+        logf("fl26swiss: CUPRES cid=%u group=%u rec=%p name=%s", cid, (unsigned)g2, (void*)r2, r2 ? nm2 : "(none)");
+      }
       w += 12; have++; added++;
     }
     if (added || short_)
