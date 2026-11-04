@@ -205,6 +205,10 @@ def main():
         c = bytearray(lib_comp[0])
         M.set_comp_cid(c, 0, cup["cid"])
         M.put(c, M.CODE_OFF, cup["code"], M.COMP - M.CODE_OFF)
+        # the 16-byte menu name at +0x14: the 28-byte code written above clears it (the same
+        # bug add_league had), and an empty one makes the cup list fall back to the first
+        # competition in the table -- all 18 cups read "FIFA Club World Cup" (2026-11-04)
+        M.put(c, 0x14, cup["name"][:15], 16)
         if cup["conf"] is not None:
             c[M.FLAG_OFF] = (c[M.FLAG_OFF] & ~CONF_MASK) | cup["conf"]
         if cup["region"] is not None:
