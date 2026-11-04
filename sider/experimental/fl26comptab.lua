@@ -183,6 +183,12 @@ local ID_COUNTRY = {
 -- the world file's kickorder line: { regulation id, place } -- see install_order
 local KICKORDER = {}
 
+-- The cup lines' regulation ids: Kick Off > Cup looks a competition up in the parameter table by
+-- its regulation id, and a competition with no row there falls back to row 0 -- every cup of ours
+-- showed "FIFA Club World Cup" and had no draw size (2026-11-04).  One hidden row (slot 123) per
+-- cup fixes that; the name label is cleared so the UI uses the inline name, like our leagues.
+local WORLD_CUPS = {}
+
 local function read_world(ctx)
   local sep = string.char(92)
   local path = ctx.sider_dir:gsub("[/" .. sep .. "]+$", "") .. sep .. "modules" .. sep .. "fl26world.txt"
@@ -191,6 +197,8 @@ local function read_world(ctx)
   local leagues = {}
   KICKORDER = {}
   for line in f:lines() do
+    local creg = line:match("^%s*ccup%s+(%d+)")
+    if creg then WORLD_CUPS[#WORLD_CUPS + 1] = tonumber(creg) end
     local ko = line:match("^%s*kickorder%s+([%d:,]+)")
     for kid, krank in (ko or ""):gmatch("(%d+):(%d+)") do
       KICKORDER[#KICKORDER + 1] = { tonumber(kid), tonumber(krank) }
@@ -574,6 +582,23 @@ function m.init(ctx)
       ours[id] = true
     end
   end
+  -- 2a-bis. a hidden row per cup of the world (slot 123): Kick Off > Cup resolves a competition
+  -- through this table by its regulation id, so without a row every cup of ours landed on row 0.
+  do
+    local made = 0
+    for _, id in ipairs(WORLD_CUPS) do
+      if not byid[id] then
+        rows[#rows + 1] = row_set(row_set(tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(123))
+        byid[id] = #rows
+        ours[id] = true
+        made = made + 1
+      end
+    end
+    if made > 0 then
+      log(string.format("fl26comptab: %d hidden row(s) for the world's cups", made))
+    end
+  end
+
   -- 190 shares slot 112 with the exe's row for 145 (the game's empty J2), which comes first, and
   -- Select Team takes the slot's logo from that row: the league on 190 had no logo there (GitHub
   -- #38, Paraguay). A world with a league on 190 has none on 145, so that row goes to the hidden
@@ -653,7 +678,10 @@ function m.init(ctx)
   -- South American row showed that text (issue #43). Without a label the line is left out.
   do
     local cleared, texts = 0, 0
-    for _, id in ipairs(OUR_IDS) do
+    local ids = {}
+    for _, id in ipairs(OUR_IDS) do ids[#ids + 1] = id end
+    for _, id in ipairs(WORLD_CUPS) do ids[#ids + 1] = id end
+    for _, id in ipairs(ids) do
       local i = byid[id]
       if i then
         if row_u32(rows[i], OFF_NAME) ~= 0xffffffff then cleared = cleared + 1 end
@@ -697,7 +725,7 @@ function m.init(ctx)
   local n = #rows
   -- 255 was the module's own safety: the game's count is patched as a dword (COUNT_SITES),
   -- so the table can hold more. 400 lets a world with ~230 of ours through (165 + 235).
-  if n > 400 then log("fl26comptab: too many rows -- aborting"); return end
+  if n > 1200 then log("fl26comptab: too many rows -- aborting"); return end
 
   -- 4. allocate the copy within +-2GB of the code, write it
   local body = table.concat(rows)
