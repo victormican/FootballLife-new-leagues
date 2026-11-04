@@ -588,8 +588,7 @@ function m.init(ctx)
     local made = 0
     for _, id in ipairs(WORLD_CUPS) do
       if not byid[id] then
-        rows[#rows + 1] = row_set(row_set(row_set(tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(123)),
-                                  OFF_NAME, u32le(1))
+        rows[#rows + 1] = row_set(row_set(tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(123))
         byid[id] = #rows
         ours[id] = true
         made = made + 1
@@ -681,6 +680,7 @@ function m.init(ctx)
     local cleared, texts = 0, 0
     local ids = {}
     for _, id in ipairs(OUR_IDS) do ids[#ids + 1] = id end
+    for _, id in ipairs(WORLD_CUPS) do ids[#ids + 1] = id end
     for _, id in ipairs(ids) do
       local i = byid[id]
       if i then
