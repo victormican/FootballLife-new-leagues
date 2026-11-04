@@ -39,6 +39,29 @@ game has 749 clubs and 29,492 players, so about **4,051 new clubs** fit at 22 pl
 Select Team slots (158) and the competition ids (255) are now the walls: a 188-league world needs
 188 slots and 279 competition ids with the shipped 91.
 
+## Límites vigentes (2026-11-04)
+
+Dos muros de la lista de arriba han caído, así que la tabla queda así:
+
+| recurso | tope | cómo se subió | usado en el mundo vivo |
+|---|---|---|---|
+| slots de competición | **250** | `fl26slots250` (123 → 250, slot 123 = centinela) | 135 |
+| **ids de competición** | **1023** | `fl26cid16` con el censo ya de 16 bits (tabla plana) | 265 |
+| regulaciones | 1200 | `fl26regs1200` + `fl26caps` | 419 |
+| regiones | 127 | `fl26reg128` | 101 |
+| equipos | 4800 | `fl26caps` | 3430 |
+| jugadores | 123.825 (cómodo) / 262.143 (pared de 18 bits) | `fl26caps`, `fl26playercap` | 89.048 |
+| **filas en Kick Off > Cup** | **64** | `fl26cupgrow` (13 → 64) | 27 (8 del juego + 19 nuestras) |
+| clubes por liga | 38 | el calendario (`BIG_LEAGUE_DAYS`) | 8–48 |
+
+Lo que sigue siendo pared de verdad: **250 slots** (una liga, una plaza), **38 clubes por liga**
+(calendario) y las **127 regiones** si cada liga va en un país nuevo. Los ids de competición ya no
+lo son: 1023 da para todas las copas que se quieran, y el menú de copas tiene 37 filas libres.
+
+Con el censo de 16 bits, un cid ≥ 256 ya no tiene que compartir byte bajo con otra competición
+(antes solo había doce bytes bajos sin clubes y las ligas se pisaban entre sí). El **emblema** sigue
+pidiéndose por el byte bajo: es la única ruta que aún trunca.
+
 ## Club sizes
 
 `leaguebuilder.CLUBS_MAX` was 24 ("the range seasons have been played with"), then 30 for
