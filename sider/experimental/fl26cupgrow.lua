@@ -21,17 +21,17 @@ local m = {}
 local VT = 0x142692d18
 local DTOR, DTOR_NEXT = 0x140b1c810, 0x140b1c824
 local DTOR_OLD = "40574883ec3048c7442420feffffff48895c2448488bf9"
-local WANT, RING = 64, 16
+local WANT, RING = 256, 16
 
 -- 181 bytes: crece la lista y salta al handler previo.
 --   begin se guarda en rdx (push/pop) porque rax pasa a ser el indice del anillo;
 --   con el begin en rax el rep movsb copiaba desde la direccion 0 (crash 0x16110026f);
 --   el SIB de [r10+rax*8] pedia REX.X y leia [r10+r8*8].
 --   Huecos: anillo en 53, prev en 171.
-local VSTUB =               "5152565741574989cf498b87900000004889c24885c00f84870000004d8b9fa00000004929c34981fb000300" ..
+local VSTUB =               "5152565741574989cf498b87900000004889c24885c00f84870000004d8b9fa00000004929c34981fb000c00" ..
               "000f837000000049ba0001106101000000498b82800000004883f8100f835500000049838280000000014d8b" ..
               "1cc24d85db0f8440000000498b8f980000004829d14889d64c89dff3a4498b8798000000492b87900000004d" ..
-              "899f90000000498d0c0349898f98000000498d8b0003000049898fa0000000415f5f5e5a5948b8f05155d6fe" ..
+              "899f90000000498d0c0349898f98000000498d8b000c000049898fa0000000415f5f5e5a5948b8f05155d6fe" ..
               "7f0000ffe0"
 
 -- 60 bytes: prologo del destructor y anulacion de la lista

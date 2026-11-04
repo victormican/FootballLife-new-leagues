@@ -77,3 +77,33 @@ Resultado en vivo: `Cup mode -- 19 world cup(s) added, all in (list 27 of 64)`.
 
 Y la línea de log final usaba `%#x`, que el `format` de LuaJIT no acepta: el módulo se quedaba en
 "NOT activated" con el parche ya escrito. Ahora concatena con `string.format("%x", …)`.
+
+## Cuántas copas caben (2026-11-04)
+
+El buffer del stub es lo que manda: estaba en 64 items de 12 bytes (768 B) y ahora está en **256**
+(3072 B, `cmp r11, 0xc00` y `lea rcx,[r11+0xc00]`, con `WANT = 256`). El anillo son 16 buffers.
+
+| recurso | usado | tope | margen |
+|---|---|---|---|
+| filas en Kick Off > Cup | 46 | **256** | 210 |
+| regulaciones | 488 | 1200 | 712 |
+| ids de competición | 293 | 1023 | 730 |
+| slots | 132 | 250 | — las copas no gastan slot |
+| clubes / jugadores | 3450 / 89.488 | 4800 / 262.143 | las copas reutilizan clubes |
+
+El coste en regulaciones es lo único que hay que mirar al planificar:
+
+- copa de eliminatoria (estadual, nacional): **1** regulación → caben ~700 más;
+- copa con fase de grupos de 8: **10** (maestra + 8 réplicas + eliminatoria) → caben ~70 más.
+
+Con eso: **duplicar (92) y triplicar (138) entran sin tocar nada más**; el límite realista de
+mezcla es unas 70 copas con grupos + 68 de eliminatoria = 138, y si todas son de eliminatoria se
+llega a las 256 filas del menú.
+
+## Lo que sigue mal: el nombre
+
+Con el `cid` de 16 bits resuelto, el nombre de la copa en esa lista **no** sale de
+`Competition.bin +0x14` ni de las ranuras de la regulación: los dos están escritos y verificados, y
+la lista sigue mostrando el nombre del item que copió como plantilla (`FIFA Club World Cup`, la
+primera copa del juego). Es un trabajo dentro de `fl26swiss.dll`: al añadir cada item hay que
+volver a resolver su nombre (o copiarlo del sitio correcto) en vez de heredar el de la plantilla.
