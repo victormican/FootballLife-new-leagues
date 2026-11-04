@@ -85,6 +85,56 @@ propia de clubes ahí: `fl26clubs.lua` los sirve desde la regulación de cada li
 que tener el slot en `SERVED` y el `slot=` explícito en la línea del mundo. Sin las dos cosas la
 liga no se dibuja.
 
+## 7. El byte bajo del cid: la lista de clubes también
+
+Medido el 2026-11-04 con el mundo en marcha: **el censo de Select Team busca la lista de clubes
+por el byte bajo del cid**, no por el cid. Yokary (cid 265) caía en el nodo de la competición 9
+y su slot listaba los 20 clubes de la Premier League; Austria (266) los 20 de la Serie A;
+Russian First (261) los 17 de la Libertadores; TT Premier (258) los 33 de la Champions. No era
+un club movido ni duplicado: era la lista equivocada, con los nuestros detrás.
+
+Las nueve ligas se movieron con `tools/move_cids.py` a los únicos bytes bajos que no tienen
+clubes de ninguna competición (12 en todo el mundo):
+
+| liga | cid viejo | cid nuevo | byte |
+|---|---|---|---|
+| TT Premier | 258 | 301 | 45 |
+| TFF 1. Lig | 259 | 302 | 46 |
+| Aruba | 260 | 303 | 47 |
+| Russian First | 261 | 326 | 70 |
+| Danish 1. Division | 262 | 327 | 71 |
+| Scottish Championship | 263 | 328 | 72 |
+| Swiss Challenge | 264 | 353 | 97 |
+| Yokary Liga | 265 | 359 | 103 |
+| Austrian Second League | 266 | 483 | 227 |
+
+`move_cids.py --free` imprime los doce (1, 37, 45, 46, 47, 70, 71, 72, 86, 97, 103, 227); el 1
+choca con la Sudamericana (513) y el 37/86 son la Copa y la Liga personalizadas del juego, así
+que quedan **tres libres**.
+
+**Consecuencia para la planificación:** de este tipo de liga (cid ≥ 256) solo caben **12**, no
+115. Los slots dan para 115, pero el juego identifica estas ligas por el byte bajo. Para pasar de
+12 hay que parchear el censo (es el `cmp`/`cid` de `fl26cid16`, que ya mató el juego a los 25 s
+cuando se activó).
+
+## 8. Emblemas de todo el mundo
+
+`mkemblems.py` gana tres opciones: `--missing` (solo lo que aún no tiene fichero), `--shipped`
+(el `pesdb` de base con el que comparar, para no necesitar `modscan`) y `--bytes` (escribe en
+`emb_<cid & 0xFF>`, que es la ruta que el exe pide de verdad para un cid > 255).
+
+    python tools/mkemblems.py --base <pesdb> --out <raíz livecpk> \
+        --shipped C:\Users\viarm\test-carpeta\pesdb\_base --missing
+    python tools/mkemblems.py --base <pesdb> --out <raíz livecpk> \
+        --bytes --only 301,302,303,326,327,328,353,359,483
+
+Resultado: 181 de las 265 competiciones del mundo tienen emblema propio por livecpk. Las 84
+restantes son competiciones del juego (cid ≤ 145 y la Sudamericana 513) y conservan el suyo del
+CPK; no se pisan. Ocho de las nueve ligas quedan claveadas en un byte que una competición del
+juego también usa (45/46/47 partido amistoso, entrenamiento y retirada; 70/71/72 play-offs de
+segunda; 97 retirada; 103 World Selection), así que esos badges de partido muestran el de nuestra
+liga: es el precio de que la fila tenga escudo.
+
 ## Comprobación
 
 `check_world.py` sobre el mundo vivo: **0 errores**, 1 aviso preexistente (competición 2, copa

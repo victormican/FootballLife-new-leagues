@@ -185,6 +185,8 @@ def main():
         return 1
     only = {int(x) for x in get("--only", "").split(",") if x.strip()}
     first = get("--from")
+    as_bytes = "--bytes" in a
+    missing_only = "--missing" in a
 
     comps = competitions(base)
     if only:
@@ -197,9 +199,24 @@ def main():
         # the ones the shipped tables do not have, and that is a comparison, not a threshold.
         import modscan
 
-        shipped = load(modscan.base_dir(), "Competition.bin")
-        have = {shipped[i * COMP + C_ID] for i in range(len(shipped) // COMP)}
+        shipped = load(get("--shipped") or modscan.base_dir(), "Competition.bin")
+        have = {
+            shipped[i * COMP + C_ID] | (shipped[i * COMP + C_ID + 2] << 8)
+            for i in range(len(shipped) // COMP)
+        }
         pick = [c for c in comps if c[0] not in have]
+
+    # The exe builds the path with the **low byte** of the competition id (measured 2026-11-04:
+    # cid 265 listed the clubs of the Premier League, cid 266 those of Serie A). --bytes writes
+    # the file the exe actually asks for, which for a cid above 255 is emb_<cid & 0xFF>.
+    key = (lambda cid: cid & 0xFF) if as_bytes else (lambda cid: cid)
+    d = preview or os.path.join(out, "common", "render", "symbol", "emblemLc")
+    if missing_only and not preview:
+        pick = [
+            c
+            for c in pick
+            if not os.path.exists(os.path.join(d, "emb_%04d_l.png" % key(c[0])))
+        ]
     if not pick:
         raise SystemExit(
             "this pesdb folder adds no competition to the shipped 91 -- is it "
@@ -207,7 +224,6 @@ def main():
         )
     print("%d competitions in %s, %d of them ours" % (len(comps), base, len(pick)))
 
-    d = preview or os.path.join(out, "common", "render", "symbol", "emblemLc")
     os.makedirs(d, exist_ok=True)
     for cid, code, name in pick:
         lab, sub = initials(name, code, cid), tier(name)
@@ -218,12 +234,22 @@ def main():
             continue
         for suf, px in VARIANTS:
             mode = "b" if "_b" in suf else ("w" if "_w" in suf else "")
-            emblem(cid, lab, sub, px, mode).save(
-                os.path.join(d, "emb_%04d%s.png" % (cid, suf))
+            emblem(key(cid), lab, sub, px, mode).save(
+                os.path.join(d, "emb_%04d%s.png" % (key(cid), suf))
             )
     print("wrote %d competition emblems to %s" % (len(pick), d))
     for cid, code, name in pick[:5]:
-        print("   emb_%04d  %-22s %s" % (cid, code, name))
+        print("   emb_%04d  %-22s %s" % (key(cid), code, name))
+    if as_bytes:
+        over = [c for c in pick if c[0] > 255 and c[0] & 0xFF <= 145]
+        if over:
+            print(
+                "%d of them keyed on a byte a shipped competition also uses (<=145): %s"
+                % (
+                    len(over),
+                    ", ".join("cid %d -> %d" % (c[0], c[0] & 0xFF) for c in over),
+                )
+            )
     if not preview:
         print(
             "Keyed by competition id, and only ids the shipped tables do not use, so nothing "
