@@ -37,6 +37,8 @@ B("56")  # push rsi
 B("57")  # push rdi
 B("4157")  # push r15
 B("4989cf")  # mov r15, rcx
+B("48b8402c694201000000")            # mov rax, 0x142692c40 (vtable MenuModeCupSelect)
+B("483b01"); J("85", "done")             # cmp rax,[rcx] ; jne done
 B("498b8790000000")  # mov rax, [r15+0x90]      begin
 B("4885c0")
 J("84", "done")  # test rax,rax ; jz done
