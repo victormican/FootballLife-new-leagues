@@ -459,3 +459,55 @@ Se quitan sus dos lineas `ccup` (`196 cid=91`, `255 cid=255`): dejan de salir en
 Las filas de competicion, sus regulaciones y sus entradas se quedan como estaban (nada mas las
 referencia desde el menu), asi que no se libera ningun `cid`: son 17 lineas `ccup` y el mundo
 sigue en 255 competiciones. `check_world`: 0 errores.
+
+## Las 8 ligas nuevas y el bug de las filas de pool (2026-11-04)
+
+Se crean Trinidad y Tobago, Turquía 2ª, Aruba, Rusia 2ª, Dinamarca 2ª, Escocia 2ª, Suiza 2ª y
+Turkmenistán 1ª con `tools/add_eight_leagues.py`:
+
+| liga | cid | país (flag) | región | slot | clubes |
+|---|---|---|---|---|---|
+| TT Premier Football League | 258 | Trinidad (133) | 115 | 1 | 10 |
+| TFF 1. Lig | 259 | Turquía (190) | 116 | 2 | 18 |
+| Aruba Division di Honor | 260 | Aruba (105) | 117 | 3 | 10 |
+| Russian First League | 261 | Rusia (230) | 118 | 4 | 18 |
+| Danish 1. Division | 262 | Dinamarca (203) | 119 | 5 | 12 |
+| Scottish Championship | 263 | Escocia (232) | 120 | 6 | 10 |
+| Swiss Challenge League | 264 | Suiza (238) | 121 | 7 | 10 |
+| Ýokary Liga | 265 | Turkmenistán (42) | 122 | 8 | 8 |
+
+Resultado: **264 competiciones, 418 regulaciones, 4.095 entradas, 150 ligas**, `check_world`
+0 errores, `fl26catlist` nombra 95 regiones y el juego arranca.
+
+### El bug (y la regla que queda)
+
+La primera pasada eligió filas "libres" = nombre `... Club NN` y **sin entrada en ninguna
+competición**. Pero los clubes de los grupos **"Other ..."** (Otros Latinoamericanos, Otros
+Europa, Otros Asia, Otros África, Otros Concacaf) **no están en ninguna entrada**: Select Team
+los lista por el **nibble de pool** del propio registro (`Team.bin +0x4f`, nibble alto). Al
+tomarlas se renombraron clubes de esos grupos, y "Otros Latinoamericanos" salió con nombres
+ajenos.
+
+Arreglado así:
+
+1. `Team.bin` restaurado del backup `*.before-8ligas-20261104-075733`;
+2. se renombraron **solo** los 96 clubes que están en las entradas de 258..265;
+3. la condición del selector lleva ahora `(r[0x4f] >> 4) == 0`: **nunca** se toma una fila con
+   pool.
+
+Regla para cualquier herramienta que recicle clubes: *fila libre* = sin entrada **y** sin nibble
+de pool.
+
+### De dónde lee el juego (para no volver a dudarlo)
+
+`sider.ini` monta, en este orden:
+
+```
+cpk.root = ".\livecpk\_FL26MyWorld"     <- el mundo vivo (manda)
+cpk.root = ".\livecpk\_FL26All"         <- la base del modpack
+cpk.root = ".\livecpk\FL26 Regen Faces"
+```
+
+Y hay **dos** `fl26world.txt`: el del mundo (`_FL26MyWorld\fl26world.txt`, el que editan las
+herramientas) y el que leen los módulos (`SiderAddons\modules\fl26world.txt`). **Hay que
+copiar el primero sobre el segundo** o los cambios no se ven.

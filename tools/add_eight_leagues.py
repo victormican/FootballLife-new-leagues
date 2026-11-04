@@ -186,7 +186,11 @@ def main():
         r = teams_raw[i : i + T_REC]
         tid = int.from_bytes(r[T_ID : T_ID + 4], "little")
         nm = r[T_NAME : T_NAME + 60].split(b"\x00")[0].decode("latin1", "replace")
-        if tid not in used and re.search(r"Club \d+$", nm):
+        # a row of the "Other ..." pools carries a pool number in the high nibble of +0x4f:
+        # Select Team lists those clubs even with no competition entry, so taking one renames a
+        # club of the pool (it happened with Other Latin American, 2026-11-04)
+        in_pool = (r[0x4F] >> 4) != 0
+        if tid not in used and not in_pool and re.search(r"Club \d+$", nm):
             free.append(tid)
     free.sort()
     print("%d filas de club libres" % len(free))
