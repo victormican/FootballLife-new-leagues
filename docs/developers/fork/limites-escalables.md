@@ -400,3 +400,55 @@ Colombia por un `fill_group --seed-country 148`). `tools/other_groups.py` les da
   0 `aborting`.
 - `fill_group.py` ya no revienta al final cuando la competicion no tiene linea en el world
   (copas del juego): imprime "done" y sale con 0.
+
+## El techo real: 255 competiciones, y los `cid` de 16 bits no aguantan el arranque (2026-11-04)
+
+Prueba hecha con el mundo vivo (`_FL26MyWorld`), 12 copas nuevas en `cid 256..267` y
+`fl26cid16.lua` cargado:
+
+- Tablas escritas y validadas: **267 competiciones, 446 regulaciones, 30 líneas `ccup`**,
+  `check_world` **0 errores** (1 aviso preexistente: la competición 2 tiene dos clubes en la
+  posición 32).
+- El juego **no llega al menú**: `0xc0000005` en `FL_2026+0x14f1c42`
+  (`mov rax, qword [r15 + rax*8]`, con `rax = (id - 1) * 2`): es una **tabla fija de entradas de
+  16 bytes indexada por `id - 1`**, y un `id` de 256 se sale de ella. El parche de 16 bits
+  (`fl26cid16.lua`) cubre Select Team, el censo y Edit, **no este camino**.
+
+Conclusión: el límite es **255 competiciones** y el `cid` es un byte *de verdad* en el arranque.
+Los 255 están gastados (ids 1..255; el 0 no existe), así que una copa nueva exige **liberar un
+`cid`**, no inventarlo.
+
+### Qué se puede liberar (candidatos vistos en las tablas)
+
+| cids | qué son | coste |
+|---|---|---|
+| 227 | copia duplicada del FIFA Club World Cup (el 1 ya existe) | 1 |
+| 25, 26, 38, 99 | copas argentinas `FL_ARG_*` | 4 |
+| 229..236 | 8 copas estatales brasileñas (Paulista, Carioca, Mineiro, Gaucho, Paranaense, Baiano, Pernambucano, …) | 8 |
+| 95, 98, 254 | pools `FL_OTHERLATINAM`, `FL_OTHEREUROPEA`, `FL_OTROS_ASIA_LE` | 3 |
+| 100..103 | `CHAMPIONS_CUP_NA/SA/ASIA`, `WORLD_SELECTION` | 4 |
+| 45..47, 97 | `SPE_*` (amistoso, práctica, retirada) | 4 |
+
+Con **12** de esos (por ejemplo el CWC duplicado + las 8 brasileñas + los 3 pools "Other") caben
+las 12 copas pedidas. La otra vía es **rotar**: mantener 255 y cambiar cuáles ocupan los huecos,
+que es lo que ya se hacía con la lista del menú.
+
+### Otros topes, medidos hoy
+
+| recurso | límite | usado | libre |
+|---|---|---|---|
+| competiciones (tabla y contador *My world*) | **255** | 255 | **0** |
+| `cid` de 16 bits (256..511) | no sirve en el arranque | - | 0 útiles |
+| regulaciones | 1.200 | 400 | 800 |
+| copas del menú | 512 (`MAX_CCUP`) y el ensanche ya funciona | 19 | - |
+| países nuevos | 99 | 26 | 73 |
+| clubes por regulación | 48 | - | - |
+
+Y una consecuencia práctica: **Custom Cup y Sudamericana no caben a la vez**. La Sudamericana
+vive hoy en el `cid 37` (la fila de la Custom Cup); para devolver la Custom Cup hay que sacar la
+Sudamericana o liberar un `cid`.
+
+Herramientas que quedan de la prueba (sin usar por ahora): `tools/mk_conf_cups.py` (genera las
+copas con sus `ccup` y elige clubes por confederación) y `mkccup.py` lee ya el `cid` de 16 bits
+completo al buscar la Libertadores y las entradas, para que un `cid` alto no se confunda con el
+de byte bajo.

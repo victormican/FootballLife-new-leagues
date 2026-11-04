@@ -146,14 +146,24 @@ def main():
         )
     )
     C, R, E = rows(comp, M.COMP), rows(regs, M.REG), rows(ents, M.ENT)
-    used_cid = {c[M.CID_OFF] for c in C}
+
+    def c_cid(c):
+        return c[M.CID_OFF] | (c[M.C_CID_HI] << 8)
+
+    def r_cid(r):
+        return r[M.R_CID] | (r[M.R_CID_HI] << 8)
+
+    def e_cid(e):
+        return e[M.E_CID] | (e[M.E_CID_HI] << 8)
+
+    used_cid = {c_cid(c) for c in C}
     used_reg = {rid(r) for r in R}
 
-    lib = [r for r in R if r[M.R_CID] == LIB_CID and rid(r) & 0x3FF == LIB_GROUPS]
+    lib = [r for r in R if r_cid(r) == LIB_CID and rid(r) & 0x3FF == LIB_GROUPS]
     master = [r for r in lib if r[R_GROUP] == NO_GROUP]
     reps = sorted((r for r in lib if r[R_GROUP] != NO_GROUP), key=lambda r: r[R_GROUP])
     ko_src = [r for r in R if rid(r) == UEL_KO]
-    lib_comp = [c for c in C if c[M.CID_OFF] == LIB_CID]
+    lib_comp = [c for c in C if c_cid(c) == LIB_CID]
     if len(master) != 1 or len(reps) < 8 or len(ko_src) != 1 or len(lib_comp) != 1:
         raise SystemExit(
             "this world has no shipped Libertadores group stage (reg 9, 8 groups) "
@@ -161,10 +171,10 @@ def main():
         )
 
     # a league's clubs in its own entry order, for the entries written here
-    cid_of_reg = {rid(r): r[M.R_CID] for r in R}
+    cid_of_reg = {rid(r): r_cid(r) for r in R}
     listed = {}
     for e in E:
-        listed.setdefault(e[M.E_CID], []).append(
+        listed.setdefault(e_cid(e), []).append(
             (e[M.E_ORDER], int.from_bytes(e[M.E_TEAM : M.E_TEAM + 4], "little"))
         )
     eid = max(int.from_bytes(e[M.E_EID : M.E_EID + 4], "little") for e in E)

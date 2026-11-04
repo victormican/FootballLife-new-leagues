@@ -82,7 +82,16 @@ PRESETS = {
         [69, 72],
     ),
     "asean": ("ASEAN Cup", 3, 8, 150, [165, 168, 171], "FL_ASEAN", 148, [149, 152]),
-    "caribbean": ("Caribbean Cup", 6, 8, 150, [160, 163, 166], "FL_CRBC", 148, [149, 152]),
+    "caribbean": (
+        "Caribbean Cup",
+        6,
+        8,
+        150,
+        [160, 163, 166],
+        "FL_CRBC",
+        148,
+        [149, 152],
+    ),
     "nl-concacaf": (
         "CONCACAF Nations League",
         6,
@@ -99,11 +108,19 @@ PRESETS = {
 def free_ids(base):
     comp = M.load(base, "Competition.bin")
     regs = M.load(base, "CompetitionRegulation.bin")
-    used_c = {comp[i + M.CID_OFF] for i in range(0, len(comp), M.COMP)}
+    # the id is 16 bits once sider/fl26cid16.lua is installed: Competition.bin +0x07 keeps the
+    # high byte, so 256..511 are free even when every low byte is taken
+    used_c = {
+        comp[i + M.CID_OFF] | (comp[i + M.C_CID_HI] << 8)
+        for i in range(0, len(comp), M.COMP)
+    }
     used_r = {
         int.from_bytes(regs[i + M.R_ID : i + M.R_ID + 2], "little")
         for i in range(0, len(regs), M.REG)
     }
+    # 256..511 look free here and the tables take them, but the game dies at boot with them
+    # (FL_2026+0x14f1c42, a fixed 255-entry table indexed by id-1): this script only hands out
+    # ids the game can actually load
     cids = [c for c in range(48, 256) if c not in used_c]
     rids = [r for r in range(176, 1024) if r not in used_r]
     return cids, rids
