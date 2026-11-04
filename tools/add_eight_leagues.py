@@ -227,10 +227,14 @@ def main():
             name,
             code,
             rows,
-            proto_code="ENGLAND_D1_LEAGUE",
+            proto_code="FL_223_D1",
             quiet=True,
             tier=1,
         )
+        # add_league writes a 28-byte code, which also clears the 16-byte name at +0x14: the
+        # menu does not list a competition without it (new_league.py writes it for the same
+        # reason). This was the bug on 2026-11-04: the eight leagues came out nameless.
+        M.put(comp, (len(comp) // M.COMP - 1) * M.COMP + 0x14, name, 16)
         lines.append(
             "league %d cid=%d region=%d country=%d conf=%d slot=%d tier=1 promote=0 demote=0 "
             "clubs=%d legs=%d kickoff=%d name=%s"
@@ -259,9 +263,10 @@ def main():
     cur = io.open(world, encoding="utf-8", errors="replace").read().splitlines()
     have = {l.split()[1] for l in cur if l.startswith("league ")}
     add = [l for l in lines if l.split()[1] not in have]
-    io.open(world, "w", encoding="utf-8", newline="\n").write(
-        "\n".join(cur + add) + "\n"
-    )
+    # right after the last league line (the league block comes before uefa/rcal/ccup)
+    at = max(i for i, l in enumerate(cur) if l.startswith("league "))
+    cur[at + 1 : at + 1] = add
+    io.open(world, "w", encoding="utf-8", newline="\n").write("\n".join(cur) + "\n")
     print("añadidas %d lineas league a %s" % (len(add), world))
     return 0
 
