@@ -189,7 +189,7 @@ local KICKORDER = {}
 -- 2026-11-06: the row used to sit on slot 123 (the "none" sentinel): opening the cup list then
 -- read the slot's data and crashed (memcpy from 0x00000d70, Access Violation 0x1403fef5f).  A
 -- real, free slot of the parameter table is used instead (slot 22 is in the shipped free list).
-local CUP_SLOT = 22
+local CUP_SLOT = 123   -- el 22 repetido hace que comptab aborte la tabla entera
 local WORLD_CUPS = {}
 
 local function read_world(ctx)
