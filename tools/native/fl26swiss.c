@@ -11872,7 +11872,13 @@ static int regcid_fix(void)
   /* la cuenta puede ser 65535 (phkind tambien la ve asi): mas alla de 1200 el registro es el
      centinela de +0xd0b77c, que no es de nadie.  El tope real lo pone fl26caps (300 -> 1200). */
   uint32_t lim = n > 1200 ? 1200 : n;
-  int fixed = 0, seen = 0;
+  int fixed = 0, seen = 0, nz = 0;
+  char ids[160]; int il = 0;
+  for (uint32_t i = 0; i < lim; i++) {
+    uint16_t pid = *(uint16_t*)(blk + 0xc12e9c + (size_t)i * 0x314);
+    if (pid) { nz++; if (il < 140) il += snprintf(ids + il, sizeof ids - il, " %u", (unsigned)pid); }
+  }
+  logf("fl26swiss: regcid -- %d record(s) with an id, first ones:%s", nz, ids);
   for (uint32_t i = 0; i < lim; i++) {
     unsigned char* rec = blk + 0xc12e9c + (size_t)i * 0x314;
     uint16_t rid = *(uint16_t*)rec;
