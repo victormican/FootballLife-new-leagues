@@ -116,4 +116,28 @@ check_world: 0 errores
 Ese es exactamente el estado que funcionaba antes de duplicar las copas hoy (con la corrección
 de Bélgica/Ecuador incluida). Backup de las tres tablas y del world: `*.before-cleanup`.
 
+## 9. OFC Champions League
+
+El mundo solo tenía 4 ligas OFC (New Zealand Northern 24, New Zealand Central 10, Super Ligue 12,
+Fiji Premier 10), y ninguna copa de clubes de Oceanía.
+
+`tools/mk_ofc_cl.py` la crea con la forma de la AFC Champions League Two (cid 603, maestra 279,
+eliminatoria 280): **8 clubes** (los dos primeros de cada una de las 4 ligas) en **2 grupos de 4**
+y eliminatoria de 4. Maestra y KO por debajo de 1024 para que `id & 0x3ff` siga valiendo.
+
+```
+OFC CL: cid 367, master 434, replicas [1458, 2482], ko 435, 8 clubes
+ccup 434 ko=435 groups=2 entry=182:1,197:1,198:1,8463:1,182:2,... cid=367 conf=7 region=26 \
+     name=OFC Champions League
+check_world: 272 ccup, 0 errores
+```
+
+## 10. A/B del `regcid` (cierre al abrir Copas)
+
+El cierre ocurre dentro de `cupsel_handler` (el `regcid.txt` se escribe justo antes). Primer
+sospechoso: `regcid_fix`, que recorre el array vivo de regulaciones. En `fl26swiss.lua` hay ahora
+`local REGCID = false`: no se le pasa el mapa al DLL y `regcid_fix` sale sin recorrer nada.
+Es una prueba: si el menú abre así, el problema está en ese recorrido; si sigue cerrando, no.
+
+
 

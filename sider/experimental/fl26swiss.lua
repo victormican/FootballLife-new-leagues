@@ -70,6 +70,10 @@ local UECL = { 4071, 4145, 320, 4124, 403, 242, 5845, 174, 5196, 270, 5202, 2067
 -- else the next Premier League club. A table set here is used when there is no world file.
 local ACCESS = nil
 
+-- 2026-11-06: A/B de la escritura reg->cid.  En false no se le pasa el mapa al DLL y
+-- `regcid_fix` sale sin recorrer el array (era el primer sospechoso del cierre al abrir Copas).
+local REGCID = false
+
 local dll_log, dll_stats, dll_ko_tick, logbuf, statbuf, regbuf
 local ticks = 0
 
@@ -674,7 +678,7 @@ function m.init(ctx)
                 end
                 wf:close()
               end
-              if #rc > 0 then
+              if #rc > 0 and REGCID then
                 local buf = ffi.new("uint32_t[?]", #rc)
                 for i = 1, #rc do buf[i - 1] = rc[i] end
                 local m = tonumber(ffi.cast("fl26_swiss_regcid_t", prc)(buf, #rc))
