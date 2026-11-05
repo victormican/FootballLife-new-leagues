@@ -59,21 +59,40 @@ sider.log:   285 cup(s) for Kick Off > Cup, 285 taken (8 del juego + 261 nuestra
 Juego arrancado. En Kick Off > Cup deberían salir ~293 filas (las 8 del juego + las nuestras +
 las suyas listadas) y **acabar en la última, sin repetir FIFA Club World Cup**.
 
-## 6. Lo que queda (cid secuestrados)
+## 6. Revisión de los secuestros (2026-11-06, segunda pasada)
 
-Todavía hay líneas nuestras que usan el `cid` de una copa del juego y por eso su nombre no
-aparece:
+Se revisaron todas las líneas cuyo `cid` es una copa de otro país. Resultado:
 
-| cid | lo usa | debería ser |
-|---|---|---|
-| 16 | AFC Champions League (nuestra) | Coppa Italia (Italia) |
-| 42 | UEFA EURO (nuestra) | DFB-Pokal (Alemania) |
-| 43 | Copa America (nuestra) | US Open Cup (EE. UU.) |
-| 44 | AFC Asian Cup (nuestra) | Copa de Japón |
-| 56 | 국제 친선 경기 | (no es copa) |
-| 123 | Russian Cup (nuestra) | Copa Colombia |
-| 126 | Copa BetPlay Dimayor | Copa de China |
-| 129 | Russian Supercup | Copa de Dinamarca |
+| línea | cid | era | ahora |
+|---|---|---|---|
+| Coppa Italia | 16 | 24 (Brasil) | **16 ITALY_D1_CUP** |
+| Copa BetPlay Dimayor | 123 | 126 (China) | **123 COLOMBIA_CUP** |
+| Russian Supercup | 116 | 129 (Dinamarca) | **116 RUSSIA_SUPER_CUP** |
+| Russia Cup | 115 | — | 115 RUSSIA_CUP (ya estaba bien) |
+| Supercopa de España | 74 | — | 74 SPAIN_SUPER_CUP (ya estaba bien) |
 
-La siguiente pasada: remapear esas líneas a su cid real (o quitarlas si son duplicados de las
-8 del juego) y volver a listar. Así cada `showcup` cae en su sitio.
+Y se quitaron 7 líneas que eran copias de copas que el juego ya muestra en su lista de 8, o que
+no son copas:
+
+```
+AFC Asian Cup          (el juego ya la tiene, cid 35)
+AFC Champions League   (dos líneas; el juego ya la tiene, cid 8)
+Copa America           (el juego ya la tiene, cid 34)
+UEFA EURO              (el juego ya la tiene, cid 33)
+Russian Cup            (duplicado de Russia Cup)
+국제 친선 경기            (amistosos, no es copa)
+```
+
+`check_world`: **254 líneas `ccup`, 0 errores**. Ya no queda ninguna línea usando el `cid` de la
+copa de otro país.
+
+## 7. Las copas del juego (`showcup`) se retiraron
+
+La prueba de listarlas en Kick Off > Cup **no llegó a abrir el menú**: el juego se cerró en
+`FL_2026+0x3fd2b2`, la caída de heap conocida de `copas-por-liga.md` (la misma que aparece a veces
+sin abrir Copas). Las 33 líneas `showcup` se quitaron para dejar el menú como estaba; el soporte
+en `fl26swiss.lua` queda, sin datos.
+
+Siguiente intento, si se quiere: listar **una sola** copa del juego (p. ej. `showcup 73`, la
+Community Shield) y comprobar que el menú abre antes de añadir el resto.
+
