@@ -11861,7 +11861,10 @@ __declspec(dllexport) int fl26_swiss_regcid(const uint32_t* v, int n)
 static int regcid_fix(void)
 {
   if (g_nregcid == 0) return -1;
-  void *ctx = ((void* (*)(void))(uintptr_t)(g_base + PHDATA_RVA))();
+  /* phkind la llama con rcx = puntero al cid; sin argumento el registro queda con basura y
+     revienta (0x140025963, 2026-11-04).  Se le pasa un puntero a un cero. */
+  uint32_t zero = 0;
+  void *ctx = ((void* (*)(void*))(uintptr_t)(g_base + PHDATA_RVA))(&zero);
   if (!ctx) return -1;
   unsigned char* blk = *(unsigned char**)((unsigned char*)ctx + 0x48);
   if (!blk) return -1;
