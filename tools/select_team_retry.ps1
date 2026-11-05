@@ -37,8 +37,8 @@ Start-Sleep -Milliseconds 100
 Start-Sleep -Milliseconds 400
 
 function Tap([byte]$vk,[byte]$sc,[uint32]$ex) {
-  [ST]::keybd_event($vk,$sc,$ex,[UIntPtr]::Zero); Start-Sleep -Milliseconds 110
-  [ST]::keybd_event($vk,$sc,($ex -bor 2),[UIntPtr]::Zero); Start-Sleep -Milliseconds 380
+  [ST]::keybd_event($vk,$sc,$ex,[UIntPtr]::Zero); Start-Sleep -Milliseconds 140
+  [ST]::keybd_event($vk,$sc,($ex -bor 2),[UIntPtr]::Zero); Start-Sleep -Milliseconds 650
 }
 # volver al menu principal (por si estamos en un submenu)
 Tap 0x1B 0x01 0; Tap 0x1B 0x01 0; Tap 0x1B 0x01 0
