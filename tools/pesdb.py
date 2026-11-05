@@ -69,8 +69,9 @@ def entry_rows(raw=None):
     raw = raw if raw is not None else load("CompetitionEntry")
     out = []
     for r in rows(raw, 12):
-        team, rowid, cs = struct.unpack("<III", r)
-        out.append(dict(raw=r, team=team, rowid=rowid, comp=cs & 0xff, slot=cs >> 8))
+        team, rowid = struct.unpack_from("<II", r, 0)
+        out.append(dict(raw=r, team=team, rowid=rowid,
+                        comp=r[8] | (r[0x0b] << 8), slot=r[9]))
     return out
 
 def entry_pack(team, rowid, comp, slot):
@@ -87,8 +88,10 @@ def reg_rows(raw=None):
         for k in range(20):                      # 20 language slots, NUL-terminated, 115 B each
             o = 0x14 + k * 115
             names.append(cstr(r[o:o+115]))
-        out.append(dict(raw=r, releg=releg, id=rid, sub=sub, promo=promo, parent=parent,
-                        comp=r[8], type=r[9], group=r[0xa], teams=r[0xb],
+        cid = r[8] | (r[0x492] << 8)
+        out.append(dict(raw=r, releg=releg, id=rid | (sub << 8), id_lo=rid, id_hi=sub,
+                        promo=promo, parent=parent, comp=cid, cid=cid,
+                        type=r[9], group=r[0xa], teams=r[0xb],
                         hdr=r[0xc:0x14].hex(" "), names=names, name=names[0]))
     return out
 

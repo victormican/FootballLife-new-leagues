@@ -7,8 +7,9 @@ es histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la column
 
 | documento | estado |
 |---|---|
-| **`estado-y-escalado-2026-11-05.md`** | **vigente** — qué está cerrado, qué abierto y qué romper para escalar |
-| `pendientes-2026-11-05.md` | vigente (lista corta de tareas) |
+| **`revision-completa-y-pendientes-2026-11-06.md`** | **vigente** — cifras del mundo, los 4 fallos abiertos y los pendientes P0..P3 |
+| **`estado-y-escalado-2026-11-05.md`** | histórico: qué estaba cerrado y abierto el 05; superado por el anterior |
+| `pendientes-2026-11-05.md` | superado por la lista de `revision-completa-y-pendientes-2026-11-06.md` |
 | `summary-2026-10-23.md`, `summary-2026-10-24.md`, `test-world-2026-10-23.md`, `world-state-2026-10-24.md`, `inventario-oculto-2026-10-26.md`, `reconstruccion-paso-a-paso.md` | histórico: sesiones pasadas |
 
 ## Límites y capacidad
@@ -38,6 +39,7 @@ es histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la column
 | `code-map.md`, `re-arquitectura.md` | vigentes — mapa del ejecutable y del flujo de Select Team |
 | `cids-16-bit.md` | vigente — cid por encima de 255 |
 | **`regulaciones-en-memoria.md`** | **vigente** — el array vivo y el REA del nombre de copas |
+| **`revision-completa-y-pendientes-2026-11-06.md`** §2 | **vigente** — id de regulación u16 en `+0x02`, cid alto en `+0x492` y en la entrada `+0x0B` |
 
 ## Copas
 

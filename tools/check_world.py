@@ -8,7 +8,7 @@ What it checks
   Player.bin            unique ids, none at or above 262144 (the 18-bit wall), a name
   PlayerAssignment.bin  every player and team exists; one row per (player, team); every club has
                         eleven players and a keeper; every national team its squad
-  Competition.bin       unique competition ids, at most 255
+  Competition.bin       unique competition ids, at most 1023
   CompetitionRegulation unique regulation ids; the competition it names exists; its club count
                         agrees with its entries
   CompetitionEntry.bin  the competition and the club exist; orders are 1..n with no repeats
