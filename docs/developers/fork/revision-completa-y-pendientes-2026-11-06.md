@@ -123,8 +123,11 @@ Si solo lista competiciones del juego, se documenta como límite y no se fuerza.
    byte bajo, en el orden `cid << 6 | plaza-1`. Medición y evidencia en
    `informacion-de-la-liga-censo-2026-11-06.md` (Sudamericana 513←257, Yokary 359←615, NIFL
    63←319, Danish 327←839). Es la causa (a).
-2. **Es el censo: probar `cid = true`** en `sider/experimental/fl26cid16.lua` (A/B con el
-   juego cerrado, una sola pantalla) y, si casca, mover las ligas que importan con
+2. ~~Es el censo: probar `cid = true`~~ **HECHO (2026-11-06): no arregla el panel.** No casca,
+   pero `cid` solo cambia la lectura del id de la fila de competición (`0x1414f1500`) y el panel
+   sigue agrupando por el byte bajo de la entrada. Evidencia y sitios candidatos en
+   `p02-cid-true-ab-2026-11-06.md`. Queda parchear el rango/agrupado por byte (o mover cids).
+   A/B original: `sider/experimental/fl26cid16.lua` (juego cerrado, una sola pantalla) y, si casca, mover las ligas que importan con
    `tools/move_cids.py --free` (solo 12 bytes bajos libres: 1, 37, 45, 46, 47, 70, 71, 72, 86,
    97, 103, 227; 37 y 86 son la copa/liga personalizadas del juego).
 3. **Si es el array vivo:** pasar `clubs=` del world al DLL y cortar `rebuild()` en
