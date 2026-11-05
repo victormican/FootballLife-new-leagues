@@ -11880,6 +11880,14 @@ static int readable_span(void* p, size_t n)
   return ((unsigned char*)p + n) <= ((unsigned char*)m.BaseAddress + m.RegionSize);
 }
 
+/* Un registro de regulacion del mundo: id 16 bits en +0x00 y cid en +0x80. */
+static int rec_matches(unsigned char* r, uint16_t rid, uint32_t cid)
+{
+  if (!readable_span(r, 0x88)) return 0;
+  if (*(uint16_t*)r != rid) return 0;
+  return *(uint32_t*)(r + 0x80) == cid;
+}
+
 static int regcid_fix(void)
 {
   if (g_nregcid == 0) return -1;
@@ -11889,63 +11897,69 @@ static int regcid_fix(void)
   rlog("ctx=%p hint=%p", ctx, (void*)hint);
   if (!hint) return -1;
 
-  /* El bloque bueno se localiza por sus cuentas (el recuento de 0x1414bc0a0 deja seguidas
-     jugadores y equipos en +0xd0bce8/+0xd0bcec).  Se exige ademas que el bloque y el array
-     sean legibles y que los primeros registros tengan ids de regulacion: un par falso en
-     memoria baja saco un bloque negativo y cerro el juego (2026-11-06). */
-  unsigned char* blk = 0;
+  /* El array vivo se busca por una FIRMA conocida, no por cuentas: la regulacion 30 es la
+     Primera de Argentina (cid 22) y la 34 el Mundial (cid 27).  Se barre la zona del heap
+     alrededor del bloque de phkind (+-1 GB), que es donde viven estas estructuras, y se exige
+     que el registro anterior y el siguiente tambien tengan un id plausible. */
+  static const struct { uint16_t rid; uint32_t cid; } SIG[] = {
+    { 30, 22 }, { 34, 27 }, { 128, 113 }, { 11, 130 },
+  };
+  unsigned char* base = 0;
   {
+    unsigned char* lo = hint > (unsigned char*)0x40000000 ? hint - 0x40000000 : (unsigned char*)0x10000;
+    unsigned char* hi = hint + 0x40000000;
+    unsigned char* p = lo;
     MEMORY_BASIC_INFORMATION mbi;
-    unsigned char* p = (unsigned char*)0x10000;
-    while (p < (unsigned char*)0x00007FFFFFFEFFFFULL) {
+    while (p < hi) {
       if (VirtualQuery(p, &mbi, sizeof mbi) == 0) break;
       unsigned char* b = (unsigned char*)mbi.BaseAddress;
       unsigned char* e = b + mbi.RegionSize;
       int ok = (mbi.State == MEM_COMMIT) && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD));
       if (!ok) { p = e; continue; }
-      for (unsigned char* q = b; q + 16 < e; q += 4) {
-        uint32_t a = *(uint32_t*)q, c = *(uint32_t*)(q + 4);
-        if (a < 95000u || a > 108000u) continue;      /* jugadores del mundo */
-        if (c < 3300u || c > 3800u) continue;         /* equipos del mundo */
-        unsigned char* cand = q - 0xd0bce8;
-        if (cand < (unsigned char*)0x10000) continue;
-        if (!readable_span(cand + 0xd0bce8, 16)) continue;
-        if (!readable_span(cand + 0xc131b0, 12 * 0x314)) continue;
-        unsigned char* arr = cand + 0xc131b0;
-        int good = 0, bad = 0;
-        for (int i = 0; i < 8; i++) {
-          uint16_t rid = *(uint16_t*)(arr + (size_t)i * 0x314);
-          if (rid >= 1 && rid <= 1200) good++; else bad++;
+      unsigned char* s = b < lo ? lo : b;
+      unsigned char* t = e > hi ? hi : e;
+      for (size_t k = 0; k < sizeof SIG / sizeof SIG[0] && !base; k++) {
+        for (unsigned char* q = s; q + 0x88 + 0x314 < t; q += 2) {
+          if (*(uint16_t*)q != SIG[k].rid) continue;
+          if (*(uint32_t*)(q + 0x80) != SIG[k].cid) continue;
+          /* el registro siguiente tiene que ser otro id plausible */
+          unsigned char* nxt = q + 0x314;
+          uint16_t nid = *(uint16_t*)nxt;
+          if (nid < 1 || nid > 3000) continue;
+          base = q;
+          rlog("signature reg %u/cid %u at %p", (unsigned)SIG[k].rid, (unsigned)SIG[k].cid, (void*)q);
+          break;
         }
-        if (good < 6) continue;
-        blk = cand;
-        rlog("counts at %p -> blk %p (ids ok %d/%d)", (void*)q, (void*)blk, good, good + bad);
-        break;
       }
-      if (blk) break;
+      if (base) break;
       p = e;
     }
   }
-  if (!blk) { rlog("counts not found (players 95000-108000, teams 3300-3800)"); return -1; }
+  if (!base) { rlog("no signature (30/22, 34/27, 128/113, 11/130) near hint"); return -1; }
 
-  uint32_t cp = *(uint32_t*)(blk + 0xd0bce8), ct = *(uint32_t*)(blk + 0xd0bcec);
-  uint32_t cc = *(uint32_t*)(blk + 0xd0bcf0), cr = *(uint32_t*)(blk + 0xd0bcf4);
-  rlog("counts players=%u teams=%u coaches=%u regs=%u", cp, ct, cc, cr);
+  /* caminar hacia atras hasta el primer registro del array */
+  while (readable_span(base - 0x314, 0x88)) {
+    uint16_t prev = *(uint16_t*)(base - 0x314);
+    if (prev < 1 || prev > 3000) break;
+    base -= 0x314;
+  }
+  rlog("array base %p (block+%#llx from hint)", (void*)base,
+       (unsigned long long)((long long)(base - hint)));
 
-  unsigned char* arr = blk + 0xc131b0;
   {
-    char ids[200]; int il = 0;
+    char ids[220]; int il = 0;
     for (int i = 0; i < 12; i++) {
-      uint16_t rid = *(uint16_t*)(arr + (size_t)i * 0x314);
-      uint32_t cid = *(uint32_t*)(arr + (size_t)i * 0x314 + 0x80);
-      il += snprintf(ids + il, sizeof ids - il, " %u/%u", (unsigned)rid, cid);
+      unsigned char* r = base + (size_t)i * 0x314;
+      if (!readable_span(r, 0x88)) break;
+      il += snprintf(ids + il, sizeof ids - il, " %u/%u",
+                     (unsigned)*(uint16_t*)r, *(uint32_t*)(r + 0x80));
     }
     rlog("first records (id/cid):%s", ids);
   }
 
   int fixed = 0, seen = 0;
   for (int i = 0; i < 1200; i++) {
-    unsigned char* rec = arr + (size_t)i * 0x314;
+    unsigned char* rec = base + (size_t)i * 0x314;
     if (!readable_span(rec, 0x88)) break;
     uint16_t rid = *(uint16_t*)rec;
     if (!rid) continue;
@@ -11957,7 +11971,7 @@ static int regcid_fix(void)
       break;
     }
   }
-  rlog("regs=%u ours=%d fixed=%d", cr, seen, fixed);
+  rlog("ours=%d fixed=%d", seen, fixed);
   return fixed;
 }
 
