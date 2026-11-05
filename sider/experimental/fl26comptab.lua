@@ -96,6 +96,9 @@ local SHARED_OK = { [49] = 177, [112] = 145 }
 local RESHAPE = { [76] = { from = 100, slot = 80 } }
 -- our ids with no row: appended as copies of the row of TEMPLATE_ID, on these slots
 local TEMPLATE_ID = 61
+-- 2026-11-06: las filas de copa se copian de una fila de COPA (Libertadores), no de una
+-- liga; con la plantilla de liga aparecian en "Liga > Seleccionar la liga a competir".
+local CUP_TEMPLATE_ID = 5
 -- The 27 slots free in the shipped table are 0..6, 22, 29, 43, 68, 69, 71..77, 80..87
 -- (Appendix A of docs/competition-param-table-decode.md; 74 goes to our id 74 above, 80 and 81
 -- to the two reshaped rows). Every one of our row-less ids can therefore have a slot of its
@@ -591,7 +594,8 @@ function m.init(ctx)
     local made = 0
     for _, id in ipairs(WORLD_CUPS) do
       if not byid[id] then
-        rows[#rows + 1] = row_set(row_set(tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(CUP_SLOT))
+        local cup_tmpl = rows[byid[CUP_TEMPLATE_ID]] or tmpl
+      rows[#rows + 1] = row_set(row_set(cup_tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(CUP_SLOT))
         byid[id] = #rows
         ours[id] = true
         made = made + 1
