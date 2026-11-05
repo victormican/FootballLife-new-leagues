@@ -50,7 +50,7 @@ local function world_cids(ctx)
   return map
 end
 
-local map, done, told = nil, false, false
+local map, done, told, dumped = nil, false, false, false
 local ticks = 0
 
 local function fix_at(bb)
@@ -97,6 +97,21 @@ local function fix()
       if bval ~= 0 then
         local cnt = memory.read(bval + COUNT_OFF, 4)
         local first = memory.read(bval + ARRAY_OFF, 4)
+        if not dumped then
+          dumped = true
+          local function hexdump(off, n, tag)
+            local b = memory.read(bval + off, n)
+            if not b then log("fl26regcid: " .. tag .. " sin memoria"); return end
+            local t = {}
+            for i = 0, math.min(n, 32) - 1, 4 do
+              t[#t + 1] = string.format("%08x", u32(b, i))
+            end
+            log(string.format("fl26regcid: %s +%#x: %s", tag, off, table.concat(t, " ")))
+          end
+          hexdump(COUNT_OFF - 0x20, 32, "count-0x20")
+          hexdump(COUNT_OFF, 32, "count")
+          hexdump(ARRAY_OFF, 32, "array")
+        end
         log(string.format("fl26regcid: ctx=%#x block=%#x count=%s firstid=%s", cval, bval,
           cnt and u32(cnt, 0) or "?", first and (first:byte(1) + first:byte(2) * 256) or "?"))
         if cnt and u32(cnt, 0) > 8 and u32(cnt, 0) <= MAX then
