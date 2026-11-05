@@ -11827,7 +11827,9 @@ uint64_t date_handler(uint64_t reg, void* vec)
 #define CUPSEL_INIT_RVA 0xb1c990
 #define CUPSEL_POOL_RVA_ALLOC 0x3fb330   /* void* pool_alloc(int* pool, size_t bytes, size_t align, size_t extra) */
 #define CUPSEL_POOL_RVA_FREE  0x3fb5b0   /* void  pool_free (int* pool, void* p) */
-#define CUPSEL_POOL 2                    /* the pool the menu's list belongs to (0x140c6b1e0) */
+#define CUPSEL_POOL 0                    /* operator new's pool: the Cup mode (Jugar > Copa) frees
+                                            the list with operator delete, and the menu's own free
+                                            is taped by fl26cupfree (2026-11-06) */
 typedef char (*cupsel_fn)(void* self, uint64_t a, uint64_t b, uint64_t c);
 typedef void* (*pool_alloc_fn)(int* pool, size_t bytes, size_t align, size_t extra);
 typedef void (*pool_free_fn)(int* pool, void* p);
@@ -11976,8 +11978,9 @@ static int regcid_fix(void)
       /* solo se toca un registro que aun lleva el byte truncado: si ya tiene otro valor, no es
          nuestro o no esta truncado y se deja quieto */
       if (want != cur && cur == (want & 0xFF)) {
-        /* PRUEBA A/B 2026-11-06: se cuenta pero NO se escribe, para saber si el cierre al salir
-           del menu lo causan estas escrituras.  Volver a poner la asignacion si no es asi. */
+        /* 2026-11-06: la asignacion vuelve (el A/B confirmo que el cierre al salir no lo causan
+           estas escrituras sino el fallback a la competicion 1). */
+        *(uint32_t*)(rec + 0x80) = want;
         fixed++;
       } else if (want != cur) {
         skipped++;
