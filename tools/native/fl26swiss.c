@@ -11863,13 +11863,12 @@ static int regcid_fix(void)
   if (g_nregcid == 0) return -1;
   /* phkind la llama con rcx = puntero al cid; sin argumento el registro queda con basura y
      revienta (0x140025963, 2026-11-04).  Se le pasa un puntero a un cero. */
-  uint32_t zero = 0;
-  void *ctx = ((void* (*)(void*))(uintptr_t)(g_base + PHDATA_RVA))(&zero);
-  if (!ctx) return -1;
-  unsigned char* blk = *(unsigned char**)((unsigned char*)ctx + 0x48);
-  if (!blk) return -1;
-  uint32_t n = *(uint32_t*)(blk + 0xd0bcf4);
-  if (n == 0 || n > 1200) return -1;
+  uint32_t probe = 27;   /* un cid que resuelve seguro: la funcion depende del que se le pasa */
+  void *ctx = ((void* (*)(void*))(uintptr_t)(g_base + PHDATA_RVA))(&probe);
+  unsigned char* blk = ctx ? *(unsigned char**)((unsigned char*)ctx + 0x48) : 0;
+  uint32_t n = blk ? *(uint32_t*)(blk + 0xd0bcf4) : 0;
+  logf("fl26swiss: regcid -- ctx=%p blk=%p n=%u", ctx, (void*)blk, n);
+  if (!ctx || !blk || n == 0 || n > 1200) return -1;
   int fixed = 0, seen = 0;
   for (uint32_t i = 0; i < n; i++) {
     unsigned char* rec = blk + 0xc12e9c + (size_t)i * 0x314;
