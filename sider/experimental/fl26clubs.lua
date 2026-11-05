@@ -130,8 +130,15 @@ local function from_world(world, pools)
   -- `pool <slot> <regulation>`: a group of clubs the game never fills (slot 75, "Other Clubs
   -- (Africa)") answered from a regulation of its own, without a league line on the slot
   for _, P in ipairs(pools or {}) do slots[#slots + 1] = { P[1], P[2] } end
+  -- 2026-11-06: se sirve TODO slot de liga del mundo desde su regulacion, no solo los
+  -- especiales de SERVED. Los slots que el juego llena con listas suyas (selecciones,
+  -- clasicos, pools 69..80 y el centinela 123) no se tocan.
+  local DENY = { [0] = true, [1] = true, [2] = true, [3] = true, [4] = true, [5] = true,
+                 [6] = true, [69] = true, [70] = true, [71] = true, [72] = true, [73] = true,
+                 [74] = true, [75] = true, [76] = true, [77] = true, [78] = true, [79] = true,
+                 [80] = true, [123] = true }
   for _, L in ipairs(world) do
-    if L.slot and SERVED[L.slot] then slots[#slots + 1] = { L.slot, L.id } end
+    if L.slot and L.slot >= 0 and not DENY[L.slot] then slots[#slots + 1] = { L.slot, L.id } end
     -- `serve=75`: answer that slot from this regulation without asking fl26comptab for a
     -- parameter row there. The pool slots (69..75) already carry a competition of the exe, so a
     -- league put on one of them aborts the whole Select Team table; a group of ours fills them

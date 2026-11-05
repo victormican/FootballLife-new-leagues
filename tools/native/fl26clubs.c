@@ -107,7 +107,7 @@ static uint16_t* slot_count(void* self, unsigned s)
 #define MERGE_MAX   48
 #define HANDLE_SHIFT 14        /* handle = team_id << 14                          */
 
-#define MAX_CFG     32      /* 20 slots served in 2026-11 (was 16: install failed)   */
+#define MAX_CFG     192     /* every league slot of a 500-slot world (was 32)        */
 
 /* The three reader calls inside 0x141263b40 (the Master League club slot), as return addresses:
    count at 0x141263bd6 and 0x1412640ca, get at 0x141263bf9. */
