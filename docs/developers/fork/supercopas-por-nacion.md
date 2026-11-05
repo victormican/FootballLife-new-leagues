@@ -67,3 +67,18 @@ por el **byte bajo del cid** (el campo `+0x80` del registro vivo solo guarda un 
 257..357 mostrarán el nombre de la competición que tenga ese byte bajo, igual que las otras copas
 del mundo. Es el mismo bloqueo de siempre: falta la base real del array de regulaciones o rellenar
 ese `+0x80` con el cid completo.
+
+## Aviso (2026-11-05): el módulo tiene que quedar en 512
+
+Durante la bisección de un crash de arranque se restauró `modules\fl26cupgrow.lua` a la copia de
+256 filas y se quedó así: con 271 copas en el mundo, 15 no cabían en el menú. El módulo del repo
+(`sider/experimental/fl26cupgrow.lua`, `WANT = 512` y el stub `lea rcx,[r11+0x1800]`) es el bueno
+y ya está desplegado.
+
+Comprobación rápida:
+
+```
+Select-String modules\fl26cupgrow.lua -Pattern 'local WANT|498d8b00180000'
+```
+
+Debe decir 512 y encontrar el stub. Si dice 256, se han perdido 15 copas del menú.
