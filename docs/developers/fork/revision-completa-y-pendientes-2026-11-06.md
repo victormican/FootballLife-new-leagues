@@ -117,10 +117,13 @@ Si solo lista competiciones del juego, se documenta como límite y no se fuerza.
 
 ### P0 — parar la contaminación (antes de tocar nada más)
 
-1. **Medir qué lista pinta "Información de la Liga"** (servida y no servida), con el volcado de
-   `count_hook`/`get_hook` y una captura por liga. Decidir entre (a) censo por byte bajo o
-   (b) lista del array de regulaciones.
-2. **Si es el censo:** probar `cid = true` en `sider/experimental/fl26cid16.lua` (A/B con el
+1. ~~Medir qué lista pinta "Información de la Liga"~~ **HECHO (2026-11-06).** El panel no lee
+   el array vivo (en esa pantalla el bloque está sin cargar: 0 jugadores, 0 equipos, 65535
+   regulaciones) sino las tablas pesdb, y el censo junta las entradas de todo cid que comparte
+   byte bajo, en el orden `cid << 6 | plaza-1`. Medición y evidencia en
+   `informacion-de-la-liga-censo-2026-11-06.md` (Sudamericana 513←257, Yokary 359←615, NIFL
+   63←319, Danish 327←839). Es la causa (a).
+2. **Es el censo: probar `cid = true`** en `sider/experimental/fl26cid16.lua` (A/B con el
    juego cerrado, una sola pantalla) y, si casca, mover las ligas que importan con
    `tools/move_cids.py --free` (solo 12 bytes bajos libres: 1, 37, 45, 46, 47, 70, 71, 72, 86,
    97, 103, 227; 37 y 86 son la copa/liga personalizadas del juego).
