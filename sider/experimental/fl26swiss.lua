@@ -146,8 +146,13 @@ local function read_world(ctx)
   local leagues, splits, uefa, ccups, dlike, qrounds, lpres = {}, {}, {}, {}, {}, {}, {}
   confed = {}
   CWCCH = {}
+  SHOWCUPS = {}
   CUPDRAW = { all = 1 }
   for line in f:lines() do
+    -- showcup <cid>: a competition of the game's own data to list in Kick Off > Cup (it is
+    -- played by the game, not by this module: only its id goes to the menu).
+    local sc = line:match("^%s*showcup%s+(%d+)")
+    if sc then SHOWCUPS[#SHOWCUPS + 1] = tonumber(sc) end
     local lr, lrest = line:match("^%s*lpre%s+(%d+)(.*)$")
     if lr then
       local L = { tonumber(lr), tonumber(lrest:match("cup=(%d+)") or 0), tonumber(lrest:match("fill=(%d+)") or 0), {}, {}, {} }
@@ -628,6 +633,15 @@ function m.init(ctx)
           -- the cup's competition id is the seventh field (1 reg, 2 ko, 3 groups, 4 entries, 5 and 6
           -- spare); it used to be read from c[6], which is nil, so Cup mode never got an id
           for _, c in ipairs(ccups) do if c[7] and c[7] > 0 then ids[#ids + 1] = c[7] end end
+          -- the game's own cups we want listed (showcup <cid>): they are already in the game's
+          -- tables, so only the menu id is needed; fl26_swiss_cup_cids skips repeats.
+          if SHOWCUPS then
+            for _, v in ipairs(SHOWCUPS) do
+              local there = false
+              for _, w in ipairs(ids) do if w == v then there = true break end end
+              if not there then ids[#ids + 1] = v end
+            end
+          end
           if #ids > 0 then
             local pci = ffi.C.GetProcAddress(h, "fl26_swiss_cup_cids")
             if pci == nil then
