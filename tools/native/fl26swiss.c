@@ -11879,12 +11879,19 @@ static int regcid_fix(void)
     unsigned char* lo = blk;
     unsigned char* hi = blk + 0xE00000;
     unsigned char* hit = 0;
+    /* se busca la fila del Champions (cid 2) sin suponer la base: cualquier punto donde el
+       dword de +0x80 valga 2 y el word de +0x00 sea un id de regulacion plausible */
+    int shows = 0;
     for (unsigned char* q = lo; q < hi; q++) {
-      if (*(uint16_t*)q != 34) continue;
-      if (*(uint32_t*)(q + 0x80) != 27) continue;
-      hit = q; break;
+      if (*(uint32_t*)(q + 0x80) != 2) continue;
+      uint16_t id = *(uint16_t*)q;
+      if (id == 0 || id > 9000) continue;
+      logf("fl26swiss: regcid -- cid2 row at %p (offset %#llx): id=%u kind=%u",
+           (void*)q, (unsigned long long)(q - blk), (unsigned)id, *(uint32_t*)(q + 0x84));
+      if (!hit) hit = q;
+      if (++shows >= 4) break;
     }
-    logf("fl26swiss: regcid -- record 34/27 at %p", (void*)hit);
+    logf("fl26swiss: regcid -- record cid2 at %p", (void*)hit);
     if (hit) {
       unsigned char* st = hit;
       while (st - 0x314 >= lo && *(uint16_t*)(st - 0x314) > 0 && *(uint16_t*)(st - 0x314) < 9000)
