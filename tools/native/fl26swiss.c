@@ -11870,6 +11870,16 @@ static void rlog(const char* fmt, ...)
   fclose(f);
 }
 
+static int readable_span(void* p, size_t n)
+{
+  MEMORY_BASIC_INFORMATION m;
+  if (!p) return 0;
+  if (VirtualQuery(p, &m, sizeof m) == 0) return 0;
+  if (m.State != MEM_COMMIT) return 0;
+  if (m.Protect & (PAGE_NOACCESS | PAGE_GUARD)) return 0;
+  return ((unsigned char*)p + n) <= ((unsigned char*)m.BaseAddress + m.RegionSize);
+}
+
 static int regcid_fix(void)
 {
   if (g_nregcid == 0) return -1;
@@ -11879,9 +11889,10 @@ static int regcid_fix(void)
   rlog("ctx=%p hint=%p", ctx, (void*)hint);
   if (!hint) return -1;
 
-  /* El bloque bueno se localiza por sus cuentas: el recuento de 0x1414bc0a0 deja seguidos
-     jugadores, equipos, entrenadores y regulaciones en +0xd0bce8, +0xd0bcec, +0xd0bcf0 y
-     +0xd0bcf4.  Se busca el par (jugadores, equipos) con holgura y se deshace el offset. */
+  /* El bloque bueno se localiza por sus cuentas (el recuento de 0x1414bc0a0 deja seguidas
+     jugadores y equipos en +0xd0bce8/+0xd0bcec).  Se exige ademas que el bloque y el array
+     sean legibles y que los primeros registros tengan ids de regulacion: un par falso en
+     memoria baja saco un bloque negativo y cerro el juego (2026-11-06). */
   unsigned char* blk = 0;
   {
     MEMORY_BASIC_INFORMATION mbi;
@@ -11894,17 +11905,28 @@ static int regcid_fix(void)
       if (!ok) { p = e; continue; }
       for (unsigned char* q = b; q + 16 < e; q += 4) {
         uint32_t a = *(uint32_t*)q, c = *(uint32_t*)(q + 4);
-        if (a < 90000u || a > 120000u) continue;
-        if (c < 3000u || c > 4200u) continue;
-        blk = q - 0xd0bce8;
-        rlog("counts at %p -> blk %p", (void*)q, (void*)blk);
+        if (a < 95000u || a > 108000u) continue;      /* jugadores del mundo */
+        if (c < 3300u || c > 3800u) continue;         /* equipos del mundo */
+        unsigned char* cand = q - 0xd0bce8;
+        if (cand < (unsigned char*)0x10000) continue;
+        if (!readable_span(cand + 0xd0bce8, 16)) continue;
+        if (!readable_span(cand + 0xc131b0, 12 * 0x314)) continue;
+        unsigned char* arr = cand + 0xc131b0;
+        int good = 0, bad = 0;
+        for (int i = 0; i < 8; i++) {
+          uint16_t rid = *(uint16_t*)(arr + (size_t)i * 0x314);
+          if (rid >= 1 && rid <= 1200) good++; else bad++;
+        }
+        if (good < 6) continue;
+        blk = cand;
+        rlog("counts at %p -> blk %p (ids ok %d/%d)", (void*)q, (void*)blk, good, good + bad);
         break;
       }
       if (blk) break;
       p = e;
     }
   }
-  if (!blk) { rlog("counts not found"); return -1; }
+  if (!blk) { rlog("counts not found (players 95000-108000, teams 3300-3800)"); return -1; }
 
   uint32_t cp = *(uint32_t*)(blk + 0xd0bce8), ct = *(uint32_t*)(blk + 0xd0bcec);
   uint32_t cc = *(uint32_t*)(blk + 0xd0bcf0), cr = *(uint32_t*)(blk + 0xd0bcf4);
@@ -11912,11 +11934,10 @@ static int regcid_fix(void)
 
   unsigned char* arr = blk + 0xc131b0;
   {
-    char ids[200]; int il = 0; int nz = 0;
+    char ids[200]; int il = 0;
     for (int i = 0; i < 12; i++) {
       uint16_t rid = *(uint16_t*)(arr + (size_t)i * 0x314);
       uint32_t cid = *(uint32_t*)(arr + (size_t)i * 0x314 + 0x80);
-      if (rid) nz++;
       il += snprintf(ids + il, sizeof ids - il, " %u/%u", (unsigned)rid, cid);
     }
     rlog("first records (id/cid):%s", ids);
@@ -11925,6 +11946,7 @@ static int regcid_fix(void)
   int fixed = 0, seen = 0;
   for (int i = 0; i < 1200; i++) {
     unsigned char* rec = arr + (size_t)i * 0x314;
+    if (!readable_span(rec, 0x88)) break;
     uint16_t rid = *(uint16_t*)rec;
     if (!rid) continue;
     for (int k = 0; k < g_nregcid; k++) {
