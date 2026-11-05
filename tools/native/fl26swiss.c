@@ -11951,27 +11951,40 @@ static int regcid_fix(void)
     for (int i = 0; i < 12; i++) {
       unsigned char* r = base + (size_t)i * 0x314;
       if (!readable_span(r, 0x88)) break;
-      il += snprintf(ids + il, sizeof ids - il, " %u/%u",
-                     (unsigned)*(uint16_t*)r, *(uint32_t*)(r + 0x80));
+      il += snprintf(ids + il, sizeof ids - il, " %u(g%u)/%u",
+                     (unsigned)(*(uint16_t*)r & 0x3FF), (unsigned)(*(uint16_t*)r >> 10),
+                     *(uint32_t*)(r + 0x80));
     }
     rlog("first records (id/cid):%s", ids);
   }
 
-  int fixed = 0, seen = 0;
+  int fixed = 0, seen = 0, skipped = 0;
   for (int i = 0; i < 1200; i++) {
     unsigned char* rec = base + (size_t)i * 0x314;
     if (!readable_span(rec, 0x88)) break;
-    uint16_t rid = *(uint16_t*)rec;
-    if (!rid) continue;
+    /* +0x00 es una CLAVE ordenada: los 10 bits bajos son el id de regulacion y los altos un
+       grupo de empate.  Comparar la clave entera contra el id metia cids en registros ajenos
+       (2026-11-06). */
+    uint16_t key = *(uint16_t*)rec;
+    if (!key) continue;
+    uint16_t rid = key & 0x3FF;
     for (int k = 0; k < g_nregcid; k++) {
       if (g_regcid[2 * k] != rid) continue;
       seen++;
       uint32_t want = g_regcid[2 * k + 1];
-      if (*(uint32_t*)(rec + 0x80) != want) { *(uint32_t*)(rec + 0x80) = want; fixed++; }
+      uint32_t cur = *(uint32_t*)(rec + 0x80);
+      /* solo se toca un registro que aun lleva el byte truncado: si ya tiene otro valor, no es
+         nuestro o no esta truncado y se deja quieto */
+      if (want != cur && cur == (want & 0xFF)) {
+        *(uint32_t*)(rec + 0x80) = want;
+        fixed++;
+      } else if (want != cur) {
+        skipped++;
+      }
       break;
     }
   }
-  rlog("ours=%d fixed=%d", seen, fixed);
+  rlog("ours=%d fixed=%d skipped=%d", seen, fixed, skipped);
   return fixed;
 }
 
