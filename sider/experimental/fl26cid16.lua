@@ -80,13 +80,17 @@ local INPLACE = {
 }
 
 -- bisection switches: what to patch, to find which read a crash comes from
-local ENABLE = { cmp = false, cid = false, pack = true, reg = true, build = true, map = true }
+local ENABLE = { cmp = false, cid = false, pack = true, reg = true, build = true, map = true, list = false }
 
 -- the id read and the census key, seven bytes wide (0x1414f1500..0x1414f1506)
 local CID, CID_BYTES, CID_NEXT = 0x1414f1500, "0fb64f05884d68", 0x1414f1507
 local PACK, PACK_BYTES, PACK_NEXT = 0x1414f1609, "0fb60f66ffc90fb647ff66c1e008660bc866894c2448", 0x1414f161f
 local REG,  REG_BYTES,  REG_NEXT  = 0x141eee27c, "0fb650088b4d77", 0x141eee283
 local BUILD, BUILD_BYTES, BUILD_NEXT = 0x1414f7533, "440fb67008", 0x1414f7538
+-- la lista de clubs de la regulacion: el cid de la competicion y el de cada entrada se leen
+-- como byte (0x1414f7ec2 y 0x1414f7f63)
+local LIST1, LIST1_BYTES, LIST1_NEXT = 0x1414f7ec2, "0fb668088bd5", 0x1414f7ec8
+local LIST2, LIST2_BYTES, LIST2_SKIP, LIST2_ADD = 0x1414f7f63, "403a68087518", 0x1414f7f81, 0x1414f7f69
 
 local function cave()
   ffi.cdef([[ void* VirtualAlloc(void*, unsigned long, unsigned long, unsigned long); ]])
@@ -113,6 +117,8 @@ function m.init(ctx)
                        { PACK, PACK_BYTES, "the entry pack" },
                        { REG, REG_BYTES, "the regulation lookup" },
                        { BUILD, BUILD_BYTES, "the club-list builder" },
+                       { LIST1, LIST1_BYTES, "the regulation list cid read" },
+                       { LIST2, LIST2_BYTES, "the regulation list entry compare" },
                        { 0x1414f1d6a, "0fb64808884d68", "the census key (first loop)" },
                        { 0x1414f1e5a, "0fb64808884d68", "the census key (second loop)" },
                        { 0x1414f1d8b, "e800c1ffff", "the census lookup (first loop)" },
@@ -185,6 +191,29 @@ function m.init(ctx)
   memory.write(BUILD, "\233" .. j3)
   end
 
+  if ENABLE.list then
+  -- la lista de clubs que el motor escribe en el registro de cada regulacion (0x1414f7e80):
+  -- el cid de la competicion se lee como byte en 0x1414f7ec2 y el de cada entrada se compara
+  -- tambien como byte en 0x1414f7f63, asi que todas las competiciones que comparten byte bajo
+  -- acaban en el mismo registro (Sudamericana 513 <- 257, Yokary 359 <- 615, NIFL 63 <- 319).
+  -- 16 bits: cid = byte[+8] | byte[+0x0b] << 8; el de la entrada sale de la clave del vector
+  -- (cid << 6 | plaza-1), que ya esta al lado del puntero de fila (elemento de 16 bytes).
+  local list_stub = bin("0fb66808" .. "440fb6400b" .. "41c1e008" .. "4409c5" .. "89ea")
+  local back4 = rel32(cv + 0x3000 + #list_stub + 5, LIST1_NEXT)
+  local j4 = rel32(LIST1 + 5, cv + 0x3000)
+  local cmp_stub = bin("0fb75308" .. "c1ea06" .. "6639ea")
+  local ne = rel32(cv + 0x3040 + 16, LIST2_SKIP)
+  local jp = rel32(cv + 0x3040 + 21, LIST2_ADD)
+  local j5 = rel32(LIST2 + 5, cv + 0x3040)
+  if not back4 or not j4 or not ne or not jp or not j5 then
+    log("fl26cid16: list cave out of range"); return
+  end
+  memory.write(cv + 0x3000, list_stub .. "\233" .. back4)
+  memory.write(LIST1, "\233" .. j4 .. string.rep("\144", #LIST1_BYTES / 2 - 5))
+  memory.write(cv + 0x3040, cmp_stub .. bin("0f85") .. ne .. "\233" .. jp)
+  memory.write(LIST2, "\233" .. j5 .. string.rep("\144", #LIST2_BYTES / 2 - 5))
+  end
+
   if ENABLE.map then
   -- The census keeps `std::map<byte, row*>`, so two competitions that share a low byte cannot both
   -- live in it: the insert de-duplicates on that one byte inside 0x1414e36f0, which is why the
@@ -255,6 +284,8 @@ function m.init(ctx)
   if ENABLE.reg then want[#want + 1] = { REG, "regulation" } end
   if ENABLE.build then want[#want + 1] = { BUILD, "builder" } end
   if ENABLE.map then want[#want + 1] = { 0x1414f1d6a, "map" } end
+  if ENABLE.list then want[#want + 1] = { LIST1, "list a" } end
+  if ENABLE.list then want[#want + 1] = { LIST2, "list b" } end
   for _, p in ipairs(want) do
     if memory.read(p[1], 1):byte(1) ~= 0xE9 then
       log("fl26cid16: the " .. p[2] .. " jump did not stick -- that read stays 8-bit")
@@ -263,7 +294,7 @@ function m.init(ctx)
   end
   log("fl26cid16: patched cid=" .. tostring(ENABLE.cid) .. " pack=" .. tostring(ENABLE.pack) ..
       " reg=" .. tostring(ENABLE.reg) .. " build=" .. tostring(ENABLE.build) ..
-      " map=" .. tostring(ENABLE.map))
+      " map=" .. tostring(ENABLE.map) .. " list=" .. tostring(ENABLE.list))
 end
 
 return m
