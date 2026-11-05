@@ -74,6 +74,10 @@ local ACCESS = nil
 -- `regcid_fix` sale sin recorrer el array (era el primer sospechoso del cierre al abrir Copas).
 local REGCID = false
 
+-- 2026-11-06: cuantas copas del mundo se listan en Kick Off > Cup.  0 = ninguna (solo las 8
+-- del juego), -1 = todas.  Sirve para saber si el cierre lo causa nuestra lista.
+local EXPOSE = 0
+
 local dll_log, dll_stats, dll_ko_tick, logbuf, statbuf, regbuf
 local ticks = 0
 
@@ -645,6 +649,12 @@ function m.init(ctx)
               for _, w in ipairs(ids) do if w == v then there = true break end end
               if not there then ids[#ids + 1] = v end
             end
+          end
+          if EXPOSE >= 0 then
+            local cut = {}
+            for i = 1, math.min(#ids, EXPOSE) do cut[i] = ids[i] end
+            ids = cut
+            log(string.format("fl26swiss: Cup mode A/B -- %d of the world's cups exposed", #ids))
           end
           if #ids > 0 then
             local pci = ffi.C.GetProcAddress(h, "fl26_swiss_cup_cids")
