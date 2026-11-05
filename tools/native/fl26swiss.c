@@ -1,4 +1,4 @@
-/* fl26swiss.dll -- give a 36-club league phase the modern UEFA draw.
+﻿/* fl26swiss.dll -- give a 36-club league phase the modern UEFA draw.
  *
  * Why (docs/league-phase-swiss-decode.md): a league regulation in this engine always plays a
  * complete round robin. 0x1413f29e0 fixes the number of matchdays at rounds * (N-1) and
@@ -8168,7 +8168,7 @@ uint64_t gstage_handler(uint32_t* comp)
 }
 
 
-/* ---- Libertadores -> "Fase de clasificación": F1/F2/F3 as pages (L1/R1) ----
+/* ---- Libertadores -> "Fase de clasificaciÃ³n": F1/F2/F3 as pages (L1/R1) ----
  *
  * This is the pre-port paging design, adapted to the current runtime:
  * - F1/F2 stay in their technical Competition.bin container.
@@ -9566,7 +9566,7 @@ static void july_start(uint16_t id, date_t* r, uint32_t n, int seen)
   uint32_t f = season_pos(r[0].day), w = season_pos(want), ny = 183;   /* New Year's position */
   if (r[0].day >= 365 || w >= f || f >= ny) return;
   /* a cup of its country the game plays before the first round stays before it, a week clear:
-     the Supertaça on 13 and 16 August, Liga Portugal's first round on 22 August -- brought
+     the SupertaÃ§a on 13 and 16 August, Liga Portugal's first round on 22 August -- brought
      forward to 8 August it came after the super cup (Hugo Freixo, B36). The same for the
      Netherlands, Turkey, Russia, Belgium and France: those keep the game's start */
   const cupd_t* c = cupd_of(id);
@@ -11988,12 +11988,12 @@ static int regcid_fix(void)
   int fixed = 0, seen = 0, nz = 0;
   char ids[160]; int il = 0;
   for (uint32_t i = 0; i < lim; i++) {
-    uint16_t pid = *(uint16_t*)(blk + 0xc12e9c + (size_t)i * 0x314);
+    uint16_t pid = *(uint16_t*)(blk + 0xc131b0 + (size_t)i * 0x314);
     if (pid) { nz++; if (il < 140) il += snprintf(ids + il, sizeof ids - il, " %u", (unsigned)pid); }
   }
   logf("fl26swiss: regcid -- %d record(s) with an id, first ones:%s", nz, ids);
   for (uint32_t i = 0; i < lim; i++) {
-    unsigned char* rec = blk + 0xc12e9c + (size_t)i * 0x314;
+    unsigned char* rec = blk + 0xc131b0 + (size_t)i * 0x314;
     uint16_t rid = *(uint16_t*)rec;
     for (int k = 0; k < g_nregcid; k++) {
       if (g_regcid[2 * k] != rid) continue;
@@ -13867,3 +13867,4 @@ __declspec(dllexport) void fl26_swiss_stats(uint32_t* out5)
 }
 
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r) { (void)h;(void)reason;(void)r; return TRUE; }
+
