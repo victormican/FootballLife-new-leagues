@@ -41,13 +41,13 @@ import capstone
 
 IMAGE_BASE = 0x140000000
 EXE = os.path.join(os.environ.get("FL26_DIR", r"E:\instalacija"), "FL_2026.exe")
-SIDER = r"D:\dev\fl26\wt\limits\sider"           # read only: overlap checks
+SIDER = os.environ.get("FL26_SIDER") or r"D:\SP Football Life 2026 - copia - copia\SiderAddons\modules"           # read only: overlap checks
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 PAGE = 0x163400000            # our own page; fl26caps has 0x163000000
 CODE = PAGE                   # stubs
 OFF_TAB = PAGE + 0x800        # N dwords: first dword of each slot's list
-CAP_TAB = PAGE + 0xc00        # N dwords: capacity of each slot
+CAP_TAB = PAGE + 0x1000   # N>256: la tabla de offsets (0x800 + 4N) acaba en 0xFD0        # N dwords: capacity of each slot
 
 OLD_N = 123
 SENTINEL = 0x7b
@@ -175,8 +175,8 @@ class Asm:
 
 
 def layout(n):
-    if not OLD_N < n <= 250:
-        raise SystemExit("N must be 124..250")
+    if not OLD_N < n <= 500:
+        raise SystemExit("N must be 124..500")
     listdw = (OLD_CNT - 2 * n) // 4
     cnt = listdw * 4
     big = {s: c for s, c in BIG.items() if s < n}
@@ -468,7 +468,7 @@ def main():
     for va, oldh, newh, w in jumps:                      # rel32 reach to our page
         if newh.startswith("e9"):
             tgt = va + 5 + struct.unpack("<i", bytes.fromhex(newh[2:10]))[0]
-            assert PAGE <= tgt < PAGE + 0x1000, hex(va)
+            assert PAGE <= tgt < PAGE + 0x2000, hex(va)
     problems = []
     for va, total in ranges:
         if va < PAGE and total > 1:
@@ -498,6 +498,8 @@ def main():
     tail = tmpl[tmpl.index("local PAGES"):]
     summary = ("competition slots 123 -> %d (slot 123 kept as sentinel), per-slot capacity "
                "%d, slots 79/80 %d, %d patches" % (n, L["per"], BIG[79], len(patches)))
+    if n > 256:
+        tail = tail.replace("0x1000", "0x2000")
     tail = (tail.replace("--[[PAGES]]", "0x%x" % PAGE)
                 .replace("--[[SET]]", "slots%d" % n)
                 .replace("--[[SUMMARY]]", summary)

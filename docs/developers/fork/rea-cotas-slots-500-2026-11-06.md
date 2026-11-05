@@ -44,3 +44,28 @@ generados para 500 corrompen el flujo (o el propio modulo al aplicarse). Con 250
 Depurar la cueva generada por `mkslots` para N>250 (offsets/trampolines de 32 bits) o escribir
 a mano un modulo de 500 con comparaciones de 32 bits y saltos largos. Es un trabajo de RE
 aparte; 250 sigue siendo el techo seguro (111 slots libres).
+
+
+## Resuelto: la cueva no era, era el solape de tablas (2026-11-06)
+
+El fallo de N>256 no estaba en las comparaciones: `mkslots` colocaba la tabla de **capacidades**
+en `PAGE + 0xC00`, pero la de **offsets** empieza en `PAGE + 0x800` y para N=500 mide
+`4*500 = 0x7D0`, o sea que acaba en `0xFD0` y **pisa la de capacidades**. Los accesores leian
+offsets/capacidades corruptos y el juego se caia (pila por sider.dll, escritura a 0x24).
+
+Arreglo en `tools/mkslots.py`:
+
+1. `CAP_TAB = PAGE + 0x1000` (fuera de la tabla de offsets).
+2. La pagina se reserva con **0x2000** cuando N > 256.
+3. El assert de la cueva pasa a `PAGE+0x2000`.
+4. Tope a **500** y `SIDER` por variable de entorno (antes `D:\dev\fl26\...`).
+
+Resultado, comprobado:
+
+```
+fl26slots: applied all 35 patches -- competition slots 123 -> 500
+           (slot 123 kept as sentinel), per-slot capacity 159, slots 79/80 1600
+```
+
+Juego arrancado con el modulo de 500. Capacidad por slot: **159 clubes** (la liga mas grande
+del mundo tiene 87). Slots usados: 137; **363 libres** (hasta 499).
