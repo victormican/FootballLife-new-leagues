@@ -96,3 +96,24 @@ en `fl26swiss.lua` queda, sin datos.
 Siguiente intento, si se quiere: listar **una sola** copa del juego (p. ej. `showcup 73`, la
 Community Shield) y comprobar que el menú abre antes de añadir el resto.
 
+## 8. La caída al quitar líneas: había que quitar también sus filas
+
+Quitar las 271 líneas `ccup` `… II` (o las 10 ligas-como-copa) dejó **huérfanas** sus filas en
+las tablas: 767 competiciones, 1.031 regulaciones y 7.520 entradas seguían ahí, pero el world
+file ya no las listaba. Al abrir Kick Off > Cup el juego se cerraba en `FL_2026+0x3fd2b2`
+(después de `regcid_fix`, antes de que el log llegara a volcar `CUPVEC`).
+
+Arreglo (`tools/cleanup_dup_cups.py`): borrar de las tablas las filas de las copias, no solo del
+world file.
+
+```
+antes : 767 competiciones, 1.031 regulaciones, 7.520 entradas
+después: 496 competiciones,   692 regulaciones, 5.547 entradas
+world : 271 líneas ccup
+check_world: 0 errores
+```
+
+Ese es exactamente el estado que funcionaba antes de duplicar las copas hoy (con la corrección
+de Bélgica/Ecuador incluida). Backup de las tres tablas y del world: `*.before-cleanup`.
+
+
