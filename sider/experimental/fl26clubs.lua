@@ -86,7 +86,10 @@ local function read_world(ctx)
   local f = io.open(path, "r")
   if not f then return nil end
   local leagues, nopool, fans = {}, {}, {}
+  local pools = {}
   for line in f:lines() do
+    local pslot, preg = line:match("^%s*pool%s+(%d+)%s+(%d+)%s*$")
+    if pslot then pools[#pools + 1] = { tonumber(pslot), tonumber(preg) } end
     local cls, pct, ids = line:match("^%s*fans%s+(%d+)%s+(%d+)%s+([%d%s]+)$")
     if cls then
       for t in ids:gmatch("%d+") do fans[#fans + 1] = { tonumber(t), tonumber(cls), tonumber(pct) } end
@@ -105,7 +108,7 @@ local function read_world(ctx)
     end
   end
   f:close()
-  return leagues, nopool, fans
+  return leagues, nopool, fans, pools
 end
 
 -- From the world file. SERVED: the slots the game fills with lists of its own (national teams,
@@ -120,8 +123,11 @@ local SERVED = { [0] = true, [1] = true, [2] = true, [3] = true,
                  [200] = true, [201] = true, [202] = true, [203] = true,
                  [204] = true, [205] = true, [206] = true, [207] = true, [208] = true }
 local POOL_CASE = { [26] = 3, [27] = 3, [28] = 3, [67] = 3, [74] = 3, [71] = 5 }
-local function from_world(world)
+local function from_world(world, pools)
   local slots, remap = {}, {}
+  -- `pool <slot> <regulation>`: a group of clubs the game never fills (slot 75, "Other Clubs
+  -- (Africa)") answered from a regulation of its own, without a league line on the slot
+  for _, P in ipairs(pools or {}) do slots[#slots + 1] = { P[1], P[2] } end
   for _, L in ipairs(world) do
     if L.slot and SERVED[L.slot] then slots[#slots + 1] = { L.slot, L.id } end
     -- `serve=75`: answer that slot from this regulation without asking fl26comptab for a
@@ -198,10 +204,10 @@ function m.init(ctx)
     typedef int  (*fl26_clubs_keep_out_t)(const uint32_t*, int);
     typedef int  (*fl26_clubs_fans_t)(const uint32_t*, int);
   ]])
-  local world, nopool, fans = read_world(ctx)
+  local world, nopool, fans, pools = read_world(ctx)
   nopool, fans = nopool or {}, fans or {}
   if world then
-    SLOTS, REMAP_OWN = from_world(world)
+    SLOTS, REMAP_OWN = from_world(world, pools)
     log(string.format("fl26clubs: world file -- %d leagues, %d on slots the game fills itself, %d on pool slots",
                       #world, #SLOTS, #REMAP_OWN))
   end

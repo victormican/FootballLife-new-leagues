@@ -48,6 +48,7 @@ tables (`python tools/fl26world.py --root <world>`), but it only knows `league`,
 | `fans` | `fans <class 0-9> <percent> <team id> ...` | `leaguebuilder.club_money` (by squad strength and division) | fl26clubs -> fl26clubs.dll (`fl26_clubs_fans`) |
 | `newfaces`, `newfaces3d` | `newfaces 179673-179679 179681` | `lbplayers.new_face_lines` | fl26regen |
 | `faceapp` | `faceapp 179700:36912` | `lbplayers.face_app_lines` | fl26regen (`fl26_regen_copy`) |
+| `pool` | `pool 75 181` | hand written | fl26clubs (a group the game never fills, answered from that regulation) |
 | `cupdraw` | `cupdraw seeded` (or `cupdraw <reg> random`) | `build()` from the recipe's `cup_draw` | fl26swiss (`fl26_swiss_cupdraw`) |
 
 ## `league` keys
