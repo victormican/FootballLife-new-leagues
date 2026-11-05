@@ -52,7 +52,9 @@ Start-Sleep -Seconds 2
 # Nuevo
 Tap 0x0D 0x1C 0
 Start-Sleep -Seconds 6
-# desplazamiento opcional por la lista de competiciones
+# primero Enter para que la lista coja el foco; despues se navega
+Tap 0x0D 0x1C 0
+Start-Sleep -Milliseconds 400
 1..$scroll | ForEach-Object { Tap 0x28 0x50 1 }
 if ($shot) {
   Add-Type -AssemblyName System.Windows.Forms,System.Drawing
