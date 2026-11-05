@@ -69,13 +69,15 @@ local function fix()
            + blk:byte(6) * 1099511627776 + blk:byte(7) * 281474976710656
            + blk:byte(8) * 72057594037927936
   if bb == 0 then return end
-  if not told then
-    told = true
-    log(string.format("fl26regcid: owner=%#x block=%#x", ob, bb))
-  end
   local cntb = memory.read(bb + COUNT_OFF, 4)
   if not cntb then return end
   local n = u32(cntb, 0)
+  if not told then
+    told = true
+    local first = memory.read(bb + ARRAY_OFF, 4)
+    log(string.format("fl26regcid: owner=%#x block=%#x count=%d firstid=%s", ob, bb, n,
+                      first and (first:byte(1) + first:byte(2) * 256) or "?"))
+  end
   if n == 0 or n > MAX then return end
   local arr = bb + ARRAY_OFF
   local fixed, seen = 0, 0
