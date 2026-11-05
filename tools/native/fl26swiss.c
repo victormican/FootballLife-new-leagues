@@ -11873,140 +11873,69 @@ static void rlog(const char* fmt, ...)
 static int regcid_fix(void)
 {
   if (g_nregcid == 0) return -1;
-  /* phkind la llama con rcx = puntero al cid; sin argumento el registro queda con basura y
-     revienta (0x140025963, 2026-11-04).  Se le pasa un puntero a un cero. */
-  uint32_t probe = 27;   /* un cid que resuelve seguro: la funcion depende del que se le pasa */
-  void *ctx = ((void* (*)(void*))(uintptr_t)(g_base + PHDATA_RVA))(&probe);
-  unsigned char* blk = ctx ? *(unsigned char**)((unsigned char*)ctx + 0x48) : 0;
-  uint32_t n = blk ? *(uint32_t*)(blk + 0xd0bcf4) : 0;
-  rlog("ctx=%p blk=%p n=%u", ctx, (void*)blk, n); logf("fl26swiss: regcid -- ctx=%p blk=%p n=%u", ctx, (void*)blk, n);
-  if (!ctx || !blk || n == 0) return -1;
-  /* la cuenta puede ser 65535 (phkind tambien la ve asi): mas alla de 1200 el registro es el
-     centinela de +0xd0b77c, que no es de nadie.  El tope real lo pone fl26caps (300 -> 1200). */
-  uint32_t lim = n > 1200 ? 1200 : n;
-  /* El bloque de arriba no es el array (sus ids son basura).  Se localiza el array por un
-     registro conocido: el del Mundial (id de regulacion 34, cid 27) y se camina hacia atras
-     hasta el primer registro.  Despues se aplica el mapa sobre esa base. */
+  uint32_t probe = 27;
+  void* ctx = ((void* (*)(void*))(uintptr_t)(g_base + PHDATA_RVA))(&probe);
+  unsigned char* hint = ctx ? *(unsigned char**)((unsigned char*)ctx + 0x48) : 0;
+  rlog("ctx=%p hint=%p", ctx, (void*)hint);
+  if (!hint) return -1;
+
+  /* El bloque bueno se localiza por sus cuentas: el recuento de 0x1414bc0a0 deja seguidos
+     jugadores, equipos, entrenadores y regulaciones en +0xd0bce8, +0xd0bcec, +0xd0bcf0 y
+     +0xd0bcf4.  Se busca el par (jugadores, equipos) con holgura y se deshace el offset. */
+  unsigned char* blk = 0;
   {
-    unsigned char* lo = blk;
-    unsigned char* hi = blk + 0xE00000;
-    unsigned char* hit = 0;
-    /* se busca la fila del Champions (cid 2) sin suponer la base: cualquier punto donde el
-       dword de +0x80 valga 2 y el word de +0x00 sea un id de regulacion plausible */
-    int shows = 0;
-    /* Ancla por nombre: "Kosovo Cup" solo existe en nuestra regulacion 918.  Si aparece, el
-       registro empieza 0x14 antes (ahi esta el nombre en las tablas), y en +0x00 su id. */
-    {
-      const char* needle = "Kosovo Cup";
-      size_t nl = 10;
-      unsigned char* q = lo;
-      unsigned long long sc = 0;
-      int found = 0;
-      while (q < hi && found < 3 && sc < 0x2000000ULL) {
-        MEMORY_BASIC_INFORMATION mbi;
-        if (VirtualQuery(q, &mbi, sizeof mbi) == 0) break;
-        unsigned char* rb = (unsigned char*)mbi.BaseAddress;
-        unsigned char* re = rb + mbi.RegionSize;
-        int rd = (mbi.State == MEM_COMMIT) && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD));
-        if (!rd) { q = re; continue; }
-        if (rb < lo) rb = lo;
-        if (re > hi) re = hi;
-        for (unsigned char* r = rb; r + nl < re && found < 3; r++) {
-          sc++;
-          if (memcmp(r, needle, nl) != 0) continue;
-          unsigned char* rec0 = r - 0x14;
-          rlog("name at %p id=%u cid80=%u %s", (void*)r, (unsigned)*(uint16_t*)(r-0x14), *(uint32_t*)(r-0x14+0x80), (char*)r);
-          logf("fl26swiss: regcid -- name at %p; rec id=%u cid80=%u name=%s", (void*)r,
-               (unsigned)*(uint16_t*)rec0, *(uint32_t*)(rec0 + 0x80), (char*)r);
-          found++;
-        }
-        q = re;
+    MEMORY_BASIC_INFORMATION mbi;
+    unsigned char* p = (unsigned char*)0x10000;
+    while (p < (unsigned char*)0x00007FFFFFFEFFFFULL) {
+      if (VirtualQuery(p, &mbi, sizeof mbi) == 0) break;
+      unsigned char* b = (unsigned char*)mbi.BaseAddress;
+      unsigned char* e = b + mbi.RegionSize;
+      int ok = (mbi.State == MEM_COMMIT) && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD));
+      if (!ok) { p = e; continue; }
+      for (unsigned char* q = b; q + 16 < e; q += 4) {
+        uint32_t a = *(uint32_t*)q, c = *(uint32_t*)(q + 4);
+        if (a < 90000u || a > 120000u) continue;
+        if (c < 3000u || c > 4200u) continue;
+        blk = q - 0xd0bce8;
+        rlog("counts at %p -> blk %p", (void*)q, (void*)blk);
+        break;
       }
-      rlog("name scan: %llu bytes, %d found", sc, found); logf("fl26swiss: regcid -- name scan: %llu bytes, %d found", sc, found);
-    }
-    /* Barrido solo por memoria comprometida y legible: leer a lo bruto cerraba el juego
-       (0x140025c03, 2026-11-04). */
-    unsigned char* q = lo;
-    unsigned long long scanned = 0;
-    while (q < hi && shows < 6 && scanned < 0x2000000ULL) {
-      MEMORY_BASIC_INFORMATION mbi;
-      if (VirtualQuery(q, &mbi, sizeof mbi) == 0) break;
-      unsigned char* rbase = (unsigned char*)mbi.BaseAddress;
-      unsigned char* rend = rbase + mbi.RegionSize;
-      int readable = (mbi.State == MEM_COMMIT)
-                  && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD));
-      if (!readable) { q = rend; continue; }
-      if (rbase < lo) rbase = lo;
-      if (rend > hi) rend = hi;
-      for (unsigned char* r = rbase; r < rend && shows < 6; r++) {
-        scanned++;
-        if (*(uint32_t*)(r + 0x80) == 96) { shows++; logf("fl26swiss: regcid -- cid96 at %p rel 0x80 off %#llx id=%u kind=%u", (void*)r, (unsigned long long)(r - blk), (unsigned)*(uint16_t*)r, *(uint32_t*)(r + 0x84)); if (!hit) hit = r; continue; }
-        if (*(uint32_t*)(r + 0x84) == 96) { shows++; logf("fl26swiss: regcid -- cid96 at %p rel 0x84 off %#llx id=%u", (void*)r, (unsigned long long)(r - blk), (unsigned)*(uint16_t*)r); if (!hit) hit = r - 4; continue; }
-        if (*(uint32_t*)(r + 0x7c) == 96) { shows++; logf("fl26swiss: regcid -- cid96 at %p rel 0x7c off %#llx id=%u", (void*)r, (unsigned long long)(r - blk), (unsigned)*(uint16_t*)r); if (!hit) hit = r + 4; continue; }
-      }
-      q = rend;
-    }
-    logf("fl26swiss: regcid -- scanned %llu bytes, %d hit(s)", scanned, shows);
-    for (unsigned char* qq = lo; 0 && qq < hi; qq++) {
-      int rel = -1;
-      if (*(uint32_t*)(q + 0x80) == 96) rel = 0x80;
-      else if (*(uint32_t*)(q + 0x84) == 96) rel = 0x84;
-      else if (*(uint32_t*)(q + 0x7c) == 96) rel = 0x7c;
-      if (rel < 0) continue;
-      logf("fl26swiss: regcid -- cid96 at %p rel %#x off %#llx: w0=%u w2=%u d78=%u d88=%u",
-           (void*)q, rel, (unsigned long long)(q - blk),
-           (unsigned)*(uint16_t*)q, (unsigned)*(uint16_t*)(q + 2),
-           *(uint32_t*)(q + 0x78), *(uint32_t*)(q + 0x88));
-      if (!hit) hit = q - (rel - 0x80);
-      shows++;
-    }
-    logf("fl26swiss: regcid -- record cid96 at %p", (void*)hit);
-    if (hit) {
-      unsigned char* st = hit;
-      while (st - 0x314 >= lo && *(uint16_t*)(st - 0x314) > 0 && *(uint16_t*)(st - 0x314) < 9000)
-        st -= 0x314;
-      rlog("array starts %p off %#llx", (void*)st, (unsigned long long)(st - blk));
-      logf("fl26swiss: regcid -- array starts at %p (offset %#llx in the block)",
-           (void*)st, (unsigned long long)(st - blk));
-      int fx = 0, sn = 0;
-      for (int i = 0; i < 1200; i++) {
-        unsigned char* rec = st + (size_t)i * 0x314;
-        uint16_t rid = *(uint16_t*)rec;
-        if (rid == 0 || rid >= 9000) break;
-        for (int k = 0; k < g_nregcid; k++) {
-          if (g_regcid[2 * k] != rid) continue;
-          sn++;
-          uint32_t want = g_regcid[2 * k + 1];
-          if (*(uint32_t*)(rec + 0x80) != want) { *(uint32_t*)(rec + 0x80) = want; fx++; }
-          break;
-        }
-      }
-      logf("fl26swiss: regcid -- array: %d ours seen, %d got the full cid", sn, fx);
-      if (sn > 0) return fx;
+      if (blk) break;
+      p = e;
     }
   }
-  int fixed = 0, seen = 0, nz = 0;
-  char ids[160]; int il = 0;
-  for (uint32_t i = 0; i < lim; i++) {
-    uint16_t pid = *(uint16_t*)(blk + 0xc131b0 + (size_t)i * 0x314);
-    if (pid) { nz++; if (il < 140) il += snprintf(ids + il, sizeof ids - il, " %u", (unsigned)pid); }
+  if (!blk) { rlog("counts not found"); return -1; }
+
+  uint32_t cp = *(uint32_t*)(blk + 0xd0bce8), ct = *(uint32_t*)(blk + 0xd0bcec);
+  uint32_t cc = *(uint32_t*)(blk + 0xd0bcf0), cr = *(uint32_t*)(blk + 0xd0bcf4);
+  rlog("counts players=%u teams=%u coaches=%u regs=%u", cp, ct, cc, cr);
+
+  unsigned char* arr = blk + 0xc131b0;
+  {
+    char ids[200]; int il = 0; int nz = 0;
+    for (int i = 0; i < 12; i++) {
+      uint16_t rid = *(uint16_t*)(arr + (size_t)i * 0x314);
+      uint32_t cid = *(uint32_t*)(arr + (size_t)i * 0x314 + 0x80);
+      if (rid) nz++;
+      il += snprintf(ids + il, sizeof ids - il, " %u/%u", (unsigned)rid, cid);
+    }
+    rlog("first records (id/cid):%s", ids);
   }
-  logf("fl26swiss: regcid -- %d record(s) with an id, first ones:%s", nz, ids);
-  for (uint32_t i = 0; i < lim; i++) {
-    unsigned char* rec = blk + 0xc131b0 + (size_t)i * 0x314;
+
+  int fixed = 0, seen = 0;
+  for (int i = 0; i < 1200; i++) {
+    unsigned char* rec = arr + (size_t)i * 0x314;
     uint16_t rid = *(uint16_t*)rec;
+    if (!rid) continue;
     for (int k = 0; k < g_nregcid; k++) {
       if (g_regcid[2 * k] != rid) continue;
       seen++;
       uint32_t want = g_regcid[2 * k + 1];
-      if (*(uint32_t*)(rec + 0x80) != want) {
-        *(uint32_t*)(rec + 0x80) = want;
-        fixed++;
-      }
+      if (*(uint32_t*)(rec + 0x80) != want) { *(uint32_t*)(rec + 0x80) = want; fixed++; }
       break;
     }
   }
-  logf("fl26swiss: regcid -- %u regulations (scanning %u), %d ours seen, %d got the full cid", n, lim, seen, fixed);
+  rlog("regs=%u ours=%d fixed=%d", cr, seen, fixed);
   return fixed;
 }
 
