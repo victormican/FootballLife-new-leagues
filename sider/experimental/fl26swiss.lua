@@ -436,6 +436,7 @@ function m.init(ctx)
     typedef void (*fl26_swiss_uecl_t)(const uint32_t*, int);
     typedef void (*fl26_swiss_ko_tick_t)(void);
     typedef int  (*fl26_swiss_access_t)(const uint16_t*, int);
+    typedef int  (*fl26_swiss_regcid_t)(const uint32_t*, int);
     typedef int  (*fl26_swiss_first_t)(const uint32_t*, int);
   ]])
 
@@ -662,7 +663,7 @@ function m.init(ctx)
               if #rc > 0 then
                 local buf = ffi.new("uint32_t[?]", #rc)
                 for i = 1, #rc do buf[i - 1] = rc[i] end
-                local m = tonumber(ffi.cast("fl26_swiss_access_t", prc)(buf, #rc))
+                local m = tonumber(ffi.cast("fl26_swiss_regcid_t", prc)(buf, #rc))
                 log(string.format("fl26swiss: %d reg->cid pair(s) handed to the DLL", m))
               end
             end
