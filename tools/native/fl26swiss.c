@@ -11868,9 +11868,12 @@ static int regcid_fix(void)
   unsigned char* blk = ctx ? *(unsigned char**)((unsigned char*)ctx + 0x48) : 0;
   uint32_t n = blk ? *(uint32_t*)(blk + 0xd0bcf4) : 0;
   logf("fl26swiss: regcid -- ctx=%p blk=%p n=%u", ctx, (void*)blk, n);
-  if (!ctx || !blk || n == 0 || n > 1200) return -1;
+  if (!ctx || !blk || n == 0) return -1;
+  /* la cuenta puede ser 65535 (phkind tambien la ve asi): mas alla de 1200 el registro es el
+     centinela de +0xd0b77c, que no es de nadie.  El tope real lo pone fl26caps (300 -> 1200). */
+  uint32_t lim = n > 1200 ? 1200 : n;
   int fixed = 0, seen = 0;
-  for (uint32_t i = 0; i < n; i++) {
+  for (uint32_t i = 0; i < lim; i++) {
     unsigned char* rec = blk + 0xc12e9c + (size_t)i * 0x314;
     uint16_t rid = *(uint16_t*)rec;
     for (int k = 0; k < g_nregcid; k++) {
@@ -11884,7 +11887,7 @@ static int regcid_fix(void)
       break;
     }
   }
-  logf("fl26swiss: regcid -- %u regulations, %d ours seen, %d got the full cid", n, seen, fixed);
+  logf("fl26swiss: regcid -- %u regulations (scanning %u), %d ours seen, %d got the full cid", n, lim, seen, fixed);
   return fixed;
 }
 
