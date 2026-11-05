@@ -16,6 +16,7 @@ histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la columna "
 | documento | estado |
 |---|---|
 | **`limites-actuales-2026-11-05.md`** | **vigente** — uso real y hasta dónde se puede subir |
+| **`belgica-slot84-y-limite-16.md`** | **vigente** — `MAX_CFG 16` del DLL (instalación fallida) y el id 111 de Bélgica |
 | `limites-escalables.md` | vigente en el **mecanismo** (`layout.json` → `patchset` → `fl26caps`); sus números son de octubre |
 | `walls.md` | vigente como mapa conceptual de paredes |
 | `limits-and-formats.md`, `limits-2026-10-24.md` | superados en números por `limites-actuales-2026-11-05.md` |

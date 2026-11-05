@@ -107,7 +107,7 @@ static uint16_t* slot_count(void* self, unsigned s)
 #define MERGE_MAX   48
 #define HANDLE_SHIFT 14        /* handle = team_id << 14                          */
 
-#define MAX_CFG     16
+#define MAX_CFG     32      /* 20 slots served in 2026-11 (was 16: install failed)   */
 
 /* The three reader calls inside 0x141263b40 (the Master League club slot), as return addresses:
    count at 0x141263bd6 and 0x1412640ca, get at 0x141263bf9. */
@@ -131,6 +131,7 @@ static fl26_clubs_cfg_t g_cfg[MAX_CFG];
 static int      g_ncfg;
 static uint32_t g_list[MAX_CFG][MAX_CLUBS];
 static int      g_n[MAX_CFG];              /* -1 = no answer of ours for this slot */
+static unsigned char g_said[MAX_CFG];      /* the "slot <- reg: N clubs" line was logged */
 static uint32_t g_stat[4];                 /* counts served, gets served, rebuilds, misses */
 static uint32_t g_pool[STRIDE];            /* a pool slot's stored list minus our clubs      */
 static int      g_npool = -1;
@@ -193,6 +194,10 @@ static int rebuild(int i)
   if (!n) return 0;
   g_n[i] = n;
   g_stat[2]++;
+  if (!g_said[i]) {
+    g_said[i] = 1;
+    logf("fl26clubs: slot %u <- reg %u: %d clubs", g_cfg[i].slot, g_cfg[i].reg, n);
+  }
   return n;
 }
 
