@@ -121,7 +121,9 @@ local SERVED = { [0] = true, [1] = true, [2] = true, [3] = true,
                  -- slots added by fl26slots (beyond the exe's 123): the game has no list of its own
                  -- there, so a league on one needs its club list answered from its regulation too.
                  [200] = true, [201] = true, [202] = true, [203] = true,
-                 [204] = true, [205] = true, [206] = true, [207] = true, [208] = true }
+                 [204] = true, [205] = true, [206] = true, [207] = true, [208] = true,
+                 -- slots nuestros para grupos que el juego no tiene (Concacaf)
+                 [247] = true, [248] = true, [249] = true }
 local POOL_CASE = { [26] = 3, [27] = 3, [28] = 3, [67] = 3, [74] = 3, [71] = 5 }
 local function from_world(world, pools)
   local slots, remap = {}, {}
