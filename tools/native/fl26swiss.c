@@ -11858,6 +11858,18 @@ __declspec(dllexport) int fl26_swiss_regcid(const uint32_t* v, int n)
   return g_nregcid;
 }
 
+/* log propio a fichero: el buffer de Sider se drena cada 32 ficheros y se come lineas */
+static void rlog(const char* fmt, ...)
+{
+  FILE* f = fopen("C:/Users/viarm/AppData/Local/Temp/opencode/regcid.txt", "a");
+  if (!f) return;
+  va_list ap; va_start(ap, fmt);
+  vfprintf(f, fmt, ap);
+  va_end(ap);
+  fputc('\n', f);
+  fclose(f);
+}
+
 static int regcid_fix(void)
 {
   if (g_nregcid == 0) return -1;
@@ -11867,7 +11879,7 @@ static int regcid_fix(void)
   void *ctx = ((void* (*)(void*))(uintptr_t)(g_base + PHDATA_RVA))(&probe);
   unsigned char* blk = ctx ? *(unsigned char**)((unsigned char*)ctx + 0x48) : 0;
   uint32_t n = blk ? *(uint32_t*)(blk + 0xd0bcf4) : 0;
-  logf("fl26swiss: regcid -- ctx=%p blk=%p n=%u", ctx, (void*)blk, n);
+  rlog("ctx=%p blk=%p n=%u", ctx, (void*)blk, n); logf("fl26swiss: regcid -- ctx=%p blk=%p n=%u", ctx, (void*)blk, n);
   if (!ctx || !blk || n == 0) return -1;
   /* la cuenta puede ser 65535 (phkind tambien la ve asi): mas alla de 1200 el registro es el
      centinela de +0xd0b77c, que no es de nadie.  El tope real lo pone fl26caps (300 -> 1200). */
@@ -11882,6 +11894,36 @@ static int regcid_fix(void)
     /* se busca la fila del Champions (cid 2) sin suponer la base: cualquier punto donde el
        dword de +0x80 valga 2 y el word de +0x00 sea un id de regulacion plausible */
     int shows = 0;
+    /* Ancla por nombre: "Kosovo Cup" solo existe en nuestra regulacion 918.  Si aparece, el
+       registro empieza 0x14 antes (ahi esta el nombre en las tablas), y en +0x00 su id. */
+    {
+      const char* needle = "Kosovo Cup";
+      size_t nl = 10;
+      unsigned char* q = lo;
+      unsigned long long sc = 0;
+      int found = 0;
+      while (q < hi && found < 3 && sc < 0x2000000ULL) {
+        MEMORY_BASIC_INFORMATION mbi;
+        if (VirtualQuery(q, &mbi, sizeof mbi) == 0) break;
+        unsigned char* rb = (unsigned char*)mbi.BaseAddress;
+        unsigned char* re = rb + mbi.RegionSize;
+        int rd = (mbi.State == MEM_COMMIT) && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD));
+        if (!rd) { q = re; continue; }
+        if (rb < lo) rb = lo;
+        if (re > hi) re = hi;
+        for (unsigned char* r = rb; r + nl < re && found < 3; r++) {
+          sc++;
+          if (memcmp(r, needle, nl) != 0) continue;
+          unsigned char* rec0 = r - 0x14;
+          rlog("name at %p id=%u cid80=%u %s", (void*)r, (unsigned)*(uint16_t*)(r-0x14), *(uint32_t*)(r-0x14+0x80), (char*)r);
+          logf("fl26swiss: regcid -- name at %p; rec id=%u cid80=%u name=%s", (void*)r,
+               (unsigned)*(uint16_t*)rec0, *(uint32_t*)(rec0 + 0x80), (char*)r);
+          found++;
+        }
+        q = re;
+      }
+      rlog("name scan: %llu bytes, %d found", sc, found); logf("fl26swiss: regcid -- name scan: %llu bytes, %d found", sc, found);
+    }
     /* Barrido solo por memoria comprometida y legible: leer a lo bruto cerraba el juego
        (0x140025c03, 2026-11-04). */
     unsigned char* q = lo;
@@ -11923,6 +11965,7 @@ static int regcid_fix(void)
       unsigned char* st = hit;
       while (st - 0x314 >= lo && *(uint16_t*)(st - 0x314) > 0 && *(uint16_t*)(st - 0x314) < 9000)
         st -= 0x314;
+      rlog("array starts %p off %#llx", (void*)st, (unsigned long long)(st - blk));
       logf("fl26swiss: regcid -- array starts at %p (offset %#llx in the block)",
            (void*)st, (unsigned long long)(st - blk));
       int fx = 0, sn = 0;
