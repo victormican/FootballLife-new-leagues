@@ -1,7 +1,7 @@
-# Índice de la documentación del fork (revisado 2026-11-05)
+# Índice de la documentación del fork (revisado 2026-11-06)
 
-70 documentos. Este índice dice **cuál manda hoy** en cada tema, cuál está superado y cuál es
-histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la columna "vigente".
+Documentos del fork. Este índice dice **cuál manda hoy** en cada tema, cuál está superado y cuál
+es histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la columna "vigente".
 
 ## Estado y pendientes
 
@@ -15,11 +15,16 @@ histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la columna "
 
 | documento | estado |
 |---|---|
-| **`limites-actuales-2026-11-05.md`** | **vigente** — uso real y hasta dónde se puede subir |
+| **`limites-actuales-2026-11-06.md`** | **vigente** — 500 slots, 159 por slot, y los topes de ligas/copas |
+| **`sesion-2026-11-06.md`** | **vigente** — todo lo investigado y hecho en la sesión |
+| **`rea-cotas-slots-500-2026-11-06.md`** | **vigente** — por qué 500 fallaba (solape de tablas) y el arreglo |
+| **`limites-ligas-y-copas-2026-11-06.md`** | **vigente** — ligas solas y copas solas |
+| **`regresion-slot22-2026-11-06.md`** | **vigente** — el slot 22 repetido abortaba comptab |
 | **`belgica-slot84-y-limite-16.md`** | **vigente** — `MAX_CFG 16` del DLL (instalación fallida) y el id 111 de Bélgica |
+| `limites-actuales-2026-11-05.md` | superado en números por el de 2026-11-06 |
 | `limites-escalables.md` | vigente en el **mecanismo** (`layout.json` → `patchset` → `fl26caps`); sus números son de octubre |
 | `walls.md` | vigente como mapa conceptual de paredes |
-| `limits-and-formats.md`, `limits-2026-10-24.md` | superados en números por `limites-actuales-2026-11-05.md` |
+| `limits-and-formats.md`, `limits-2026-10-24.md` | superados en números |
 
 ## Competiciones, formato y tablas
 
@@ -39,6 +44,10 @@ histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la columna "
 | documento | estado |
 |---|---|
 | **`supercopas-por-nacion.md`** | **vigente** — las 101 supercopas y el cupgrow a 512 |
+| **`copas-regionales-2026-11-06.md`** | **vigente** — 14 copas regionales (CHAN, UNAF, WAFU B, UNIFFAC, CECAFA, COSAFA, ASEAN, CAFA, WAFF, EAFF) |
+| **`copa-cierre-y-blanco.md`** | **vigente** — el cierre del menú de Copa: slot 123, buffer, cid |
+| **`menus-y-automatizacion-2026-11-06.md`** | **vigente** — flujos de menú y automatización elevada |
+| **`otros-ofc-y-slots-2026-11-06.md`** | **vigente** — Otros OFC (slot 248) y el techo de 250 que ahora es 500 |
 | **`copas-grupos-duplicadas.md`** | **vigente** — las 9 copas que `dup_cups.py` dejaba fuera: 542 líneas `ccup` |
 | **`copas-por-pais-y-del-juego.md`** | **vigente** — una copa y una supercopa por país; `showcup` para las del juego |
 | **`selecciones-en-copa.md`** | **vigente** — Oceania y No FIFA en Copa |
@@ -51,6 +60,8 @@ histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la columna "
 | documento | estado |
 |---|---|
 | **`paises-id-bandera.md`** | **vigente** — el id de país era el de la bandera |
+| **`revertido-paises-2026-11-06.md`** | **vigente** — el remapeo a filas de Country.bin se revirtió |
+| **`nombres-corruptos-y-belgica.md`** | **vigente** — 35 nombres doble-codificados y la liga belga |
 | **`otros-grupos.md`** | **vigente** — nibble `+0x4f` y los cinco grupos |
 | `banderas-de-pais.md` | vigente — formato y nombres de las banderas |
 | `national-teams-and-oceania.md` | vigente — modelo de slots de selecciones |

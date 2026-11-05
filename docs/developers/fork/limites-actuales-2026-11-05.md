@@ -1,3 +1,5 @@
+﻿> **Superado en numeros por limites-actuales-2026-11-06.md.** Se deja como historico.
+
 # Límites del mundo: estado y hasta dónde se puede subir (2026-11-05)
 
 Foto de los topes con el mundo vivo (`_FL26MyWorld`) medido hoy, y para cada uno: cuánto queda,
@@ -130,3 +132,4 @@ array de regulaciones está en `block+0xc131b0` y el cid completo va en `+0x80`
 4. **cid a 4.096** solo si el mundo pasa de 1.000 competiciones.
 5. **Jugadores** solo si el mundo pasa de ~400 ligas de 30: es el cambio caro y con más riesgo.
 6. **Slots** el último: es el que más se rompe y el que menos aprieta hoy (117 libres).
+
