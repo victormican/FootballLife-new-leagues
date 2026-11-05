@@ -100,14 +100,14 @@ static uint32_t* slot_list(void* self, unsigned s)
 static uint16_t* slot_count(void* self, unsigned s)
 { return (uint16_t*)((unsigned char*)self + g_cntoff + s * 2); }
 #define REG_CLUBS   0x170      /* regulation record: club handle list             */
-#define MAX_CLUBS   48         /* the game's own cap on that list                 */
+#define MAX_CLUBS   96         /* probando 96: la lista viva puede tener mas de 48 */
 /* A served slot is answered as the game's own stored list first and ours after it, up to this
    many: a group keeps the clubs the game put there and we only fill the rest. 48 is the size of
    a regulation's club list, which is what the group can show. */
 #define MERGE_MAX   48
 #define HANDLE_SHIFT 14        /* handle = team_id << 14                          */
 
-#define MAX_CFG     192     /* every league slot of a 500-slot world (was 32)        */
+#define MAX_CFG     768     /* hasta 750 slots de mundo (fl26slots750); 768 por alineacion */
 
 /* The three reader calls inside 0x141263b40 (the Master League club slot), as return addresses:
    count at 0x141263bd6 and 0x1412640ca, get at 0x141263bf9. */

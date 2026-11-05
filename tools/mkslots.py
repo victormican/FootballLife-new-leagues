@@ -47,7 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE = 0x163400000            # our own page; fl26caps has 0x163000000
 CODE = PAGE                   # stubs
 OFF_TAB = PAGE + 0x800        # N dwords: first dword of each slot's list
-CAP_TAB = PAGE + 0x1000   # N>256: la tabla de offsets (0x800 + 4N) acaba en 0xFD0        # N dwords: capacity of each slot
+CAP_TAB = PAGE + 0xC00    # se recalcula en main() segun N        # N dwords: capacity of each slot
 
 OLD_N = 123
 SENTINEL = 0x7b
@@ -175,8 +175,8 @@ class Asm:
 
 
 def layout(n):
-    if not OLD_N < n <= 500:
-        raise SystemExit("N must be 124..500")
+    if not OLD_N < n <= 750:
+        raise SystemExit("N must be 124..750")
     listdw = (OLD_CNT - 2 * n) // 4
     cnt = listdw * 4
     big = {s: c for s, c in BIG.items() if s < n}
@@ -383,6 +383,8 @@ def main():
     d = open(EXE, "rb").read()
     secs = sections(d)
     L = layout(n)
+    global CAP_TAB
+    CAP_TAB = PAGE + ((max(0xC00, 0x800 + 4 * n) + 0xF) & ~0xF)
 
     # 1. the accessors must be exactly what was read
     for k, (va, h) in ACC.items():
