@@ -185,8 +185,11 @@ local KICKORDER = {}
 
 -- The cup lines' regulation ids: Kick Off > Cup looks a competition up in the parameter table by
 -- its regulation id, and a competition with no row there falls back to row 0 -- every cup of ours
--- showed "FIFA Club World Cup" and had no draw size (2026-11-04).  One hidden row (slot 123) per
--- cup fixes that; the name label is cleared so the UI uses the inline name, like our leagues.
+-- showed "FIFA Club World Cup" and had no draw size (2026-11-04).  One row per cup fixes that.
+-- 2026-11-06: the row used to sit on slot 123 (the "none" sentinel): opening the cup list then
+-- read the slot's data and crashed (memcpy from 0x00000d70, Access Violation 0x1403fef5f).  A
+-- real, free slot of the parameter table is used instead (slot 22 is in the shipped free list).
+local CUP_SLOT = 22
 local WORLD_CUPS = {}
 
 local function read_world(ctx)
@@ -588,7 +591,7 @@ function m.init(ctx)
     local made = 0
     for _, id in ipairs(WORLD_CUPS) do
       if not byid[id] then
-        rows[#rows + 1] = row_set(row_set(tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(123))
+        rows[#rows + 1] = row_set(row_set(tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(CUP_SLOT))
         byid[id] = #rows
         ours[id] = true
         made = made + 1
