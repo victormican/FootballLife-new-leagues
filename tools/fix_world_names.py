@@ -17,6 +17,26 @@ def norm(s):
     return " ".join("".join(c if c.isalnum() else " " for c in s.lower()).split())
 
 
+def corrupt(s):
+    """True only when the text is mojibake or garbage, never when it is merely another name.
+
+    The old check rewrote every line whose name differed from its regulation's; that renamed
+    the Russia Cup line to "Jupiler Pro League" (regulation 115 holds Belgium's record), which
+    later made it look malformed. A name that is plain text is left alone now.
+    """
+    if not s:
+        return False
+    if "\ufffd" in s or any(0x80 <= ord(c) <= 0x9F for c in s):
+        return True
+    if any(ord(c) > 0x2FFF for c in s):
+        return True
+    try:
+        fixed = s.encode("cp1252").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return False
+    return fixed != s
+
+
 def cstr(b):
     return bytes(b).split(b"\0")[0].decode("utf-8", "replace").strip()
 
@@ -39,7 +59,7 @@ for i, line in enumerate(lines):
     real = rname.get(rid)
     if not real:
         continue
-    if norm(real) != norm(name):
+    if corrupt(name) and norm(real) != norm(name):
         lines[i] = "%s %d%sname=%s" % (kind, rid, mid, real)
         fixed += 1
         if fixed <= 10:

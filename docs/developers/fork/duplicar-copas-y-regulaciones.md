@@ -49,7 +49,8 @@ O sea: **duplicar las copas no necesita romper ningún tope de datos**; solo sub
 
 - **Copas de grupos** (`groups>0`): tienen regulación maestra, una réplica por grupo y la
   eliminatoria; hay que duplicar las tres y renumerar las réplicas (`maestra + 1024*(g+1)`). El
-  script las salta a propósito.
+  script las salta a propósito. **Ya se hace** con `tools/dup_cups_groups.py`
+  (ver `copas-grupos-duplicadas.md`): 9 copas, 77 regulaciones y 240 entradas para llegar a 542.
 - **Fechas**: una copia conserva el `like=` de la original, así que se datea igual que ella. Dos
   copias el mismo día es legal, pero si se quiere otra fecha hay que poner `days=`.
 

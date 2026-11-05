@@ -39,6 +39,7 @@ histórico. Regla: si dos hablan de lo mismo, gana el más nuevo de la columna "
 | documento | estado |
 |---|---|
 | **`supercopas-por-nacion.md`** | **vigente** — las 101 supercopas y el cupgrow a 512 |
+| **`copas-grupos-duplicadas.md`** | **vigente** — las 9 copas que `dup_cups.py` dejaba fuera: 542 líneas `ccup` |
 | **`selecciones-en-copa.md`** | **vigente** — Oceania y No FIFA en Copa |
 | **`grupo-africa.md`** | **vigente** — slot 75 servido con `pool 75 181` |
 | `estado-copas-2026-11-04.md` | histórico del bloque de copas (el nombre sigue abierto) |
