@@ -56,3 +56,25 @@ un `mov rcx,[rcx]` con `rcx` inválido) con el mundo activo o desactivado: no es
 datos. Con su lanzador `FL 2026 start.exe` arranca bien. Además el juego queda **elevado**, así
 que Frida y Rizin no pueden engancharse sin un UAC: de ahí que el REA en vivo haya que hacerlo
 desde el DLL de Sider (que ya corre dentro) o elevando la herramienta.
+
+## REA 2026-11-05 (noche): por qué no se puede seguir sin el menú
+
+- `phkind` (`0x14150af30`) tiene **una sola referencia** en todo el ejecutable: una entrada de
+  tabla en `0x143bcf04c` (tabla de desplazamientos de 32 bits, no un `call`). Es decir, se llama
+  **indirectamente**: recorrer xrefs no lleva a quien lo usa, así que el camino estático para
+  encontrar al que pinta la fila se corta aquí.
+- Por eso la vía sigue siendo escribir el cid completo en `+0x80` desde el DLL (ya compilado y
+  desplegado) y **comprobarlo abriendo Kick Off > Cup**.
+- Automatizar el menú no es posible: `SendKeys` y `SendInput` con códigos de scan (incluso con la
+  ventana en primer plano y un clic dentro) **no llegan** a la pantalla `INGRESAR`; el juego solo
+  acepta entrada real. Hace falta que la abra una persona.
+
+Lo que hay que mirar cuando se abra: `C:\Users\viarm\AppData\Local\Temp\opencode\regcid.txt`.
+
+```
+regcid -- ctx=... blk=... n=...
+regcid -- N record(s) with an id, first ones: 1 2 3 ...
+regcid -- 690 regulations (scanning 1200), NNN ours seen, MMM got the full cid
+```
+
+Si `NNN` sale ~317 y `MMM` ~168, los nombres de las 271 copas salen bien y el sorteo abre.
