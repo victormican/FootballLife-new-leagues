@@ -52,3 +52,115 @@ menu cae al resolverla.
   (`CUPROWS`) ya escrita y probada (no aborta la tabla con 286 copas), por si se retoma la via 3.
 - El mundo `_FL26CupTest` queda con `ccup 317` y `showcup 131`: la copa se ve en la lista.
 - `Competition.bin` de la copa devuelto a lo que escribio el constructor (area 29, flags 0x02).
+
+---
+
+# Sesión 2 (tarde): el cierre no era el menú, era un `call` a memoria libre
+
+## El fallo del stub de `fl26cupgrow`
+
+`fl26cupgrow.lua` envuelve el slot de la vtable y **parchea el destructor** del menú
+(`0x140b1c810`) con un stub de 61 bytes que anula la lista y salta a `0x140b1c824`. El parche
+estaba mal:
+
+```lua
+-- antes (mal)
+d = d:sub(1, 56) .. u32(DTOR_NEXT - (dstub + 60)) .. d:sub(61)
+-- despues (bien)
+d = d:sub(1, 57) .. u32(DTOR_NEXT - (dstub + 61)) .. d:sub(62)
+```
+
+Con `sub(1,56)` se perdía el opcode `e9` del `jmp`: en `dstub+0x38` quedaban los bytes
+`e8 c3 a1 df 00`, es decir **`call 0x161efa600`** — memoria libre. Ese era el
+`CRASH #1 code c0000005 rip 161efa600 ... info 8` (fallo de *ejecución*) y el cierre exacto al
+elegir la copa. Verificado con capstone: el stub corregido hace `jmp 0x140b1c824`.
+
+## El volcado que lo demostró
+
+`tools/native/fl26swiss.c` lleva desde hoy un grabador de excepciones propio
+(`AddVectoredExceptionHandler`, escribe `fl26swiss-crash.log` junto al DLL y al log del DLL):
+
+```
+CRASH #1 code c0000005 rip 161efa600 (base+21efa600) touched 161efa600 info 8
+  rip page state 10000 protect 1 type 0     -> MEM_FREE
+  rax 142692c40 (vtable MenuModeCupSelect)   rcx/rdi = objeto del menu
+  rsp+00 16110043d                           -> retorno dentro del stub de cupgrow
+```
+
+Sin ese volcado no se veía que el `call` salía de nuestro propio stub.
+
+## Trazas del handler (`CUPTRACE`)
+
+Con el stub arreglado, el handler **completa**:
+
+```
+CUPTRACE enter self=... +90=... +98=... +a0=... +88=... +00=142692C40
+CUPTRACE regcid_fix done
+CUPTRACE filter done gone=2 items=8
+CUPTRACE add begin have=8 room=1024 ncupcid=1
+CUPTRACE add end added=1 short=0 items=9
+CUPTRACE init call begin
+CUPTRACE init call returned 1
+```
+
+- La lista del menú **no crece**: `cap - begin = 0x3000` = 1024 entradas. `room=1024`, así que
+  `fl_pool_alloc` no llega a usarse. El item se escribe en su sitio (`begin+96`).
+- `init` (0x140b1c990) devuelve **1** con nuestros 9 items y la lista queda
+  `33,5,8,27,36,34,35,37,131`.
+- El fallo de `0x141ae48ae` que apareció después es un recorrido de `std::map<wstring,...>` con
+  nodo nulo (`[[global]+8]=0x7`). Ese global (`0x1437ce9c8`) es el mapa de **rutas de procesos**
+  que el juego consulta en un hilo de fondo (`conhost.exe`, `explorer.exe`, `FL_2026.exe`...), no
+  el de la copa: el volcado se produce cuando el proceso ya está muriendo.
+
+## El resolver del juego, medido desde dentro (`tools/native/frida/cid_probe.js`)
+
+`phkind(cid, kind)` (RVA `0x150af30`), `owner()` (`0x14b6a60`) y `findrec` (`0x14bc860`) son las
+mismas funciones que usa el filtro del handler:
+
+| cid | k1 | k2 (grupos) | k3 (eliminatoria) | registro |
+|---|---|---|---|---|
+| 33 | 65535 | 41 | 42 | si |
+| 5 | 65535 | 9 | 10 | si |
+| 8 | 65535 | 15 | 16 | si |
+| 27 | 65535 | 34 | 35 | si |
+| 36 | 65535 | **65535** | 46 | **no** |
+| 34 | 65535 | 104 | 43 | si |
+| 35 | 65535 | 44 | 45 | si |
+| 37 | 65535 | 47 | 48 | si |
+| **131** | 65535 | **65535** | **317** | **no** |
+
+Nuestra copa tiene **la misma forma que la 36** (el Mundial de Clubes): sin fase de grupos y con
+la regulación en `kind 3`. O sea: el resolutor no la rechaza por rara; la 36 se lista igual.
+
+## Herramientas nuevas
+
+- `tools/native/frida/cupmenu_probe.js` — INIT, items, excepciones, y `rpc.exports.setcups()` para
+  añadir o no la copa sin reiniciar.
+- `tools/native/frida/cupmenu_rea.js` — lo mismo más los pasos del modo copa (`0x140e43450` es el
+  "enter" del menú, que llama al slot `+0xd8` y sigue si devuelve 1) y hooks de
+  `ExitProcess`/`TerminateProcess`/`RtlExitUserProcess`/`abort` con backtrace.
+- `tools/native/frida/cid_probe.js` — la tabla de arriba.
+- `tools/native/frida/run_probe.cjs` — engancha sin límite de 60 s (REA corta a 60 s por llamada).
+
+## Frida, desbloqueado
+
+El fallo `capability_unavailable: Could not locate the bindings file` era el binding nativo de
+`frida` sin compilar en la caché de npx. Se arregla con:
+
+```
+cd %LOCALAPPDATA%\npm-cache\_npx\ad9a3fdbcad992c6\node_modules\frida
+node ..\prebuild-install\bin.js      # baja frida_binding.node (135 MB)
+```
+
+El servidor MCP que ya estaba en marcha cachea el `import("frida")` fallido (mapa de módulos ESM),
+así que **hay que reiniciar OpenCode** para que REA lo vea; el CLI (`rea list-frida-devices`,
+`rea instrument-with-frida attach <pid> --script-file ...`) funciona ya con el binding nuevo.
+
+## Lo que queda abierto
+
+- Con el stub corregido, entrar en Kick Off > Copa **devuelve al menú principal** (pantalla de
+  carga y vuelta) en las pruebas de esta sesión; el driver de teclas no es fiable (el juego tarda
+  ~2 min desde que aparece la ventana hasta que acepta input, y las pulsaciones caían en el título),
+  así que ese extremo hay que confirmarlo a mano antes de sacar conclusiones.
+- El camino de la vía 3 sigue siendo el mismo: enganchar el resolutor y devolver un objeto propio
+  para el cid nuevo, o clonar el objeto de la 36 (misma forma) al arrancar.
