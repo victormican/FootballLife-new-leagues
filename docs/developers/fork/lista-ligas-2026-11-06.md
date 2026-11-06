@@ -164,3 +164,8 @@ el mismo byte bajo que tienen entradas: son los que el motor mete en la misma li
 > Especial Colombia, 30 clubes) son **ligas sin slot (-1)**, no seleccionables, y se **quitan**.
 > Se queda el cid **366** "Primera C Colombia" (87 clubes, slot 246). Total reconstruido: **152
 > ligas**. Al quitarlas se borran su fila de competicion, sus regulaciones y sus entradas.
+
+> Matiz (2026-11-06): de las 5 lineas que no estan en el handoff, **solo 3 son ligas nuestras**
+> (Otros Concacaf 221/247, Otros OFC 382/248 y Primera C Colombia 366/246). Las otras dos,
+> **Jupiler Pro League (cid 111)** y **Liga Profesional de Futbol (cid 22)**, son competiciones
+> **del juego**: lo que anadimos fue su linea de mundo (slot y clubes), no la competicion.

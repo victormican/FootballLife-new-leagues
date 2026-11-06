@@ -108,8 +108,12 @@ de 91 ligas y 0 copas). En el disco no queda copia de nuestras tablas (la mayor 
 ## 7. Reconstrucción en la instalación limpia (orden)
 
 1. Base: instalar el **handoff de Matozanato** (`handoff-matozanato-20261104`) → 149 ligas, 168 copas.
-2. Quitar las dos ligas sin slot (cid 92 y 65) y añadir las 5 nuestras con `add_*`/`leaguebuilder`
-   → **152 ligas** (149 del handoff − 2 + 5).
+2. Quitar las dos ligas sin slot (cid 92 y 65) y añadir:
+   - **3 nuestras**: Otros Concacaf (221/247, 58), Otros OFC (382/248, 48) y Primera C Colombia
+     (366/246, 87);
+   - **2 líneas de competiciones del juego** (no son nuestras, solo se les da línea de mundo):
+     Jupiler Pro League (cid 111, slot 84) y Liga Profesional de Fútbol (cid 22, slot 245).
+   → **152 ligas** (149 del handoff − 2 + 5 líneas, de las que 3 son ligas nuevas nuestras).
 3. Copas: `mk_conf_cups.py` (continentales), `mk_regional_cups.py` (las 14), `dup_cups_groups.py`
    (menú de copas), una copa + supercopa por país.
 4. `mkslots.py` (750), `cid16_migrate.py` (cids altos), `fix_cid2_entries.py` (copa 2).
