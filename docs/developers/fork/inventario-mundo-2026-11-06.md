@@ -37,10 +37,11 @@ Extras:
 ## 3. Copas (286 líneas `ccup`)
 
 - **Del juego, intactas**: 91 competiciones originales (no se pisó ninguna).
-- **Ojo con los nombres**: los cid **92** y **65** son **ligas**, no copas: *Primera C Colombia*
-  y *Primera C Especial Colombia* (en el world file venían como "Copa Colombia" y "Copa Especial
-  Colombia", sin slot). La única copa metida en una línea `league` es *Liechtensteiner Cup* (94).
-  Además el cid **366** también se llama "Primera C Colombia": hay dos con el mismo nombre.
+- **Decisión (2026-11-06)**: las dos ligas **sin slot (-1)** se quitan:
+  *Primera C Colombia* (cid **92**, 48 clubes) y *Primera C Especial Colombia* (cid **65**, 30
+  clubes), no seleccionables. Se queda *Primera C Colombia* del cid **366** (87 clubes, slot 246).
+  El mundo reconstruido tendrá **152 ligas**; al quitarlas se borran también sus regulaciones y
+  entradas. La única copa metida en una línea `league` es *Liechtensteiner Cup* (94).
 - **14 copas regionales nuevas** (creadas con `mk_regional_cups.py`, eliminatoria con byes):
 
 | copa | cid | equipos | tipo |
@@ -107,7 +108,8 @@ de 91 ligas y 0 copas). En el disco no queda copia de nuestras tablas (la mayor 
 ## 7. Reconstrucción en la instalación limpia (orden)
 
 1. Base: instalar el **handoff de Matozanato** (`handoff-matozanato-20261104`) → 149 ligas, 168 copas.
-2. Añadir las ligas que faltan hasta 154 (las 5 nuestras) con `add_*`/`leaguebuilder`.
+2. Quitar las dos ligas sin slot (cid 92 y 65) y añadir las 5 nuestras con `add_*`/`leaguebuilder`
+   → **152 ligas** (149 del handoff − 2 + 5).
 3. Copas: `mk_conf_cups.py` (continentales), `mk_regional_cups.py` (las 14), `dup_cups_groups.py`
    (menú de copas), una copa + supercopa por país.
 4. `mkslots.py` (750), `cid16_migrate.py` (cids altos), `fix_cid2_entries.py` (copa 2).
