@@ -69,3 +69,44 @@ Para usarlo hay que darle **solo la sección de código** (`.trace`, 38 MB, VA 0
 - Enlazar el editor del juego (`MenuEditLgCp*`) con las tablas que escribe: si el juego deja
   editar nombre/emblema/equipos de una competición, esa es la vía para que lo insertado quede
   "como lo suyo" (y para ver qué campos mira antes de listarlo).
+
+## Constructores y el mito del fichero de menú (2026-11-06, tarde)
+
+Con `tools/vtable_xrefs.py` (busca el `lea`/`mov imm64` que guarda cada vtable) salen los
+constructores:
+
+| clase | vtable | constructor |
+|---|---|---|
+| `MenuModeCupSelect` | 0x142692c40 | 0x140b1c6xx (destructor 0x140b1c810 al lado) |
+| `MenuEditMenu` | 0x1426f79f0 | 0x140c26ac0 |
+| `MenuEditLgCpMain` | 0x1426ef848 | **0x140c18dd0** |
+| `TeamSelectCommon` | 0x14271c8c8 | 0x140c92eex |
+
+`MenuEditLgCpMain` (0x140c18dd0): llama a la base (0x140e38940), guarda sus vtable en `[this]` y
+`[this+0x70]`, pone `[this+0x90]=0`, y **solo carga dos assets**:
+
+```
+lea rax, "cpk_data/common/menu/mode/editSettingList.bin"
+lea rax, "editSettingList"
+call 0x140e3ef30 / 0x140e3f0e0
+```
+
+Ese `.bin` **no es la lista de ítems**: extraído de `dt11_x64.cpk` (`tools/cpkread.py`) y
+descomprimido (WESYS) es un paquete de texturas `TXP2` (`afp_editSettingList.apk`). Lo mismo pasa
+con `modeMainMenu.bin`, `editTeamInfo.bin` y `editLeagueOrganizeMenu.bin`: todos son `afp_*.apk`
+(atlas de texturas).
+
+Conclusión: los ítems de los menús **no están en datos**: se construyen en código, y los `.bin` de
+`common/menu/mode` son solo su arte. Así que "de arriba abajo" hay que sacarlo de los métodos
+virtuales de cada clase (init/enter), no de un fichero.
+
+## Cómo seguir con el menú Editar
+
+1. Localizar en cada `MenuEdit*` su slot de inicialización (el que añade ítems: en la Copa es
+   `+0xd8`; en las demás clases hay que mirar los slots propios, los que no son la base común
+   `+0x00..+0x50`).
+2. Desensamblar ese método con capstone (rápido) o con Ghidra sobre la **sección `.trace` sola**
+   (38 MB) como `raw-binary`, que evita el timeout de los 438 MB.
+3. Los ítems se añaden con llamadas que llevan un id de texto; el id se resuelve contra la tabla de
+   textos del juego, que es la que da el rótulo ("Nombre", "Emblema", "Organizar"...).
+
