@@ -164,3 +164,32 @@ así que **hay que reiniciar OpenCode** para que REA lo vea; el CLI (`rea list-f
   así que ese extremo hay que confirmarlo a mano antes de sacar conclusiones.
 - El camino de la vía 3 sigue siendo el mismo: enganchar el resolutor y devolver un objeto propio
   para el cid nuevo, o clonar el objeto de la 36 (misma forma) al arrancar.
+
+## El id de la regulacion: por que no arranca (2026-11-06, tarde)
+
+Los equipos **no** son el problema. Leidos en caliente con `rec_probe.js` (mismas funciones que usa
+el filtro del handler: `owner()` 0x14b6a60, `findrec` 0x14bc860) el campo `+0x30c & 0x7f` da el
+numero de clubes:
+
+| regulacion | copa | clubes |
+|---|---|---|
+| 46 | 36 (Mundial de Clubes) | 14 |
+| 42 | 33 | 16 |
+| 48 | 37 | 16 |
+| 41 | 33 (grupos) | 24 |
+| 47 | 37 (grupos) | 32 |
+| **317** | **131 (la nuestra)** | **16** |
+
+La nuestra tiene 16 clubes, igual que las del juego. El problema es **el id**:
+
+- `tools/datecave.py` genera el stub de fechas con `cmp eax, 256 ; jae big`: los ids **256 o
+  mayores** caen en `big`, que da el **calendario de liga** (38 fechas), nunca el de copa.
+- `tools/patchset.py --cup-keys` solo admite **1..255** (`datecave` aborta con "regulation id %d is
+  outside the stub's table (1..255)"; `cup_patches` acepta 1..175 para el byte de caso).
+- Nuestra copa es la **regulacion 317**: por definicion no puede llevar calendario de copa. En
+  temporada el DLL le pasa las fechas a mano (`dates 317 like=122`), pero en Kick Off ese
+  hand-over no corre.
+
+Arreglo: nacer con una regulacion **<= 255** (banda libre 176..255; la doc ya probo la 200 con el
+byte `0x10`) y regenerar `fl26caps` con `--cup-keys 200`, o clonar una copa nativa (la 36), que es
+lo unico que hoy llega a iniciar partido.
