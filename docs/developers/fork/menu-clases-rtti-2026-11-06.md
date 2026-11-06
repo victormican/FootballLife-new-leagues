@@ -101,7 +101,6 @@ Conclusión: los ítems de los menús **no están en datos**: se construyen en c
 virtuales de cada clase (init/enter), no de un fichero.
 
 ## Cómo seguir con el menú Editar
-
 1. Localizar en cada `MenuEdit*` su slot de inicialización (el que añade ítems: en la Copa es
    `+0xd8`; en las demás clases hay que mirar los slots propios, los que no son la base común
    `+0x00..+0x50`).
@@ -109,4 +108,27 @@ virtuales de cada clase (init/enter), no de un fichero.
    (38 MB) como `raw-binary`, que evita el timeout de los 438 MB.
 3. Los ítems se añaden con llamadas que llevan un id de texto; el id se resuelve contra la tabla de
    textos del juego, que es la que da el rótulo ("Nombre", "Emblema", "Organizar"...).
+
+## El menú Liga: la misma máquina que la Copa (2026-11-06)
+
+| clase | vtable | `+0x18` | `+0x58` | `+0xd8` |
+|---|---|---|---|---|
+| `MenuModeCupSelect` | 0x142692c40 | 0x140b1c8c0 | **0x140e43450** | **0x140b1c990** |
+| `MenuModeLeagueSelect` | 0x1426745e8 | 0x140ac3050 | **0x140e43450** | **0x140b3be30** |
+| `MenuModeLeagueSelectStart` | 0x142674860 | 0x140ac30a0 | **0x140e43450** | 0x140ac32e0 |
+| `MenuModeLeagueSelectCategory` | 0x142677860 | 0x140accc00 | **0x140e43450** | 0x140accce0 |
+| `MenuModeCompeSelect` | 0x14268cd40 | 0x140b08a50 | **0x140e43450** | 0x140b08b70 |
+| `MenuModeCompeSelectBase` | 0x142716088 | 0x140c6b2d0 | **0x140e43450** | 0x140c6bb50 |
+
+Lo importante: **`+0x58` es el mismo enter para todos** (0x140e43450) y **`+0xd8` es el que
+construye la lista** de cada modo. O sea:
+
+- el hook del DLL en `+0xd8` no es "de la copa": es el mismo punto que usa el menú Liga (y los
+  CompeSelect de Master League). Sirve igual para inyectar filas en Liga.
+- el enter (0x140e43450) es común: llama al `+0xd8` y, si devuelve ≠0, recorre filas
+  (`[this+0x88]`, 0x50 B cada una), llama a 0x140e3f4c0 y cambia de modo. Por eso el
+  comportamiento raro al entrar (volver al menú, morir) es el mismo en Copa y en Liga.
+- `+0x120/0x128/0x130` son los otros métodos propios (transición, teardown, etc.).
+
+## Cómo seguir con el menú Editar
 
