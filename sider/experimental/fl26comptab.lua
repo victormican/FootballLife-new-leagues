@@ -189,11 +189,20 @@ local KICKORDER = {}
 -- The cup lines' regulation ids: Kick Off > Cup looks a competition up in the parameter table by
 -- its regulation id, and a competition with no row there falls back to row 0 -- every cup of ours
 -- showed "FIFA Club World Cup" and had no draw size (2026-11-04).  One row per cup fixes that.
--- 2026-11-06: the row used to sit on slot 123 (the "none" sentinel): opening the cup list then
--- read the slot's data and crashed (memcpy from 0x00000d70, Access Violation 0x1403fef5f).  A
--- real, free slot of the parameter table is used instead (slot 22 is in the shipped free list).
-local CUP_SLOT = 123   -- el 22 repetido hace que comptab aborte la tabla entera
+-- The row stays on the hidden 123 sentinel.  Measured 2026-11-06, with the row on a REAL slot:
+--   * slot 123: the list builds (CUPAFTER shows our cid) and the game closes when the cup is
+--     picked -- a jump to 0x161efa600, i.e. through the slot's competition object, which is null;
+--   * slot 22 (free, real): the screen reads the slot's data while building the list and closes
+--     in the same place, before CUPAFTER is even logged (0xc0000005 at 0x161efa600);
+--   * slots 128..749 (fl26slots750 range): the list never builds either (0xc0000005 at
+--     0x141ae48ae, a map lookup of the slot's competition).
+-- So a real slot is not the answer: the Cup menu needs the per-slot competition object the game
+-- builds at boot for shipped competitions, and a competition of ours has none.  Listed but not
+-- openable is where an added cup stands in Kick Off > Cup.
+local CUP_SLOT = 123
 local WORLD_CUPS = {}
+-- the cup ids whose row is a cup row of ours: they may share CUP_SLOT with one another
+local CUPROWS = {}
 
 local function read_world(ctx)
   local sep = string.char(92)
@@ -242,6 +251,7 @@ local function apply_world(world)
   local inworld = {}
   for _, L in ipairs(world) do inworld[L.id] = L end
   OUR_IDS, RESLOT, APPEND, COUNTS, SHIPPED_DEMOTE, ID_COUNTRY = {}, {}, {}, {}, {}, {}
+  CUPROWS = {}
   local reshape = {}
   for id, spec in pairs(RESHAPE) do
     local L = inworld[id]
@@ -604,16 +614,19 @@ function m.init(ctx)
       ours[id] = true
     end
   end
-  -- 2a-bis. a hidden row per cup of the world (slot 123): Kick Off > Cup resolves a competition
-  -- through this table by its regulation id, so without a row every cup of ours landed on row 0.
+  -- 2a-bis. a row per cup of the world (CUP_SLOT, the hidden 123 sentinel -- why not a real slot,
+  -- see above).  Kick Off > Cup resolves a competition through this table by its regulation id,
+  -- so without a row every cup of ours landed on row 0.  CUPROWS marks them so the slot checks
+  -- below let them share the sentinel instead of aborting the whole table.
   do
     local made = 0
     for _, id in ipairs(WORLD_CUPS) do
       if not byid[id] then
         local cup_tmpl = rows[byid[CUP_TEMPLATE_ID]] or tmpl
-      rows[#rows + 1] = row_set(row_set(cup_tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(CUP_SLOT))
+        rows[#rows + 1] = row_set(row_set(cup_tmpl, OFF_ID, u32le(id)), OFF_SLOT, u32le(CUP_SLOT))
         byid[id] = #rows
         ours[id] = true
+        CUPROWS[id] = true
         made = made + 1
       end
     end
@@ -682,8 +695,12 @@ function m.init(ctx)
             log(string.format("fl26comptab: slot %d is already competition %d, not free -- aborting", sl, taken[sl]))
             clash = true
           elseif mine[sl] then
-            log(string.format("fl26comptab: slot %d asked for twice, by %d and %d -- aborting", sl, mine[sl], id))
-            clash = true
+            if CUPROWS[id] and CUPROWS[mine[sl]] then
+              -- the world's cups share one slot on purpose (2a-bis)
+            else
+              log(string.format("fl26comptab: slot %d asked for twice, by %d and %d -- aborting", sl, mine[sl], id))
+              clash = true
+            end
           end
           mine[sl] = id
         end
