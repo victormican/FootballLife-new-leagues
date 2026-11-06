@@ -85,3 +85,23 @@ el DLL lea al arrancar.
 2. **`fl26layout.h`**: generarlo con `tools/mklayout.py` desde `patches/layout.json` + las firmas,
    y compilar `fl26swiss.c` con esos valores.
 3. **Recompilar y probar**: cargar, abrir Copa, ver sorteo con tamaño y formato, jugar un partido.
+
+## Lo aprendido con la copa a mano (2026-11-06, tarde)
+
+- **La copa se lista, muestra tamano, deja elegir equipos y se sortea** con `ccup 200 ko=200 groups=0 cid=50 like=23 entry=...`.
+- **El nombre que pinta el juego no sale de nuestra fila**: con cid 50 la lista mostro "Bundesliga",
+  que es lo que el ejecutable tiene en su tabla fija de competiciones para ese id. Nuestra fila de
+  `Competition.bin` dice `FL_CTEST` / "Copa Test" y la regulacion tambien: el juego no la usa para
+  el nombre de la copa.
+- **Las fechas**: el stub de `datecave.py` solo indexa ids **1..255** (`0x00..0x06` liga,
+  `0x10..0x16` copa de 16). Un id 300 no se puede fechar nunca; con 200 se puede, poniendo su byte
+  de tabla a `0x10`.
+- Conclusion: una copa hecha a mano **no puede quedar completa** (nombre, reglas, info, fechas)
+  porque esas capas las escribe el constructor del mundo (`leaguebuilder` + `patchset`) para cada
+  id. La copa tiene que nacer del plan del mundo, no de un mundo minimo.
+
+## Lo que si quedo probado
+
+- Clonar una copa **nativa** (id del juego, p. ej. la africana cid 36) con nuestro nombre y equipos
+  **llega a iniciar el partido**. Es la prueba de que el motor juega la copa cuando tiene todas las
+  capas; el camino bueno es que nuestro id las tenga tambien (constructor del mundo).
