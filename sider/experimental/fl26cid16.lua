@@ -201,9 +201,10 @@ function m.init(ctx)
   local list_stub = bin("0fb66808" .. "440fb6400b" .. "41c1e008" .. "4409c5" .. "89ea")
   local back4 = rel32(cv + 0x3000 + #list_stub + 5, LIST1_NEXT)
   local j4 = rel32(LIST1 + 5, cv + 0x3000)
-  local cmp_stub = bin("0fb75308" .. "c1ea06" .. "6639ea")
-  local ne = rel32(cv + 0x3040 + 16, LIST2_SKIP)
-  local jp = rel32(cv + 0x3040 + 21, LIST2_ADD)
+  -- la entrada tambien lleva el cid en su propia fila: byte[+8] | byte[+0x0b] << 8
+  local cmp_stub = bin("0fb65008" .. "440fb6400b" .. "41c1e008" .. "4409c2" .. "6639ea")
+  local ne = rel32(cv + 0x3040 + #cmp_stub + 6, LIST2_SKIP)
+  local jp = rel32(cv + 0x3040 + #cmp_stub + 11, LIST2_ADD)
   local j5 = rel32(LIST2 + 5, cv + 0x3040)
   if not back4 or not j4 or not ne or not jp or not j5 then
     log("fl26cid16: list cave out of range"); return
