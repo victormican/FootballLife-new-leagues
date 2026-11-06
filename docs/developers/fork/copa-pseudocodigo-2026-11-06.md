@@ -205,6 +205,19 @@ El cuadro de eliminatoria no se sortea: se llena con los ganadores de la fase an
 
 ---
 
+## 8. Lo medido en juego (2026-11-06, noche)
+
+- **Copa propia** (cid 50, reg 200, 16 equipos): entra en el menú y **no muere**, pero el juego
+  **no pregunta fechas** (`DATESTUB id=200`: 0 llamadas) y **no llama al sorteo** (`DRAW`: 0).
+  O sea: se pinta la pantalla, pero el flujo no genera cuadro ni calendario para un cid nuevo.
+- **Clon de la 36** (cid nativo, nuestros 16 equipos y nuestro nombre): con el stack de módulos
+  **apagado**, hace **sorteo, genera partidos y avanza**. Con el stack encendido **no arranca**.
+- Conclusión provisional: el flujo de Kick Off construye cuadro/calendario **solo para cids que el
+  juego ya conoce al arrancar**; y algo de nuestro stack rompe incluso el cid nativo.
+- Sospechoso nº1 del stack: el handler que reescribe la lista de copas (`+0xd8`, fl26swiss) al
+  quitar las copas de grupos >32; después, `fl26caps` (fechas) y los módulos de paridad.
+- Siguiente: bisect del stack módulo a módulo, y el pseudo-código de Ghidra del enter/sorteo.
+
 ## 7. Nuestro uso
 
 ```
