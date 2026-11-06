@@ -131,6 +131,190 @@ static void logf(const char* fmt, ...)
   memcpy(g_log + g_log_len, line, n); g_log_len += n; g_log[g_log_len++] = '\n';
 }
 
+/* ---- crash recorder (2026-11-06) ----
+   Kick Off > Cup lists a cup of the world and the game closes when it is picked: a jump through
+   a pointer to 0x161efa600, outside every module.  A vectored handler runs before the game's own
+   SEH, so it sees the fault first and can say where it happened: the faulting rip, the address
+   touched, the registers and the return addresses on the stack, each as base+offset (the exe is
+   the same every run).  It never swallows the exception (EXCEPTION_CONTINUE_SEARCH): the game
+   dies exactly as before.  The lines go to the DLL's own log AND to fl26swiss-crash.log next to
+   the DLL, because the Lua loader only drains the log when the game loads a file and a crash
+   gives it no chance. */
+static char g_crash_path[320];
+
+static void crash_line(const char* s)
+{
+  HANDLE f;
+  DWORD wrote = 0;
+  if (!g_crash_path[0]) return;
+  f = CreateFileA(g_crash_path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                  NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (f == INVALID_HANDLE_VALUE) return;
+  WriteFile(f, s, (DWORD)strlen(s), &wrote, NULL);
+  WriteFile(f, "\r\n", 2, &wrote, NULL);
+  CloseHandle(f);
+}
+
+static void clogf(const char* fmt, ...)
+{
+  char line[700];
+  va_list ap;
+  int n;
+  va_start(ap, fmt);
+  n = vsnprintf(line, sizeof line, fmt, ap);
+  va_end(ap);
+  if (n <= 0) return;
+  if (n >= (int)sizeof line) n = sizeof line - 1;
+  line[n] = 0;
+  crash_line(line);
+  logf("%s", line);
+}
+
+static unsigned long long rel(uint64_t v)
+{
+  return (unsigned long long)(v >= g_base ? v - g_base : v);
+}
+
+static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
+{
+  static volatile LONG seen = 0;
+  CONTEXT* c;
+  DWORD code;
+  ULONG_PTR at = 0;
+  void* frames[32];
+  USHORT nf = 0, i;
+  char buf[700];
+  int j;
+
+  if (!ep || !ep->ExceptionRecord || !ep->ContextRecord) return EXCEPTION_CONTINUE_SEARCH;
+  code = ep->ExceptionRecord->ExceptionCode;
+  if (code != EXCEPTION_ACCESS_VIOLATION && code != EXCEPTION_ILLEGAL_INSTRUCTION &&
+      code != EXCEPTION_PRIV_INSTRUCTION && code != EXCEPTION_INT_DIVIDE_BY_ZERO &&
+      code != EXCEPTION_STACK_OVERFLOW) return EXCEPTION_CONTINUE_SEARCH;
+  if (InterlockedIncrement(&seen) > 4) return EXCEPTION_CONTINUE_SEARCH;
+
+  c = ep->ContextRecord;
+  if (ep->ExceptionRecord->NumberParameters > 1)
+    at = (ULONG_PTR)ep->ExceptionRecord->ExceptionInformation[1];
+
+  clogf("fl26swiss: CRASH #%ld code %08lx rip %llx (base+%llx) touched %llx (base+%llx) info %llx",
+        (long)seen, (unsigned long)code,
+        (unsigned long long)c->Rip, rel(c->Rip),
+        (unsigned long long)at, rel((uint64_t)at),
+        (unsigned long long)(ep->ExceptionRecord->NumberParameters > 0
+                             ? ep->ExceptionRecord->ExceptionInformation[0] : 0));
+  /* what is at rip: is the page mapped, and what bytes are there? */
+  {
+    MEMORY_BASIC_INFORMATION mi;
+    SIZE_T q = VirtualQuery((void*)(uintptr_t)c->Rip, &mi, sizeof mi);
+    unsigned char code16[16] = { 0 };
+    SIZE_T got = 0;
+    if (q) clogf("  rip page state %lx protect %lx type %lx base %llx size %llx",
+                 (unsigned long)mi.State, (unsigned long)mi.Protect, (unsigned long)mi.Type,
+                 (unsigned long long)(uintptr_t)mi.BaseAddress,
+                 (unsigned long long)mi.RegionSize);
+    if (ReadProcessMemory(GetCurrentProcess(), (void*)(uintptr_t)c->Rip, code16, 16, &got) && got == 16)
+      clogf("  rip bytes %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+            code16[0], code16[1], code16[2], code16[3], code16[4], code16[5], code16[6], code16[7],
+            code16[8], code16[9], code16[10], code16[11], code16[12], code16[13], code16[14], code16[15]);
+    else
+      clogf("  rip bytes unreadable");
+  }
+  /* the object the menu was working with: rcx and rdi, 24 qwords each */  {
+    uint64_t obj[24];
+    SIZE_T got = 0;
+    if (ReadProcessMemory(GetCurrentProcess(), (void*)(uintptr_t)c->Rcx, obj, sizeof obj, &got) && got == sizeof obj) {
+      for (j = 0; j < 24; j += 4)
+        clogf("  rcx+%02x %llx %llx %llx %llx", 0,
+              (unsigned long long)obj[j], (unsigned long long)obj[j+1],
+              (unsigned long long)obj[j+2], (unsigned long long)obj[j+3]);
+    } else {
+      clogf("  rcx %llx unreadable", (unsigned long long)c->Rcx);
+    }
+    if (c->Rdi != c->Rcx &&
+        ReadProcessMemory(GetCurrentProcess(), (void*)(uintptr_t)c->Rdi, obj, sizeof obj, &got) && got == sizeof obj) {
+      for (j = 0; j < 24; j += 4)
+        clogf("  rdi+%02x %llx %llx %llx %llx", 0,
+              (unsigned long long)obj[j], (unsigned long long)obj[j+1],
+              (unsigned long long)obj[j+2], (unsigned long long)obj[j+3]);
+    }
+  }
+  /* rax looked like the cup menu's vtable (0x142692c40): which of its slots leave the module? */
+  {
+    uint64_t vt[32];
+    SIZE_T got = 0;
+    if (ReadProcessMemory(GetCurrentProcess(), (void*)(uintptr_t)c->Rax, vt, sizeof vt, &got) && got == sizeof vt) {
+      for (j = 0; j < 32; j += 4)
+        clogf("  rax+%02x %llx %llx %llx %llx", j * 8,
+              (unsigned long long)vt[j], (unsigned long long)vt[j+1],
+              (unsigned long long)vt[j+2], (unsigned long long)vt[j+3]);
+    }
+  }
+  /* the first access violation says whether it was a read (0) or a write (1) and the address */
+  if (code == EXCEPTION_ACCESS_VIOLATION && ep->ExceptionRecord->NumberParameters > 0)
+    clogf("  access %s",
+          ep->ExceptionRecord->ExceptionInformation[0] ? "write" : "read");
+  clogf("  rax %llx rbx %llx rcx %llx rdx %llx",
+        (unsigned long long)c->Rax, (unsigned long long)c->Rbx,
+        (unsigned long long)c->Rcx, (unsigned long long)c->Rdx);
+  clogf("  rsi %llx rdi %llx rbp %llx rsp %llx",
+        (unsigned long long)c->Rsi, (unsigned long long)c->Rdi,
+        (unsigned long long)c->Rbp, (unsigned long long)c->Rsp);
+  clogf("  r8 %llx r9 %llx r10 %llx r11 %llx",
+        (unsigned long long)c->R8, (unsigned long long)c->R9,
+        (unsigned long long)c->R10, (unsigned long long)c->R11);
+  clogf("  r12 %llx r13 %llx r14 %llx r15 %llx",
+        (unsigned long long)c->R12, (unsigned long long)c->R13,
+        (unsigned long long)c->R14, (unsigned long long)c->R15);
+
+  nf = RtlCaptureStackBackTrace(0, 32, frames, NULL);
+  for (i = 0; i < nf; i += 4) {
+    size_t k = 0;
+    buf[0] = 0;
+    for (j = (int)i; j < (int)nf && j < (int)i + 4; j++) {
+      uint64_t f = (uint64_t)(uintptr_t)frames[j];
+      int w = snprintf(buf + k, sizeof buf - k, " %llx(+%llx)",
+                       (unsigned long long)f, rel(f));
+      if (w <= 0) break;
+      k += (size_t)w;
+      if (k >= sizeof buf) break;
+    }
+    clogf("  stack%s", buf);
+  }
+  /* the stack of the faulting frame itself: the return address of the indirect call sits in it,
+     and so do the arguments of whatever called it.  ReadProcessMemory never faults. */
+  for (i = 0; i < 32; i += 4) {
+    size_t k = 0;
+    buf[0] = 0;
+    for (j = (int)i; j < (int)i + 4; j++) {
+      uint64_t v = 0;
+      SIZE_T got = 0;
+      if (!ReadProcessMemory(GetCurrentProcess(),
+                             (void*)(uintptr_t)(c->Rsp + (uint64_t)j * 8), &v, 8, &got)
+          || got != 8) v = 0;
+      {
+        int w = snprintf(buf + k, sizeof buf - k, " %llx(+%llx)",
+                         (unsigned long long)v, rel(v));
+        if (w <= 0) break;
+        k += (size_t)w;
+        if (k >= sizeof buf) break;
+      }
+    }
+    clogf("  rsp+%02x%s", (unsigned)i * 8, buf);
+  }
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static int crash_install(void)
+{
+  if (!AddVectoredExceptionHandler(1, crash_handler)) {
+    logf("fl26swiss: crash recorder NOT installed");
+    return 1;
+  }
+  logf("fl26swiss: crash recorder live (fl26swiss-crash.log)");
+  return 0;
+}
+
 static int ours(uint16_t reg)
 {
   for (int i = 0; i < g_nreg; i++) if (g_reg[i] == reg) return 1;
@@ -12458,8 +12642,19 @@ __declspec(dllexport) int fl26_swiss_cup_cids(const uint16_t* v, int n)
 
 char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
 {
+  /* CUPTRACE: the menu goes black with the cursor on the cup list, and the DLL's own log is only
+     drained when the game loads a file -- during a menu it never drains.  The traces go straight
+     to fl26swiss-crash.log (clogf writes there and to the log) so the last line names the step
+     that hangs (2026-11-06). */
+  clogf("fl26swiss: CUPTRACE enter self=%p a=%llx b=%llx c=%llx", (void*)self,
+        (unsigned long long)a, (unsigned long long)b, (unsigned long long)c);
+  clogf("fl26swiss: CUPTRACE self+90=%p +98=%p +a0=%p +88=%p +00=%p",
+        (void*)*(void**)(self + 0x90), (void*)*(void**)(self + 0x98),
+        (void*)*(void**)(self + 0xa0), (void*)*(void**)(self + 0x88),
+        (void*)*(void**)self);
   logf("fl26swiss: CUPIN handler self=%p a=%llx b=%llx c=%llx", (void*)self, (unsigned long long)a, (unsigned long long)b, (unsigned long long)c);
   regcid_fix();
+  clogf("fl26swiss: CUPTRACE regcid_fix done");
   unsigned char** pb = (unsigned char**)(self + 0x90);
   unsigned char** pe = (unsigned char**)(self + 0x98);
   unsigned char* w = *pb;
@@ -12479,6 +12674,8 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
     w += 12;
   }
   if (gone) *pe = w;
+  clogf("fl26swiss: CUPTRACE filter done gone=%d items=%u", gone,
+        (unsigned)(*pb && w >= *pb ? (size_t)(w - *pb) / 12 : 0));
   /* add the world's own cups, if the vector has room; an entry is the 12 bytes of an existing
      one with its competition id replaced, so the menu's name/logo lookup still has a template */
   {
@@ -12496,7 +12693,9 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
        is released only when it is not the array inside the object. */
     if (g_ncupcid > 0 && room < have + (size_t)g_ncupcid) {
       size_t want = have + (size_t)g_ncupcid + 16;
+      clogf("fl26swiss: CUPTRACE grow begin want=%u bytes=%u", (unsigned)want, (unsigned)(want * 12));
       unsigned char* big = (unsigned char*)fl_pool_alloc(CUPSEL_POOL, want * 12);
+      clogf("fl26swiss: CUPTRACE grow alloc=%p", (void*)big);
       if (big) {
         unsigned char* old = *pb;
         if (have) memcpy(big, old, have * 12);
@@ -12514,6 +12713,7 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
       }
     }
     int added = 0, short_ = 0;
+    clogf("fl26swiss: CUPTRACE add begin have=%u room=%u ncupcid=%d", (unsigned)have, (unsigned)room, g_ncupcid);
     /* 2026-11-04: the appended item copies 12 bytes of the first one -- cid at +0 plus two more
        fields the menu uses for the name/logo.  Dump them so we can see which one carries the
        name: the first item (the template, FIFA Club World Cup), every existing item, and ours. */
@@ -12558,13 +12758,17 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
       logf("fl26swiss: Cup mode -- %d world cup(s) added, %s (list %u of %u)", added,
            short_ ? "no room for the rest" : "all in", (unsigned)have, (unsigned)room);
     if (added) *pe = w;
+    clogf("fl26swiss: CUPTRACE add end added=%d short=%d items=%u", added, short_,
+          (unsigned)(*pb && w >= *pb ? (size_t)(w - *pb) / 12 : 0));
   }
   /* 2026-11-04: llamada normal en vez de salto en cola, para poder mirar lo que la lista y
      las filas quedan DESPUES de que el menu las construya.  Si los items siguen con su cid y
      la fila no muestra el nombre, el fallo esta en la resolucion; si el menu los reescribe,
      se vera aqui. */
   {
+    clogf("fl26swiss: CUPTRACE init call begin self=%p", (void*)self);
     char r0 = ((cupsel_fn)(uintptr_t)(g_base + CUPSEL_INIT_RVA))(self, a, b, c);
+    clogf("fl26swiss: CUPTRACE init call returned %d", (int)r0);
     unsigned char* b0 = *(unsigned char**)(self + 0x90);
     unsigned char* e0 = *(unsigned char**)(self + 0x98);
     int n0 = (b0 && e0 > b0 && blk_readable(b0, (size_t)(e0 - b0))) ? (int)((e0 - b0) / 12) : 0;
@@ -14284,6 +14488,7 @@ __declspec(dllexport) int fl26_swiss_install(uint64_t exe_base, const uint16_t* 
 {
   if (!regs || nregs < 1 || nregs > MAX_REGS) return 9;
   g_base = exe_base;
+  crash_install();
   /* FL27: set_clubs starts with SmokePatch's jmp -- their league phase for the Champions and
      Europa League, so 1027 / 1029 are not ours to schedule (see g_native_uefa). fl26chain loads
      first and puts its own jmp in front of theirs (in game, 31.10.), so their other hook of the
@@ -14553,5 +14758,21 @@ __declspec(dllexport) void fl26_swiss_stats(uint32_t* out5)
   for (int i = 0; i < 5; i++) out5[i] = g_stat[i];
 }
 
-BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r) { (void)h;(void)reason;(void)r; return TRUE; }
+/* the crash log lives next to the DLL: SiderAddons\modules\fl26swiss-crash.log */
+BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
+{
+  (void)r;
+  if (reason == DLL_PROCESS_ATTACH) {
+    DWORD n = GetModuleFileNameA(h, g_crash_path, (DWORD)sizeof g_crash_path - 32);
+    if (n > 0 && n < sizeof g_crash_path - 32) {
+      while (n > 0 && g_crash_path[n - 1] != '\\' && g_crash_path[n - 1] != '/') n--;
+      if (n > 0) snprintf(g_crash_path + n, sizeof g_crash_path - n, "fl26swiss-crash.log");
+      else g_crash_path[0] = 0;
+    } else {
+      g_crash_path[0] = 0;
+    }
+  }
+  return TRUE;
+}
+
 
