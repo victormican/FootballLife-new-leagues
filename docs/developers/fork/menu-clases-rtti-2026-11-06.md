@@ -202,5 +202,28 @@ Consecuencia práctica: lo aprendido de la lista de la Copa (items de 12 B, reso
 filas en `+0x88`) se aplica **igual** a Liga y a Liga Master, cambiando solo el `+0xd8` de la
 clase que se quiera tocar.
 
+## Select Team: la misma regla (2026-11-06)
+
+| clase | vtable | `+0x18` | `+0x58` | `+0xd8` | `+0x120` |
+|---|---|---|---|---|---|
+| `TeamSelectCommon` | 0x14271c8c8 | 0x140c93200 | 0x140e43450 | 0x140c95420 | 0x140e3f520 |
+| `TeamSelectMatchBase` | 0x14271fb68 | 0x140c9f210 | 0x140e43450 | 0x140c9f520 | 0x141794410 |
+| `TeamSelectExhibition` | 0x1426833e8 | 0x140aeb1e0 | 0x140e43450 | **0x140c9f520** | 0x140aeb830 |
+| `TeamSelectSingle` | 0x14271d050 | 0x140c98390 | 0x140e43450 | 0x140c985b0 | 0x140e3f520 |
+| `TeamSelectSingleSearch` | 0x14271d8c8 | 0x140c99740 | 0x140e43450 | 0x140c99860 | 0x140e3f520 |
+| `TeamSelectDefaultTeamML` | 0x14271e138 | 0x140c9a450 | 0x140e43450 | **0x140c985b0** | 0x140e3f520 |
+| `MatchTeamSelectTraining` | 0x14271d470 | 0x140c99560 | 0x140e43450 | **0x140c9f520** | 0x140aeb830 |
+
+Detalles útiles:
+
+- `TeamSelectExhibition` y `MatchTeamSelectTraining` **comparten** el constructor de lista de
+  `TeamSelectMatchBase` (0x140c9f520), y `TeamSelectDefaultTeamML` el de `TeamSelectSingle`
+  (0x140c985b0): la lista de equipos es la misma función y solo cambia lo que la envuelve.
+- `+0x120` distingue las variantes: 0x140e3f520 (base), 0x141794410 (sin transición propia),
+  0x140aeb830 (exhibición/entrenamiento).
+- Como el enter `+0x58` también es 0x140e43450, **el mismo punto de enganche del DLL sirve para
+  Select Team**: filtrar/añadir equipos es lo mismo que filtrar/añadir copas, con la lista en
+  `[this+0x90]` y las filas en `[this+0x88]`.
+
 ## Cómo seguir con el menú Editar
 
