@@ -182,10 +182,42 @@ function m.key_down(ctx, vkey)
   if vkey == 0x79 then drain("F10 report") end      -- F10
 end
 
+-- B294 (Pelda 30.10.): ctx.sider_dir is UTF-8, and LoadLibraryA reads a name in the system's
+-- code page: with the game in a folder named with a Czech u-ring, no DLL of ours loaded (error 126)
+-- and the leagues had no fixtures. LoadLibraryW takes any folder name. The wide calls are declared
+-- under this module's own names (as fl26slotnames does), so no other module's declaration can clash.
+local function load_dll(path)
+  local n = ffi.C.fl26joindll_MultiByteToWideChar(65001, 0, path, -1, nil, 0)
+  if n > 0 then
+    local w = ffi.new("uint16_t[?]", n)
+    ffi.C.fl26joindll_MultiByteToWideChar(65001, 0, path, -1, w, n)
+    local h = ffi.C.fl26joindll_LoadLibraryW(w)
+    if h ~= nil then return h end
+  end
+  return ffi.C.LoadLibraryA(path)
+end
+
+-- B294: a path the DLL opens itself (fopen) goes in the system's code page, the way it reads it;
+-- a name that code page cannot hold stays as it was
+local function ansi_path(path)
+  local n = ffi.C.fl26joindll_MultiByteToWideChar(65001, 0, path, -1, nil, 0)
+  if n <= 0 then return path end
+  local w = ffi.new("uint16_t[?]", n)
+  ffi.C.fl26joindll_MultiByteToWideChar(65001, 0, path, -1, w, n)
+  local k = ffi.C.fl26joindll_WideCharToMultiByte(0, 0, w, -1, nil, 0, nil, nil)
+  if k <= 0 then return path end
+  local a = ffi.new("char[?]", k)
+  ffi.C.fl26joindll_WideCharToMultiByte(0, 0, w, -1, a, k, nil, nil)
+  return ffi.string(a)
+end
+
 function m.init(ctx)
   if ffi == nil then log("fl26joindll: global ffi is nil -- set luajit.ext.enabled = 1 in sider.ini"); return end
   ffi.cdef([[
     void*    LoadLibraryA(const char*);
+    void*    fl26joindll_LoadLibraryW(const uint16_t*) __asm__("LoadLibraryW");
+    int      fl26joindll_MultiByteToWideChar(unsigned int, unsigned long, const char*, int, uint16_t*, int) __asm__("MultiByteToWideChar");
+    int      fl26joindll_WideCharToMultiByte(unsigned int, unsigned long, const uint16_t*, int, char*, int, const char*, int*) __asm__("WideCharToMultiByte");
     void*    GetProcAddress(void*, const char*);
     void*    GetModuleHandleA(const char*);
     unsigned long GetLastError(void);
@@ -195,6 +227,7 @@ function m.init(ctx)
     typedef void (*fl26_join_stats_t)(uint32_t*);
     typedef int  (*fl26_join_teardown_extra_t)(const uint16_t*, int);
     typedef int  (*fl26_join_calendar_t)(const uint16_t*, int);
+    typedef int  (*fl26_join_cal_pairs_t)(const uint16_t*, int);
     typedef int  (*fl26_join_builder_extra_t)(const uint16_t*, int);
     typedef int  (*fl26_join_builder_conf_t)(const uint16_t*, int);
     typedef int  (*fl26_join_season_types_t)(const uint8_t*, int);
@@ -211,7 +244,7 @@ function m.init(ctx)
   local sider_dir = ctx.sider_dir:gsub("[/" .. sep .. "]+$", "")
   local dllpath = sider_dir .. sep .. "modules" .. sep .. "fl26join.dll"
   local logpath = sider_dir .. sep .. "fl26join.log"
-  local h = ffi.C.LoadLibraryA(dllpath)
+  local h = load_dll(dllpath)
   if h == nil then
     log(string.format("fl26joindll: LoadLibraryA failed (err %d): %s -- is fl26join.dll next to this file in modules?",
                       tonumber(ffi.C.GetLastError()), dllpath)); return
@@ -298,7 +331,7 @@ function m.init(ctx)
   for i, v in ipairs(IDS) do idbuf[i - 1] = v end
 
   local base = ffi.cast("uint64_t", ffi.C.GetModuleHandleA(nil))
-  local status = tonumber(install(base, CAVE_VA, idbuf, #IDS, logpath))
+  local status = tonumber(install(base, CAVE_VA, idbuf, #IDS, ansi_path(logpath)))
   if status == 0 then
     log(string.format("fl26joindll: installed -- %d added leagues will be registered on the first registration day of the season; the DLL's own log is %s (F10 = counters)", #IDS, logpath))
 
@@ -362,6 +395,39 @@ function m.init(ctx)
         for i, v in ipairs(CAL) do cbuf[i - 1] = v end
         local n = tonumber(ffi.cast("fl26_join_calendar_t", pc)(cbuf, #CAL))
         log(string.format("fl26joindll: %d January-December league(s) close at New Year with their region", n))
+      end
+      -- B315: the pairs of them the DLL exchanges at New Year itself (in a region with no league
+      -- of the game's no season-end pass has them), upper pairs first; a split total is left out
+      local incal, byid = {}, {}
+      for _, v in ipairs(CAL) do incal[v] = true end
+      for _, L in ipairs(world or {}) do byid[L.id] = L end
+      local function depth(L)
+        local d, seen = 0, {}
+        while L and L.above and byid[L.above] and not seen[L.id] do seen[L.id] = true; L = byid[L.above]; d = d + 1 end
+        return d
+      end
+      local PAIRS = {}
+      for _, L in ipairs(world or {}) do
+        local U = L.above and byid[L.above]
+        if U and incal[L.id] and incal[U.id] and U.region == L.region and not (regular or {})[L.id] and not (regular or {})[U.id] then
+          local n = math.min(U.demote or 0, L.promote or 0)
+          if n > 0 then PAIRS[#PAIRS + 1] = { U.id, L.id, n, depth(U) } end
+        end
+      end
+      table.sort(PAIRS, function(a, b) return a[4] < b[4] end)
+      if #PAIRS > 0 then
+        local pp = ffi.C.GetProcAddress(h, "fl26_join_cal_pairs")
+        if pp == nil then log("fl26joindll: this fl26join.dll has no fl26_join_cal_pairs -- January-December leagues of a country of ours keep their clubs at New Year")
+        else
+          local pbuf = ffi.new("uint16_t[?]", 3 * #PAIRS)
+          local txt = {}
+          for i, e in ipairs(PAIRS) do
+            pbuf[3 * i - 3] = e[1]; pbuf[3 * i - 2] = e[2]; pbuf[3 * i - 1] = e[3]
+            txt[#txt + 1] = string.format("%d<->%d %d", e[1], e[2], e[3])
+          end
+          local n = tonumber(ffi.cast("fl26_join_cal_pairs_t", pp)(pbuf, #PAIRS))
+          log(string.format("fl26joindll: %d January-December pair(s) exchanged at New Year: %s", n, table.concat(txt, ", ")))
+        end
       end
     end
     -- fl26reg128: a career saved before it gets its regions back from the 6-bit field on load

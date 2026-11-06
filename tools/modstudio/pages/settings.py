@@ -9,6 +9,8 @@ from .. import i18n
 import siderdir
 
 from ..game import Game, guess_folders
+from ..worlds import world_of
+from ..project import tables_key
 from ..i18n import _
 from ..ui import Page, section, hint, row, ask, error, info, run_job, can_write, denied
 
@@ -51,12 +53,9 @@ class Settings(Page):
         self.per_world = QCheckBox(_("Each world keeps its own careers (the save folder is switched with the world)"))
         self.per_world.toggled.connect(self.set_per_world)
         form.addRow("", self.per_world)
-        from .. import saves
-        form.addRow("", hint(_("A career is made for one world: in another world its leagues and clubs are not "
-                               "there. When this is on and you switch the world in the game, Mod Studio renames "
-                               "the game's save folder: the careers of the world going out are kept in "
-                               "save_<world>, and those of the world coming in come back. Your game settings go "
-                               "with you. Nothing is deleted. Folder: %s") % saves.root()))
+        # the folder is the game's (FL26's or FL27's): refresh() writes it again after a switch of the game
+        self.saves_note = hint("")
+        form.addRow("", self.saves_note)
         form.addRow(section("The game's tables"), QLabel(""))
         form.addRow("", hint(_("Mod Studio needs the game's tables (its list of clubs, leagues and players) once "
                                "on every PC: it unpacks them by itself the first time. After a game update click Unpack the game's "
@@ -89,6 +88,12 @@ class Settings(Page):
 
     def refresh(self):
         g = self.app.game
+        from .. import saves
+        self.saves_note.setText(_("A career is made for one world: in another world its leagues and clubs are not "
+                                  "there. When this is on and you switch the world in the game, Mod Studio renames "
+                                  "the game's save folder: the careers of the world going out are kept in "
+                                  "save_<world>, and those of the world coming in come back. Your game settings go "
+                                  "with you. Nothing is deleted. Folder: %s") % saves.root())
         self.folder.blockSignals(True)
         self.folder.clear()
         seen = []
@@ -131,7 +136,7 @@ class Settings(Page):
             n = len(p.game_cl)
             if p.overlay:
                 self.tables.setText(_("%s  (%d clubs, %d leagues; %d files from it, the rest from the game's "
-                                      "tables)") % (self.app.settings.get("tables", ""), n, len(p.game_lgs), p.overlay))
+                                      "tables)") % (p.own_tables() or "", n, len(p.game_lgs), p.overlay))
             else:
                 self.tables.setText(_("%s  (%d clubs, %d leagues)") % (p.base, n, len(p.game_lgs)))
         else:
@@ -189,7 +194,7 @@ class Settings(Page):
             self.app.busy(False)
             self.unpack_btn.setEnabled(True)
             if not p.overlay:          # a database of your own stays on top of the new tables
-                self.app.settings.pop("tables", None)
+                self.app.settings.pop(tables_key(self.app.game), None)
             p.load_tables()
             self.refresh()
             self.log.appendPlainText(_("Done."))
@@ -207,11 +212,21 @@ class Settings(Page):
         d = QFileDialog.getExistingDirectory(self, _("A pesdb folder: Team.bin, Player.bin ..."))
         if not d:
             return
+        # B277 (jibibi 29.10.): he picked livecpk\_FL26-France\common\etc\pesdb, the world itself,
+        # and got "Country.bin not found": a world holds only the tables it changes, and every
+        # Build rewrites it, so it is never the tables a Build reads
+        world = world_of(d)
+        if world:
+            error(self, "Settings", _("That folder is in %s, a world Mod Studio builds: every Build rewrites it, "
+                                      "so it cannot be the tables. Keep your own database's pesdb folder outside "
+                                      "the world (in Documents, for example) and pick that one.") % world)
+            return
         p = self.app.project
-        self.app.settings["tables"] = d
+        key = tables_key(getattr(self.app, "game", None))
+        self.app.settings[key] = d
         if not p.load_tables(d):
             why = p.tables_error
-            self.app.settings.pop("tables", None)
+            self.app.settings.pop(key, None)
             p.load_tables()
             if "unpack" in why:
                 error(self, "Settings", _("That folder has only part of the tables, as a database in livecpk "

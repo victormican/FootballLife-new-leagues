@@ -2,15 +2,29 @@
 
 The recipe is the same JSON leaguebuilder.py builds from.  The tables are the game's own
 Team/Competition/Player tables, unpacked once from the person's game into
-%APPDATA%\\FL26ModStudio\\tables (Settings > Unpack the game's tables).
+%APPDATA%\\FL26ModStudio\\tables (Settings > Unpack the game's tables), FL27's into tables27.
 """
-import copy, json, os, shutil, time, zlib
+import copy, json, os, pickle, shutil, time, zlib
 
 from PySide6.QtCore import QObject, Signal
 
 import leaguebuilder as B
 
 NATIONAL, OTHERS = -2, -3          # the two groups of teams in no league (game_groups)
+
+
+def is_27(game):
+    """the game Mod Studio uses is FL27 (a stand-in game of a test: FL26)"""
+    from modstudio.game import is_fl27
+    folder = getattr(game, "folder", None)
+    return bool(folder) and is_fl27(folder)
+
+
+def tables_key(game):
+    """B307 (02.11.): the setting that holds the tables folder picked by hand, one per game -- with
+    one for both, a switch from FL26 to FL27 built FL27's world from FL26's tables (its players,
+    its ids) and back"""
+    return "tables_fl27" if is_27(game) else "tables"
 
 
 def blank():
@@ -30,7 +44,7 @@ class Project(QObject):
         self.dirty = False
         # 0.2.5: Undo and Redo of the whole world (mato 16.10.): a copy of the recipe before each
         # change, up to 30 back; touches within a third of a second are one step
-        self._undo, self._redo, self._snap, self._snap_at = [], [], copy.deepcopy(self.recipe), 0.0
+        self._undo, self._redo, self._snap, self._snap_at = [], [], self._split(self.recipe), 0.0
         self.base = None
         self.overlay = 0            # files of the chosen tables folder laid over the game's (0: a full set)
         self.tables_error = ""
@@ -40,6 +54,7 @@ class Project(QObject):
         self.game_nat, self.game_other = [], []
         self.game_confeds = {}
         self.parent_tiers = {}
+        self.split_of = {}          # a split league's regular phase (a parent) -> its total (game_lgs)
         self._squads = None
         self._names = None
         # 0.2.5: World options > Players per new club -- the world's squad is the one every page and
@@ -48,8 +63,14 @@ class Project(QObject):
 
     # ---- tables ----
     def tables_dir(self):
+        """the game's unpacked tables: FL26's in tables, FL27's in tables27 (B307: one folder for both
+        kept the other game's tables after a switch, until Unpack was pressed again)"""
         from modstudio.app import APPDIR
-        return os.path.join(APPDIR, "tables")
+        return os.path.join(APPDIR, "tables27" if is_27(getattr(self.app, "game", None)) else "tables")
+
+    def own_tables(self):
+        """the tables folder picked by hand in Settings for the game in use, or None"""
+        return self.app.settings.get(tables_key(getattr(self.app, "game", None))) or None
 
     def _tables_of(self, where):
         """the tables folder to read for the chosen folder where. A mod's database (a pesdb folder
@@ -95,7 +116,7 @@ class Project(QObject):
         return out
 
     def load_tables(self, where=None):
-        where = where or self.app.settings.get("tables") or None
+        where = where or self.own_tables()
         # B218: a whole database mod as the tables has no kits file beside it; the game's unpacked one then
         B.KITS_FALLBACK[:] = [os.path.join(self.tables_dir(), B.UNIPAR.replace("/", os.sep))]
         self.overlay, self.tables_error = 0, ""
@@ -105,6 +126,7 @@ class Project(QObject):
             self.confeds = B.country_confederations(self.base)
             self.parents = B.shipped_parents(self.base)
             self.parent_tiers = B.shipped_tiers(self.base)
+            self.split_of = B.split_regulars(self.base)
             self.calendar_parents = B.shipped_calendar(self.base)
             self.game_lgs = B.game_leagues(self.base)
             self.game_cl = B.game_clubs(self.base)
@@ -122,6 +144,7 @@ class Project(QObject):
             self.game_nat, self.game_other = [], []
             self.game_confeds = {}
             self.parent_tiers = {}
+            self.split_of = {}
             self.calendar_parents = set()
         self._squads = None
         self._names = None
@@ -168,7 +191,7 @@ class Project(QObject):
         """the database mods (UML ...) switched on in sider.ini whose own tables a world built from
         the game's plain tables would hide (#36): enabled roots, not ours, with a pesdb folder
         holding competition or team tables. Empty when the tables in Settings are a mod's own."""
-        if self.app.settings.get("tables"):
+        if self.own_tables():
             return []
         from modstudio.siderini import root_path
         ini = self.app.ini() if hasattr(self.app, "ini") else None
@@ -266,19 +289,105 @@ class Project(QObject):
         self._autosave_soon()
 
     # ---- undo ----
+    # B267 (JoJofiaz 29.10.): each step kept a full copy of the recipe, about 160 MB in memory for a
+    # world of 1,300 new clubs (its players are most of it), so 30 steps took 5 GB and more.
+    # B270 (JoJofiaz the same night): and copying the whole recipe on every change froze the window
+    # 1.4 s and more for one Rating typed on Players ("Not responding" on his PC). A step now keeps
+    # only what the change touched, one level down -- a club's players, one league's row -- as it
+    # was, pickled and zlib-packed; finding it is a compare of the recipe with the copy kept of it
+    # (0.1 s for that world), and only the touched entries are copied.
+    _GONE = object()                            # a place not in the recipe (never packed)
+
+    @staticmethod
+    def _pack(state):
+        return zlib.compress(pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL), 3)
+
+    @staticmethod
+    def _unpack(blob):
+        return pickle.loads(zlib.decompress(blob))
+
+    @staticmethod
+    def _clone(state):
+        try:
+            return pickle.loads(pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL))
+        except Exception:
+            return copy.deepcopy(state)
+
+    def _split(self, state):
+        """the copy _remember compares with: a dict entry of the recipe as a dict of copies (each
+        copied alone, so one changes without the rest), anything else as one copy"""
+        return {k: ({k2: self._clone(v2) for k2, v2 in v.items()} if isinstance(v, dict) else self._clone(v), isinstance(v, dict))
+                for k, v in state.items()}
+
+    def _changes(self):
+        """the places where the recipe is no longer its kept copy: (key, subkey or None, there,
+        value as kept)"""
+        out, gone = [], self._GONE
+        snap, cur = self._snap, self.recipe
+        for k in list(cur) + [k for k in snap if k not in cur]:
+            v = cur.get(k, gone)
+            kept, split = snap.get(k, (gone, False))
+            if split and isinstance(v, dict):
+                if v == kept:
+                    continue
+                for k2 in list(v) + [k2 for k2 in kept if k2 not in v]:
+                    o = kept.get(k2, gone)
+                    if v.get(k2, gone) != o:
+                        out.append((k, k2, o is not gone, None if o is gone else o))
+            elif split or kept is gone or v is gone or v != kept:
+                o = gone if kept is gone else ({k2: v2 for k2, v2 in kept.items()} if split else kept)
+                out.append((k, None, o is not gone, None if o is gone else o))
+        return out
+
+    def _now(self, places):
+        """the same places as they are in the recipe now (for the other direction)"""
+        out = []
+        for k, k2, _there, _v in places:
+            if k2 is None:
+                there = k in self.recipe
+                out.append((k, None, there, self.recipe[k] if there else None))
+            else:
+                d = self.recipe.get(k)
+                there = isinstance(d, dict) and k2 in d
+                out.append((k, k2, there, d[k2] if there else None))
+        return out
+
+    def _keep(self, places):
+        """the kept copy takes the recipe's value at these places"""
+        for k, k2, _there, _v in places:
+            if k2 is None or not self._snap.get(k, (None, False))[1] or not isinstance(self.recipe.get(k), dict):
+                if k in self.recipe:
+                    v = self.recipe[k]
+                    self._snap[k] = self._split({k: v})[k]
+                else:
+                    self._snap.pop(k, None)
+            else:
+                d, kept = self.recipe[k], self._snap[k][0]
+                if k2 in d:
+                    kept[k2] = self._clone(d[k2])
+                else:
+                    kept.pop(k2, None)
+
     def _remember(self):
         """keep the recipe as it was before this change (one step for touches close together)"""
-        if self.recipe == self._snap:
+        places = self._changes()
+        if not places:
             return
         now = time.monotonic()
-        if now - self._snap_at > 0.3:
-            self._undo.append(self._snap)
+        if now - self._snap_at > 0.3 or not self._undo:
+            self._undo.append(self._pack(places))
             del self._undo[:-30]
+        else:                                   # the same step: what it holds stays the oldest
+            step = self._unpack(self._undo[-1])
+            have = {(k, k2) for k, k2, _t, _v in step}
+            step += [p for p in places if (p[0], p[1]) not in have]
+            self._undo[-1] = self._pack(step)
         self._redo.clear()
-        self._snap, self._snap_at = copy.deepcopy(self.recipe), now
+        self._keep(places)
+        self._snap_at = now
 
     def _forget(self):
-        self._undo, self._redo, self._snap, self._snap_at = [], [], copy.deepcopy(self.recipe), 0.0
+        self._undo, self._redo, self._snap, self._snap_at = [], [], self._split(self.recipe), 0.0
 
     def can_undo(self):
         return bool(self._undo)
@@ -286,28 +395,44 @@ class Project(QObject):
     def can_redo(self):
         return bool(self._redo)
 
-    def _restore(self, state):
-        """the recipe becomes `state` in place: the pages keep their references to the dict"""
-        self.recipe.clear()
-        self.recipe.update(copy.deepcopy(state))
-        self._snap, self._snap_at = copy.deepcopy(state), 0.0
+    def _restore(self, blob):
+        """the places of the packed step `blob` take the values it holds, in the recipe itself:
+        the pages keep their references to the dict. Returns the step for the other direction"""
+        places = self._unpack(blob)
+        back = self._pack(self._now(places))
+        for k, k2, there, v in places:
+            if k2 is None:
+                if there:
+                    self.recipe[k] = v
+                else:
+                    self.recipe.pop(k, None)
+            else:
+                d = self.recipe.get(k)
+                if not isinstance(d, dict):
+                    d = self.recipe[k] = {}
+                if there:
+                    d[k2] = v
+                else:
+                    d.pop(k2, None)
+        self._keep(places)
+        self._snap_at = 0.0
         self.dirty = True
         self.changed.emit()
         self._autosave_soon()
+        return back
 
     def undo(self):
         """back one change; True when there was one"""
+        self._remember()                        # a change not yet kept is the latest one
         if not self._undo:
             return False
-        self._redo.append(copy.deepcopy(self.recipe))
-        self._restore(self._undo.pop())
+        self._redo.append(self._restore(self._undo.pop()))
         return True
 
     def redo(self):
         if not self._redo:
             return False
-        self._undo.append(copy.deepcopy(self.recipe))
-        self._restore(self._redo.pop())
+        self._undo.append(self._restore(self._redo.pop()))
         return True
 
     def _autosave_soon(self):

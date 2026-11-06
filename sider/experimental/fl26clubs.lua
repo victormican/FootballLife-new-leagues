@@ -35,16 +35,25 @@ The world file. When SiderAddons\modules\fl26world.txt exists (written by FL26 M
 League Builder), SLOTS and REMAP_OWN below are ignored and built from the file: every league
 whose slot= is one the game fills with a list of its own (0..5, 69, 72, 73, 75, 76, 77, 80) is
 served from its regulation, and every league on a slot the switch sends into a pool (26, 27,
-28, 67, 71, 74) gets that switch entry pointed at the default case. If no league of the world
+28, 67, 71, 74) or gives no slot at all (76, 77, 80) gets that switch entry pointed at the
+default case. If no league of the world
 sits on a served slot, the DLL is not installed. Without the file the built-in lists below
 are used, as before.
 
 Followers (2026-10-08): the world file's "fans <class> <percent> <team id> ..." lines (League
-Builder, one per class and share) give each new club the club-ranking class it is treated as
+Builder, one per class and share) give each new club -- and, since B298, each club of the game
+a world puts into a league that has no money or followers of its own -- the club-ranking class it is treated as
 when the game's ranking has no place for it (the ranking holds 750 clubs, and a club it cannot
 find was treated as its number one: millions of followers for a third-division side), and the
 share of the game's followers base it gets. See fl26clubs.c, "followers and the club ranking".
 A world without the lines leaves both as the game has them.
+
+A pool slot by choice (2026-11-02, Mod Studio's Select Team list): a league line with pick=1
+sits on 69, 73 or 75 because the user put it in place of that "Other ..." group. The DLL then
+answers that slot from the regulation for the Master League club slot too, so the league's
+clubs get it (Team Info lists them) and the group's own clubs do not; and the switch entries that
+send other slots into that pool (26/27/28/67/74 into 73, 71 into 69) are pointed at the default
+case, so the clubs the game files there keep a slot of their own instead. See fl26clubs.c.
 
 Requires sider.ini: luajit.ext.enabled = 1 (global ffi). Load after fl26comptab.lua.
 --]]
@@ -116,6 +125,9 @@ end
 -- answered from its regulation. POOL_CASE: the slots the club-slot switch sends into an
 -- "other clubs" pool, with the switch byte each holds; a league there is pointed at the
 -- default case. Both are facts about the executable; which slots the world uses is not.
+-- 76..80 hold case 6 (B306, 31.10.2026): those clubs get no Master League slot (123), so a
+-- league there (LigaPro Serie A on 76, SuperSport HNL on 80, Guatemala on 77) was missing
+-- from the career's Team Info and transfer lists while Edit and Competition Info had it.
 local SERVED = { [0] = true, [1] = true, [2] = true, [3] = true,
                  [69] = true, [72] = true, [70] = true, [73] = true, [75] = true, [76] = true, [77] = true, [80] = true,
                  -- slots added by fl26slots (beyond the exe's 123): the game has no list of its own
@@ -124,29 +136,42 @@ local SERVED = { [0] = true, [1] = true, [2] = true, [3] = true,
                  [204] = true, [205] = true, [206] = true, [207] = true, [208] = true,
                  -- slots nuestros para grupos que el juego no tiene (Concacaf)
                  [247] = true, [248] = true, [249] = true, [84] = true, [209] = true }
-local POOL_CASE = { [26] = 3, [27] = 3, [28] = 3, [67] = 3, [74] = 3, [71] = 5 }
+local POOL_CASE = { [26] = 3, [27] = 3, [28] = 3, [67] = 3, [74] = 3, [71] = 5,
+                    [76] = 6, [77] = 6, [80] = 6 }
 local function from_world(world, pools)
-  local slots, remap = {}, {}
+  local slots, remap, own = {}, {}, {}
   -- `pool <slot> <regulation>`: a group of clubs the game never fills (slot 75, "Other Clubs
   -- (Africa)") answered from a regulation of its own, without a league line on the slot
   for _, P in ipairs(pools or {}) do slots[#slots + 1] = { P[1], P[2] } end
-  -- 2026-11-06: se sirve TODO slot de liga del mundo desde su regulacion, no solo los
-  -- especiales de SERVED. Los slots que el juego llena con listas suyas (selecciones,
-  -- clasicos, pools 69..80 y el centinela 123) no se tocan.
-  local DENY = { [0] = true, [1] = true, [2] = true, [3] = true, [4] = true, [5] = true,
-                 [6] = true, [69] = true, [70] = true, [71] = true, [72] = true, [73] = true,
-                 [74] = true, [75] = true, [76] = true, [77] = true, [78] = true, [79] = true,
-                 [80] = true, [123] = true }
+  -- 2026-11-06: se sirve solo lo que el juego llena con listas suyas (SERVED); el resto de
+  -- slots conserva la lista del juego.
   for _, L in ipairs(world) do
-    if L.slot and L.slot >= 0 and not DENY[L.slot] then slots[#slots + 1] = { L.slot, L.id } end
+    if L.slot and SERVED[L.slot] then slots[#slots + 1] = { L.slot, L.id } end
     -- `serve=75`: answer that slot from this regulation without asking fl26comptab for a
     -- parameter row there. The pool slots (69..75) already carry a competition of the exe, so a
     -- league put on one of them aborts the whole Select Team table; a group of ours fills them
     -- from here instead (2026-10-24, "Other Clubs (Africa)").
     if L.serve and SERVED[L.serve] then slots[#slots + 1] = { L.serve, L.id } end
     if L.slot and POOL_CASE[L.slot] then remap[#remap + 1] = { L.slot, POOL_CASE[L.slot] } end
+    if L.slot and L.pick == 1 and (L.slot == 69 or L.slot == 73 or L.slot == 75) then own[#own + 1] = L.slot end
   end
-  return slots, remap
+  return slots, remap, own
+end
+local OWN = {}
+-- The switch's cases that send a slot into a pool: 2 and 3 -> 73, 5 -> 69 (4 -> 70, the Asian pool,
+-- is never taken by choice). With the pool slot a league's by choice, the clubs the game files on
+-- the slots sent there (Atletico Nacional, Penarol ... of the Libertadores, on 26/27/67) would be
+-- listed under that league in Team Info: those switch entries go to the default case too.
+local INTO_POOL = { [73] = { { 26, 2 }, { 27, 3 }, { 28, 3 }, { 67, 3 }, { 74, 3 } }, [69] = { { 71, 5 } } }
+local function own_remap(remap, own)
+  local have = {}
+  for _, r in ipairs(remap) do have[r[1]] = true end
+  for _, s in ipairs(own) do
+    for _, r in ipairs(INTO_POOL[s] or {}) do
+      if not have[r[1]] then remap[#remap + 1] = r; have[r[1]] = true end
+    end
+  end
+  return remap
 end
 
 local function remap_own()
@@ -198,10 +223,27 @@ function m.key_down(ctx, vkey)
   if vkey == 0x79 then drain("F10 report") end      -- F10
 end
 
+-- B294 (Pelda 30.10.): ctx.sider_dir is UTF-8, and LoadLibraryA reads a name in the system's
+-- code page: with the game in a folder named with a Czech u-ring, no DLL of ours loaded (error 126)
+-- and the leagues had no fixtures. LoadLibraryW takes any folder name. The wide calls are declared
+-- under this module's own names (as fl26slotnames does), so no other module's declaration can clash.
+local function load_dll(path)
+  local n = ffi.C.fl26clubs_MultiByteToWideChar(65001, 0, path, -1, nil, 0)
+  if n > 0 then
+    local w = ffi.new("uint16_t[?]", n)
+    ffi.C.fl26clubs_MultiByteToWideChar(65001, 0, path, -1, w, n)
+    local h = ffi.C.fl26clubs_LoadLibraryW(w)
+    if h ~= nil then return h end
+  end
+  return ffi.C.LoadLibraryA(path)
+end
+
 function m.init(ctx)
   if ffi == nil then log("fl26clubs: global ffi is nil -- set luajit.ext.enabled = 1"); return end
   ffi.cdef([[
     void*    LoadLibraryA(const char*);
+    void*    fl26clubs_LoadLibraryW(const uint16_t*) __asm__("LoadLibraryW");
+    int      fl26clubs_MultiByteToWideChar(unsigned int, unsigned long, const char*, int, uint16_t*, int) __asm__("MultiByteToWideChar");
     void*    GetProcAddress(void*, const char*);
     void*    GetModuleHandleA(const char*);
     unsigned long GetLastError(void);
@@ -211,12 +253,14 @@ function m.init(ctx)
     typedef void (*fl26_clubs_stats_t)(uint32_t*);
     typedef uint32_t (*fl26_clubs_pool_t)(void);
     typedef int  (*fl26_clubs_keep_out_t)(const uint32_t*, int);
+    typedef int  (*fl26_clubs_own_pools_t)(const uint16_t*, int);
     typedef int  (*fl26_clubs_fans_t)(const uint32_t*, int);
   ]])
   local world, nopool, fans, pools = read_world(ctx)
   nopool, fans = nopool or {}, fans or {}
   if world then
-    SLOTS, REMAP_OWN = from_world(world, pools)
+    SLOTS, REMAP_OWN, OWN = from_world(world, pools)
+    REMAP_OWN = own_remap(REMAP_OWN, OWN)
     log(string.format("fl26clubs: world file -- %d leagues, %d on slots the game fills itself, %d on pool slots",
                       #world, #SLOTS, #REMAP_OWN))
   end
@@ -224,7 +268,7 @@ function m.init(ctx)
 
   local sep = string.char(92)
   local dllpath = ctx.sider_dir:gsub("[/" .. sep .. "]+$", "") .. sep .. "modules" .. sep .. "fl26clubs.dll"
-  local h = ffi.C.LoadLibraryA(dllpath)
+  local h = load_dll(dllpath)
   if h == nil then
     log(string.format("fl26clubs: LoadLibraryA failed (err %d): %s", tonumber(ffi.C.GetLastError()), dllpath)); return
   end
@@ -251,12 +295,24 @@ function m.init(ctx)
       kept = tonumber(ffi.cast("fl26_clubs_keep_out_t", pk)(arr, #nopool))
     end
   end
+  local owned = 0
+  if #OWN > 0 then
+    local po = ffi.C.GetProcAddress(h, "fl26_clubs_own_pools")
+    if po == nil then
+      log("fl26clubs: this fl26clubs.dll is older than the world (no fl26_clubs_own_pools): the league(s) on " ..
+          table.concat(OWN, " ") .. " keep no Master League slot -- install the modules again")
+    else
+      local arr = ffi.new("uint16_t[?]", #OWN)
+      for i, s in ipairs(OWN) do arr[i - 1] = s end
+      owned = tonumber(ffi.cast("fl26_clubs_own_pools_t", po)(arr, #OWN))
+    end
+  end
   local nfans = 0
   if #fans > 0 then
     local pf = ffi.C.GetProcAddress(h, "fl26_clubs_fans")
     if pf == nil then
       log("fl26clubs: this fl26clubs.dll is older than the world (no fl26_clubs_fans): " .. #fans ..
-          " new club(s) keep the game's followers -- install the modules again")
+          " club(s) keep the game's followers -- install the modules again")
     else
       local arr = ffi.new("uint32_t[?]", 2 * #fans)
       for i, r in ipairs(fans) do
@@ -280,7 +336,8 @@ function m.init(ctx)
     for _, s in ipairs(SLOTS) do parts[#parts + 1] = string.format("%d<-%d", s[1], s[2]) end
     log("fl26clubs: live -- " .. #SLOTS .. " slots served from our own regulations: " ..
         table.concat(parts, " ") .. (kept > 0 and (", " .. kept .. " club(s) of the game kept out of the pools") or "") ..
-        (nfans > 0 and (", followers class and share for " .. nfans .. " new club(s)") or "") ..
+        (nfans > 0 and (", followers class and share for " .. nfans .. " club(s)") or "") ..
+        (owned > 0 and (", " .. owned .. " pool slot(s) taken by choice: " .. table.concat(OWN, " ")) or "") ..
         " (F10 = report)")
     ctx.register("livecpk_make_key", m.make_key)
     ctx.register("key_down", m.key_down)

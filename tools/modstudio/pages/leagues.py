@@ -13,7 +13,7 @@ from ..i18n import _
 from ..ui import hint, row
 from .. import theme
 from .builder import (BuilderPage, GameLeagues, fmt_text, europe_text, tier_of, pixmap, others_labels,
-                      built_plan, built_league, select_team_text)
+                      built_plan, built_league, select_team_text, place_box)
 
 CONTINENTS = ((2, "Europe"), (3, "Asia"), (4, "South America"), (5, "Africa"),
               (6, "North and Central America"), (7, "Oceania"), (0, "Other"))
@@ -211,9 +211,9 @@ class Leagues(BuilderPage):
         self.o_low = b_low
         b_low.clicked.connect(lambda: self.on_ours("add_lower"))
         b_clubs = QPushButton(_("Clubs and names"))
-        b_clubs.clicked.connect(lambda: self.app.open_page("NewClubs"))
+        b_clubs.clicked.connect(self.to_clubs)
         b_pl = QPushButton(_("Players"))
-        b_pl.clicked.connect(lambda: self.app.open_page("Players"))
+        b_pl.clicked.connect(self.to_players)
         b_rm = QPushButton(_("Remove"))
         b_rm.setObjectName("danger")
         b_rm.clicked.connect(lambda: self.on_ours("remove"))
@@ -250,7 +250,8 @@ class Leagues(BuilderPage):
                                                _("League ID")])
         self.places.horizontalHeaderItem(0).setToolTip(_("The league's place in the order: the first ones get a "
                                                          "place in Select Team"))
-        self.places.horizontalHeaderItem(4).setToolTip(_("Where the last Build put the league in Select Team"))
+        self.places.horizontalHeaderItem(4).setToolTip(_("Where the last Build put the league in Select Team. Pick a group "
+                                                         "of the game's here and the league takes its place"))
         self.places.verticalHeader().hide()
         self.places.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.places.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -430,6 +431,12 @@ class Leagues(BuilderPage):
             pm = pixmap(L.get("logo"), 20)
             if pm:
                 self.places.item(n, 1).setIcon(pm)
+            if not L.get("others") and not L.get("exhibition"):
+                # the place of one of the game's "other" groups, picked here (vmican 02.11.)
+                self.places.setCellWidget(n, 4, place_box(self, L, seen, b))
+                self.places.item(n, 4).setText("")
+            else:
+                self.places.removeCellWidget(n, 4)
         self.places.resizeColumnsToContents()
 
     def save_order(self):
@@ -593,6 +600,27 @@ class Leagues(BuilderPage):
             bv.addWidget(cap)
             box.setToolTip(name)
             self.o_crests.addWidget(box, k // 5, k % 5)
+
+    def to_clubs(self):
+        """Clubs and names: the Clubs page on the league picked here (it showed the league last
+        picked there -- Xxspedd 03.11.)"""
+        e = self.current()
+        self.app.open_page("NewClubs")
+        if e and e[3] == "ours":
+            nc = self.app.page("NewClubs")
+            nc.combo.setCurrentText(e[2])
+            nc.show_clubs()
+
+    def to_players(self):
+        """Players: that page on the league picked here, as Clubs and names"""
+        e = self.current()
+        self.app.open_page("Players")
+        if e and e[3] == "ours":
+            pp = self.app.page("Players")
+            # findData() does not match a tuple: compared one by one, as Players keeps its pick
+            i = next((n for n in range(pp.lg.count()) if pp.lg.itemData(n) == ("new", e[2])), -1)
+            if i >= 0:
+                pp.lg.setCurrentIndex(i)
 
     def on_ours(self, what):
         """run a New leagues button on the league picked here"""

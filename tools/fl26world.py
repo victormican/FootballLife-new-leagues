@@ -88,6 +88,7 @@ KEYS = (
     "lcupn",
     "lcuptop",
     "cupthird",
+    "pick",
 )
 NO_SLOT = 123
 
@@ -207,6 +208,9 @@ POOL_SLOTS = {
 }
 POOL_BEFORE_HIDDEN = (75, 71)
 POOL_AFTER_HIDDEN = (73, 69)
+# a league's recipe "select_team": the group whose place it takes, whatever the order (vmican
+# 02.11.: with a South American world the Other Latin American Teams are of no use)
+POOL_PICK = {"europe": 69, "latam": 73, "africa": 75, "other": 71}
 # Limits branch: past those, a league takes a regulation id from the top of the date table down
 # (254, 253 ... 197) and a Select Team slot of its own above 123. Needs fl26slots250 (slots up
 # to 249), fl26slot7 (a club's league slot is a whole byte, not 7 bits) and a caps set whose
@@ -234,6 +238,11 @@ MORE_SLOT = {r: 189 + i for i, r in enumerate(MORE_IDS)}  # 256 -> 189 ... 316 -
 DEFAULT_SLOT.update(EXTRA_SLOT)
 DEFAULT_SLOT.update(SPARE_SLOT)
 DEFAULT_SLOT.update(MORE_SLOT)
+
+
+def pool_rid(slot):
+    """the regulation id whose Select Team slot is that group's (POOL_SLOTS)"""
+    return next((r for r, s in DEFAULT_SLOT.items() if s == slot), None)
 
 
 def id_rank(r):
@@ -617,7 +626,21 @@ SHIPPED_ACCESS = sorted(
 )  # stable: each section's holders stay first
 
 
-def uefa_places(own, replace=(), uecl=True):
+# the countries of the access list's regulations, as uefakey.DEFAULT_ORDER names them: the
+# association rank of a shipped place (uefa_places, rank)
+ACCESS_COUNTRY = {_ENG: "England", _ITA: "Italy", _ESP: "Spain", _FRA: "France", _NED: "Netherlands",
+                  _POR: "Portugal", _GER: "Germany", _GRE: "Greece", _TUR: "Turkey", _SCO: "Scotland",
+                  _DEN: "Denmark", _BEL: "Belgium"}
+UNRANKED = 999                    # a place whose league has no association rank: after the ranked ones
+
+
+def place_league(e):
+    """the regulation a uefa place belongs to: its own, or for a cup winner's place (position 0)
+    the league in alt"""
+    return e[0] if e[1] else e[3]
+
+
+def uefa_places(own, replace=(), uecl=True, rank=None):
     """the uefa lines of a world whose own leagues have places: the shipped list and the world's
     places, competition by competition (Champions League first, as fl26swiss hands them out in
     list order), each competition's shipped places before the world's -- except the play-off,
@@ -628,7 +651,13 @@ def uefa_places(own, replace=(), uecl=True):
     28 direct ones, which fl26swiss sends there). replace: regulations of the game whose shipped
     places are dropped -- the world lists its own for them (the recipe's game_europe). The room of
     each competition's qualifying is that of the rounds pick_rounds gives (uecl: with the
-    Conference League)."""
+    Conference League).
+
+    rank: {regulation: association rank} (a world with no UEFA ranking of its own: leaguebuilder
+    assoc_rank). The qualifying's places then go in that order, the world's and the shipped ones
+    alike, so the places past the room are the weakest associations' (B250, monkusgigus 26.10.:
+    the 31 Champions League qualifying places of the Europack's new leagues came first and left
+    no room for the Greek champion, Portugal's second or Belgium's)."""
     own = [tuple(int(x) for x in e) for e in own]
     replace = set(replace)
     if not own and not replace:
@@ -638,7 +667,10 @@ def uefa_places(own, replace=(), uecl=True):
         if c in UEFA_LINE:
             mine = [e for e in own if e[2] == c]
             shipped = [e for e in SHIPPED_ACCESS if e[2] == c and e[0] not in replace]
-            out += mine + shipped if c in PLAYOFFS else shipped + mine
+            if c in PLAYOFFS and rank:
+                out += sorted(mine + shipped, key=lambda e: rank.get(place_league(e), UNRANKED))
+            else:
+                out += mine + shipped if c in PLAYOFFS else shipped + mine
     return out, crowded(out, own, pick_rounds(out, uecl))
 
 
@@ -652,6 +684,31 @@ def direct_room(out):
             if lose is not None:
                 room[lose] -= PLAYOFF // 2
     return room
+
+
+def europe_count(comps, uecl=True):
+    """the European places counter (pepponeee 29.10.): {competition: (places, room)} for the
+    league phases -- comps is the competition of every place of the world (the title holders'
+    too), room the clubs each takes straight in (direct_room: 36, less eight for each play-off
+    feeding it). Fewer places than room: the game fills the rest with the next clubs of the big
+    five; more: the last go to the competition's qualifying, or get none"""
+    comps = [int(c) for c in comps]
+    room = direct_room([(0, 0, c, 0) for c in comps])
+    return {c: (comps.count(c), room[c]) for c in ((0, 1, 2) if uecl else (0, 1))}
+
+
+def europe_count_text(counts):
+    """'Champions League 26/28, Europa League 20/20 ...' with what happens to the difference"""
+    names = dict(COMPETITIONS)
+    out = []
+    for c, (n, r) in sorted(counts.items()):
+        s = "%s %d/%d" % (names[c], n, r)
+        if n < r:
+            s += " (%d more from the big five)" % (r - n)
+        elif n > r:
+            s += " (%d over)" % (n - r)
+        out.append(s)
+    return ", ".join(out)
 
 
 def crowded(out, own, rounds=None):

@@ -1,6 +1,7 @@
 """the game install: where things are, is it running, start it.
 
-A Game is the folder that holds FL_2026.exe.  Everything else is found from there:
+A Game is the folder that holds FL_2026.exe (FL26) or FL_2027.exe (FL27, the same PES 2021 exe
+with SmokePatch's changes; 31.10.).  Everything else is found from there:
 the Sider folder (sider.exe, sider.ini, modules, content, livecpk; SiderAddons or any folder
 that holds a sider.ini, see siderdir) and the save folder.
 """
@@ -8,21 +9,109 @@ import os, subprocess, time
 
 import siderdir
 
-EXE_NAMES = ("FL_2026.exe", "PES2021.exe")
-LAUNCHERS = ("FL 2026 start.exe",)
-SAVE_DIR = os.path.join(os.path.expanduser("~"), "Documents", "KONAMI",
-                        "eFootball PES 2021 SEASON UPDATE")
+EXE_NAMES = ("FL_2026.exe", "FL_2027.exe", "PES2021.exe")
+LAUNCHERS = ("FL 2026 start.exe", "FL 2027 start.exe")
+FL27_EXE = "FL_2027.exe"
+
+
+def documents():
+    r"""the player's Documents folder as Windows has it -- the folder the game saves under. Not
+    ~\Documents: a Documents folder moved elsewhere (OneDrive, another drive) is not there (B296)"""
+    if os.name == "nt":
+        try:
+            import ctypes
+            buf = ctypes.create_unicode_buffer(1024)
+            if ctypes.windll.shell32.SHGetFolderPathW(0, 5, 0, 0, buf) == 0 and buf.value:  # CSIDL_PERSONAL
+                return buf.value
+        except (OSError, AttributeError):
+            pass
+    return os.path.join(os.path.expanduser("~"), "Documents")
+
+
+SAVE_DIR = os.path.join(documents(), "KONAMI", "eFootball PES 2021 SEASON UPDATE")
+SAVE_ID = "2026"
+# FL27 saves under Documents\SPGAME\Football Life\2027\save (its exe's paths say so: KONAMI\
+# eFootball PES 2021 SEASON UPDATE became SPGAME\Football Life; sys.ini SteamID=2027)
+SAVE_DIR_FL27 = os.path.join(documents(), "SPGAME", "Football Life")
+SAVE_ID_FL27 = "2027"
+
+
+def _game_folder(folder):
+    if folder is None:
+        import flpaths
+        folder = flpaths.GAME_DIR
+    return folder
+
+
+def is_fl27(folder=None):
+    """the game folder holds FL27's exe (and not FL26's)"""
+    folder = _game_folder(folder)
+    return bool(folder) and os.path.exists(os.path.join(folder, FL27_EXE)) \
+        and not os.path.exists(os.path.join(folder, "FL_2026.exe"))
+
+
+def save_dir(folder=None):
+    """the folder the game's numbered save folders are in: FL26's KONAMI one, or FL27's SPGAME one"""
+    return SAVE_DIR_FL27 if is_fl27(folder) else SAVE_DIR
+
+
+def save_id(folder=None):
+    """the save folder's name the game asks for: SteamID of sys.ini next to FL_2026.exe (the Steam
+    stand-in reads it; 2026 in FL26, 2027 in FL27). `folder` the game folder, else the one Mod Studio uses"""
+    folder = _game_folder(folder)
+    try:
+        with open(os.path.join(folder, "sys.ini"), encoding="utf-8", errors="replace") as f:
+            sect = ""
+            for line in f:
+                line = line.strip()
+                if line.startswith("["):
+                    sect = line.strip("[]").strip().lower()
+                elif sect == "settings" and "=" in line:
+                    k, v = line.split("=", 1)
+                    if k.strip().lower() == "steamid" and v.strip().isdigit():
+                        return str(int(v.strip()))
+    except OSError:
+        pass
+    return SAVE_ID_FL27 if is_fl27(folder) else SAVE_ID
+
+
+def _system_time(d):
+    try:
+        return os.path.getmtime(os.path.join(d, "save", "SYSTEM00000000"))
+    except OSError:
+        return 0
+
+
+def save_root(folder=None):
+    r"""the folder that holds the game's save folder: SAVE_DIR\<id>. <id> is sys.ini's when the
+    game saves there; else the numbered folder whose SYSTEM00000000 was written last -- the game
+    saves under 0 when the Steam stand-in does not read sys.ini (B296). The same rule as the
+    modules' (tools/native/fl26savedir.h)"""
+    base = save_dir(folder)
+    want = os.path.join(base, save_id(folder))
+    if _system_time(want):
+        return want
+    best, newest = want, 0
+    try:
+        names = os.listdir(base)
+    except OSError:
+        names = []
+    for n in names:
+        if n.isdigit():
+            t = _system_time(os.path.join(base, n))
+            if t > newest:
+                best, newest = os.path.join(base, n), t
+    return best
+
+
 # the game's Edit save: written before a Build, it hides the Build's squads and names in Exhibition
 # and Edit mode (Risto 04.10.: two signings in a career, not in an exhibition)
-EDIT_FILE = os.path.join(SAVE_DIR, "2026", "save", "EDIT00000000")
-
-
 def edit_file():
     """the Edit save in the save folder in use: FL26_SAVE_ROOT's when it is set (saves.root()),
     so a test with a save folder of its own never sees the PC's real Edit save (coldstart 26.10.:
     the player's EDIT00000000 showed "Move the Edit save aside" on a new player's PC)"""
-    r = os.environ.get("FL26_SAVE_ROOT")
-    return os.path.join(r, "save", "EDIT00000000") if r else EDIT_FILE
+    r = os.environ.get("FL26_SAVE_ROOT") or save_root()
+    return os.path.join(r, "save", "EDIT00000000")
 
 
 def old_edit(since):
@@ -112,7 +201,7 @@ class Game:
         if not os.path.isdir(self.folder):
             return ["the game folder is not there any more"]
         if not self.exe:
-            out.append("no FL_2026.exe in the game folder")
+            out.append("no FL_2026.exe (or FL_2027.exe) in the game folder")
         if not os.path.isdir(self.sider_dir):
             out.append("no Sider folder with a sider.ini (Sider is not installed)")
         elif not os.path.exists(self.ini_path):
@@ -171,7 +260,8 @@ def guess_folders():
                     try:
                         sub = winreg.OpenKey(k, winreg.EnumKey(k, i))
                         name = str(winreg.QueryValueEx(sub, "DisplayName")[0])
-                        if "football life" in name.lower() or "fl26" in name.lower() or "pes 2021" in name.lower():
+                        if "football life" in name.lower() or "fl26" in name.lower() or "fl27" in name.lower() \
+                                or "pes 2021" in name.lower():
                             loc = str(winreg.QueryValueEx(sub, "InstallLocation")[0])
                             if loc and Game(loc).exe:
                                 found.append(os.path.normpath(loc))
@@ -181,7 +271,8 @@ def guess_folders():
         pass
     for drive in "CDEFG":
         for rel in ("Football Life 2026", "FL26", "Games\\Football Life 2026",
-                    "Program Files (x86)\\Football Life 2026"):
+                    "Program Files (x86)\\Football Life 2026",
+                    "Football Life 2027", "FL27", "FL27\\game", "Games\\Football Life 2027"):
             p = "%s:\\%s" % (drive, rel)
             if Game(p).exe:
                 found.append(p)

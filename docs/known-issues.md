@@ -4,6 +4,20 @@ Honest list, as of 2026-09-28. Addresses are given so that a fault offset in you
 Viewer can be matched against them: the offset is the address minus `0x140000000`
 (so `0x1414c674d` shows up as exception offset `0x14c674d`).
 
+## Open in Mod Studio 0.3.0 beta, Football Life 2027 (2026-11-01)
+
+- **The Worldpack and Europe pack zips carry FL26's players.** A world zip brings its own player
+  tables (`common\etc\pesdb\Player.bin` and the rest), made from FL26's when the pack was built,
+  so in FL27 those worlds play with FL26's squads. A world built in FL27 has FL27's players.
+- **NewLife is not checked on FL27 yet.** Its clubs and players were matched to FL26's.
+- **SmokePatch's `common\SleeveBadge.lua` logs a Lua error** (`folder` nil, line 367) for the
+  clubs a world adds. The game plays on.
+- **FL27 started without its launcher can close while a new Master League is created or on its
+  first days** (no error box; Windows logs `FL_2027.exe` at `0x1531cc313` or `0x1484ed4c0`,
+  sometimes `0x141fea5ba`). It happens when `FL_2027.exe` (and Sider) are started directly; started
+  through **FL 2027 start.exe**, its shortcut or **Start the game** in Mod Studio, it did not
+  (2026-11-03). Start FL27 through the launcher.
+
 ## Open in Mod Studio 0.2.4 (2026-10-20)
 
 - **Outside a match a new club can show another club's kit** (B175: in Become a Legend, after a
@@ -522,6 +536,13 @@ calendar.
 
 ## Fixed along the way (so you can confirm)
 
+- 2026-10-31 (next update, Discord, thanks leon): **A league on Select Team slot 76, 77 or 80
+  was missing from a career's Team Info and transfer lists** (LigaPro Serie A, SuperSport HNL
+  and Guatemala in the Modpack and World pack, TOPsport A lyga in the Europe pack), while Edit
+  and Competition Info had it. When a Master League is created, the game gives the clubs of
+  those three slots no career slot at all. fl26clubs.lua now sends them to the default case,
+  like the pool slots before. It takes effect in a new Master League; a career started
+  before keeps the missing clubs.
 - 2026-10-14 (next update, Discord, thanks Yanis): **With a database mod that moves the game's
   leagues around (UML 2026 v3: Ligue 1 where the Russian Premier Liga was), Mod Studio took a
   game league's country from its regulation id, and NewLife's "in the game" from the plain

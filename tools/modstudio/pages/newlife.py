@@ -427,7 +427,19 @@ class NewLife(BuilderPage):
             self.where.setText(_("No NewLife Database opened."))
             error(self, "NewLife Database", tb.strip().splitlines()[-1])
 
-        run_job(lambda progress: N.Release(folder), done, failed)
+        def job(progress):
+            rel = N.Release(folder)
+            # B303: B102's look-up of the game's players runs here, off the GUI thread; at the first
+            # Add to your world it held the window ten seconds (cold test 31.10.)
+            info = self.info()
+            if info and info.get("base"):
+                try:
+                    N.game_twin(rel, P.Squads(info["base"]))
+                except Exception:
+                    pass                    # Add works it out itself then
+            return rel
+
+        run_job(job, done, failed)
 
     def read_rows(self):
         """the release's leagues, their clubs "in game" by the tables in use (a database mod's
@@ -708,7 +720,7 @@ class NewLife(BuilderPage):
                           % (self.rel.clubs[i]["name"], where, E["name"]))
                     return
                 seen[i] = E["name"]
-        names, swap = [], []
+        names, swap, added = [], [], []
         stayed = elsewhere = 0
         for L in sel:
             if not L["country"]:
@@ -717,14 +729,29 @@ class NewLife(BuilderPage):
             name, st, el = N.add_league(self.project.recipe, self.rel, L, info=info, custom=key(L) in self.custom,
                                         picks={i: self.picks[i] for i in L["clubs"] if i in self.picks})
             names.append(name)
+            added.append((name, L.get("strength", 0)))
             stayed += st
             elsewhere += el
             if info:
                 swap += [info["clubs"][e["id"]][0] for e in self.project.recipe["leagues"][-1].get("game_clubs") or []
                          if B.game_club_where(info, e["id"])]
+        linked = []
+        if names and self.project.base:
+            # B314: a league of a country the game has goes under the game's league
+            try:
+                countries = B.game_league_countries(self.project.base, self.project.game_lgs)
+            except (B.BuildError, OSError, ValueError):
+                countries = {}
+            for reg, tot in getattr(self.project, "split_of", {}).items():   # a split league: its total's
+                if tot in countries:
+                    countries.setdefault(reg, countries[tot])
+            linked = N.link_below_game(self.project.recipe, added, self.project.parents, countries)
         if names:
             self.project.touch()
             text = _("Added: %s. Change them on Leagues, Clubs and Players, then Build.") % ", ".join(names)
+            for n, _r, up in linked:
+                text += "\n" + _("%s is the division below %s (promotion and relegation). Leagues > Edit > "
+                                 "Division changes it.") % (n, up)
             if swap:
                 text += "\n" + _("%s also play in a competition of the game: on Clubs pick each one and use "
                                  "Club of the game to choose the club that takes its place there.") % ", ".join(swap)

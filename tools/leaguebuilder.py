@@ -95,6 +95,12 @@ which league sits above -- and nothing about ids:
               (a historical league, a league of legends ...). It stands alone: no division above
               or below it, no European places, no cups. Its regulation id is one the season
               builder does not take in at creation (CREATION_IDS), and fl26joindll leaves it out
+  select_team optional, "europe", "latam", "africa" or "other": the league takes the Select Team
+              place of the game's Other European Leagues / Other Latin American Teams / Other
+              Clubs (Africa) / Other group (fl26world.POOL_PICK), whatever the league order; the
+              group's own clubs are then not in Select Team (#73). Without it Build gives those
+              places out last (vmican 02.11.: a South American world has no use for the Other
+              Latin American Teams)
   others      optional, "europe", "latam", "asia", "africa" or "classic": no league at all -- the
               clubs (1..OTHERS_MAX) go in the game's Other European / Latin American / Asia-
               Oceania / Africa teams, or Classic Teams, where the game files its own clubs that
@@ -774,14 +780,26 @@ def cpk_key(path):
     return (0, int(m.group(1)), int(m.group(2) or 0), m.group(3))
 
 
+# the season archives: data_s2526* in FL26, data_s2627* in FL27 (31.10.; the same tables)
+SEASON_CPKS = ("data_s2526*.cpk", "data_s2627*.cpk")
+
+
+def season_cpks(download):
+    """the game's season archives in download, in the order the game layers them"""
+    found = []
+    for pat in SEASON_CPKS:
+        found += glob.glob(os.path.join(download, pat))
+    return sorted(found, key=cpk_key)
+
+
 def unpack_tables(game, out, log=print):
     """unpack the game's tables (download/data_s2526*.cpk and the update's data_extra*.cpk, the
     later ones over the earlier, as the game layers them) into <out>; returns the folder with
     Team.bin -- the --base of the rest"""
     import cpkread
-    cpks = sorted(glob.glob(os.path.join(game, "download", "data_s2526*.cpk")), key=cpk_key)
+    cpks = season_cpks(os.path.join(game, "download"))
     if not cpks:
-        raise BuildError("no download/data_s2526*.cpk in %s -- is that the game folder?" % game)
+        raise BuildError("no download/data_s2526*.cpk (FL27: data_s2627*.cpk) in %s -- is that the game folder?" % game)
     # the update's tables ("National selection 2.2") go over the ones above, as the game layers
     # them: an edit file made for the updated database matches what we unpack then (#75, #63)
     cpks += sorted(glob.glob(os.path.join(game, "download", "data_extra*.cpk")))
@@ -826,7 +844,7 @@ UNIPAR_SEEN = "UniformParameter.bin"   # in UNPACKED: [1, 0] when that unpack fo
 def _table_cpks(game):
     d = os.path.join(game, "download")
     return {os.path.basename(c): [os.path.getsize(c), int(os.path.getmtime(c))]
-            for c in sorted(glob.glob(os.path.join(d, "data_s2526*.cpk")), key=cpk_key) +
+            for c in season_cpks(d) +
             sorted(glob.glob(os.path.join(d, "data_extra*.cpk")))}
 
 
@@ -1061,6 +1079,8 @@ def recipe_from_plan(pl, base):
             r["europe"] = [list(e) for e in L["europe"]]
         if L.get("exhibition"):
             r["exhibition"] = True
+        if L.get("select_team"):
+            r["select_team"] = L["select_team"]
         if L.get("real_calendar") is not None:          # false (the old calendar) counts too
             r["real_calendar"] = copy.deepcopy(L["real_calendar"])
         gc = []
@@ -1773,6 +1793,56 @@ def club_newlife(plan):
     return out
 
 
+ID_PARTS = ("clubs", "names", "people", "club_nl")
+
+
+def with_away(last):
+    """the ids file (last_build_ids) with its "away" clubs back in each part where no club has the
+    key now: a club of a league the recipe left out and added again finds its players' ids
+    (B287). The rest stay gone (_keep_ids keeps their ids retired)."""
+    away = last.get("away")
+    if not isinstance(away, dict) or not away:
+        return last
+    out = dict(last)
+    for part in ID_PARTS:
+        a = away.get(part)
+        if not isinstance(a, dict):
+            continue
+        cur = dict(last[part]) if isinstance(last.get(part), dict) else {}
+        there = set(cur.values()) if part == "club_nl" else ()
+        for club, v in a.items():
+            if part != "club_nl" or v not in there:    # a NewLife club in the world now is its own
+                cur.setdefault(club, v)
+        out[part] = cur
+    return out
+
+
+def away_part(last, ids, now):
+    """{part: {club: ...}} of the clubs the last Build's file lists (with_away, follow_clubs) and
+    this Build gives no ids (ids): they wait in the file's "away" for the club to come back. A
+    club follow_clubs put under "gone:" goes back under its own key, unless a club has it now.
+    now: club_newlife of this Build; a NewLife club in it is not away, whatever key it had."""
+    out = {}
+    for part in ("clubs", "names", "people"):
+        src = last.get(part)
+        if not isinstance(src, dict):
+            continue
+        got = {}
+        for club, v in src.items():
+            key = club[5:] if club.startswith("gone:") and club[5:] not in ids else club
+            if key not in ids:
+                got.setdefault(key, v)
+        if got:
+            out[part] = got
+    was = last.get("club_nl") if isinstance(last.get("club_nl"), dict) else {}
+    away = set(out.get("clubs") or {})
+    here = set(now.values())
+    nl = {k: v for k, v in was.items() if k in away and v not in here}
+    if nl:
+        out["club_nl"] = nl
+    return out
+
+
 def follow_clubs(last, now):
     """the last Build's ids file (last_build_ids) with its new clubs under their keys now: a
     NewLife club whose place in its league changed (a club before it left) is found by its
@@ -1841,11 +1911,20 @@ def shipped_parents(base):
         except UnicodeDecodeError:
             return raw.decode("latin-1")
     out, halves = [], set()
+    # a shipped split league (Scottish Premiership, 3F Superliga, Jupiler Pro League: a total of
+    # type 9 and its phases) takes a division below it on its regular phase, as the Modpack's
+    # Championship under 134 and fl26chain's split pair (#79/#81); listed under the league's name
+    split_name = {g[M.R_CID]: name(g) for g in rows.values()
+                  if g[M.R_TYPE] == fl26world.SPLIT_TOTAL and fl26world.fmt(g) == fl26world.F_TOTAL}
     for rid in sorted(rows):
         g = rows[rid]
-        if g[M.R_TYPE] != 4 or u16(g, M.R_BELOW) in rows or fl26world.fmt(g) in (12, 13, 14, 15):
+        if g[M.R_TYPE] != 4 or u16(g, M.R_BELOW) in rows or fl26world.fmt(g) in fl26world.F_GROUPS:
             continue
         if not re.search(r"_D\d_LEAGUE$", code.get(g[M.R_CID], "")):
+            continue
+        if fl26world.fmt(g) == fl26world.F_REGULAR:
+            if g[M.R_CID] in split_name:
+                out.append((rid, split_name[g[M.R_CID]]))
             continue
         # a shipped Apertura/Clausura season is a total (type 5) and its two halves (format 7, 8,
         # +0x06 the total): Liga BetPlay DIMAYOR I and II, MLS First and Second Round. Both halves
@@ -1870,6 +1949,17 @@ def shipped_calendar(base):
               for i in range(len(comp) // M.COMP)}
     return {u16(regs[i * M.REG:(i + 1) * M.REG], M.R_ID) for i in range(len(regs) // M.REG)
             if regs[i * M.REG + M.R_TYPE] == 4 and region.get(regs[i * M.REG + M.R_CID]) in CALENDAR_REGIONS}
+
+
+def split_regulars(base):
+    """{regulation id of a shipped split league's regular phase: the split's total} -- the entry
+    shipped_parents lists for the Scottish Premiership is 134, its clubs and country are 133's"""
+    regs = M.load(base, "CompetitionRegulation.bin")
+    rows = [regs[i * M.REG:(i + 1) * M.REG] for i in range(len(regs) // M.REG)]
+    total = {g[M.R_CID]: u16(g, M.R_ID) for g in rows
+             if g[M.R_TYPE] == fl26world.SPLIT_TOTAL and fl26world.fmt(g) == fl26world.F_TOTAL}
+    return {u16(g, M.R_ID): total[g[M.R_CID]] for g in rows
+            if g[M.R_TYPE] == 4 and fl26world.fmt(g) == fl26world.F_REGULAR and g[M.R_CID] in total}
 
 
 def shipped_tiers(base):
@@ -2015,9 +2105,29 @@ def prev_pins(prev):
     does not hand every league after it new ids. A Master League career, a Kit Server map.txt
     and the scoreboard map all hold those ids (audit 12.10.; only NewLife clubs kept theirs)."""
     out = {}
-    for q in (prev or {}).get("leagues") or []:
+    for q in list((prev or {}).get("away_leagues") or []) + list((prev or {}).get("leagues") or []):
         if isinstance(q, dict) and q.get("name"):
             out[str(q["name"]).strip().lower()] = q
+    return out
+
+
+def away_leagues(prev, names):
+    """[{name, teams, club_names}] of the leagues the last Build had (or kept as away itself) and
+    the recipe has not now: their new clubs' team ids wait in the plan, and a league added again
+    gets them back (prev_pins), and no other new club takes them while one is free (B287,
+    pepponeee98 29.10.: a league removed and added again came back with other team and player ids,
+    and the Edit made with it no longer fitted)"""
+    now = {str(n).strip().lower() for n in names}
+    out, seen = [], set()
+    for q in list((prev or {}).get("leagues") or []) + list((prev or {}).get("away_leagues") or []):
+        if not isinstance(q, dict) or not q.get("name") or not q.get("teams"):
+            continue
+        k = str(q["name"]).strip().lower()
+        if k in now or k in seen:
+            continue
+        seen.add(k)
+        out.append({"name": q["name"], "teams": [t if isinstance(t, int) else None for t in q["teams"]],
+                    "club_names": list(q.get("club_names") or [])})
     return out
 
 
@@ -2082,6 +2192,7 @@ def plan(recipe, base, prev=None):
             taken_cid.add(c)
     # nor a cup's id of the last Build: build() gives the cup its own back (pinned_ids)
     prev_cups = kept_cups(renamed_cups((prev or {}).get("cup_ids") or {}, renamed), names)
+    prev_cups = ticked_cups(prev_cups, leagues, names, pins)
     cup_cids = {w.get("cid") for w in prev_cups.values() if isinstance(w, dict)}
     rest = iter(c for c in pool if c not in taken_cid and c not in cup_cids)
     for i in range(len(leagues)):
@@ -2100,9 +2211,43 @@ def plan(recipe, base, prev=None):
     # an exhibition league first takes an id the season builder leaves alone; the others then
     # take what is left, in the usual order
     rid_of, left = {}, list(free)
+    # a league that picked the place of one of the game's "other" groups takes that group's id
+    # first, before a pin or the order hands it to another league (vmican 02.11.)
+    picked = {}
+    for i in order:
+        want = leagues[i].get("select_team")
+        if want in (None, ""):
+            continue
+        name = names[i]
+        if want not in fl26world.POOL_PICK:
+            raise BuildError("%s: select_team is one of %s, not %r"
+                             % (name, ", ".join(fl26world.POOL_PICK), want))
+        if leagues[i].get("exhibition"):
+            raise BuildError("%s: an exhibition league keeps its own place in Select Team" % name)
+        slot = fl26world.POOL_PICK[want]
+        if want in OTHERS and any(q.get("others") == OTHERS[want] for q in others):
+            raise BuildError("%s: the place of %s in Select Team is this league's, so the world's own "
+                             "clubs in no league cannot go in that group" % (name, fl26world.POOL_SLOTS[fl26world.POOL_PICK[want]]))
+        if want == "latam" and recipe.get("conmebol_associations"):
+            # assoc_seed (fl26swiss) takes an association's clubs from that group; with the group's
+            # place given away they have no slot in the Master League
+            raise BuildError("%s: the CONMEBOL associations of this world take their clubs from the game's "
+                             "Other Latin American Teams, so that place stays theirs" % name)
+        if slot in picked:
+            raise BuildError("%s and %s both want the place of %s in Select Team -- one each"
+                             % (names[picked[slot]], name, fl26world.POOL_SLOTS[slot]))
+        r = fl26world.pool_rid(slot)
+        if r not in left:
+            raise BuildError("%s: the place of %s in Select Team is not free in this game"
+                             % (name, fl26world.POOL_SLOTS[slot]))
+        picked[slot] = i
+        rid_of[i] = r
+        left.remove(r)
     # a league built before keeps its regulation id (and with it its slot and dates), as long as
     # the id is still free and still suits it (same exhibition kind; a split season off reg 49)
     for i in order:
+        if i in rid_of:
+            continue
         q = pins.get(names[i].lower()) or {}
         r = q.get("rid")
         if (isinstance(r, int) and r in left
@@ -2180,6 +2325,7 @@ def plan(recipe, base, prev=None):
             p = {"name": name, "country": fid, "clubs": n, "legs": legs, "rid": rid_of[i], "cid": cid_of[i],
                  "slot": fl26world.DEFAULT_SLOT.get(rid_of[i], fl26world.NO_SLOT), "club_names": list(L.get("club_names") or []),
                  "exhibition": bool(L.get("exhibition")),
+                 "select_team": L.get("select_team") or None,
                  "logo": L.get("logo") or None, "flag": L.get("flag") or None,
                  "club_crests": list(L.get("club_crests") or []),
                  "club_abbrs": list(L.get("club_abbrs") or []),
@@ -2516,6 +2662,8 @@ def plan(recipe, base, prev=None):
             "modern_libertadores_access": access_recipe.get("_modern_libertadores_access"),
             "suda_first": suda_first,
             "uefa_seed": uefa_seed(recipe, out, regrow, region_of_cid),
+            "assoc_rank": assoc_rank(out, base),
+            "away_leagues": away_leagues(prev, names + sorted(used)),   # a renamed league's old name is its own
             "ccups": cups, "ccup_notes": notes, "home_cups": home, "game_supers": gsupers,
             "europe_first": europe_first(recipe, by_name),
             "game_seasons": august_countries(recipe),
@@ -2562,6 +2710,24 @@ def kept_cups(ids, names, codes=None):
         if kind == "gsuper" and codes is not None and name not in codes:
             continue
         out[k] = w
+    return out
+
+
+def ticked_cups(ids, leagues, names, pins):
+    """the cups' ids of the last Build (kept_cups) less those of a cup the league has unticked
+    since: its national cup, super cup or league cup is gone from the world, so its id is free
+    again. B273 (juanjose6124 29.10.2026): a world near its limit untick cups to make room for
+    new leagues, but their ids stayed held until one more Build and it said "no free
+    competition ids left" """
+    out = dict(ids)
+    for L, nm in zip(leagues, names):
+        if not L.get("cup"):
+            out.pop("cup:" + nm, None)
+        if not (L.get("cup") and L.get("supercup")):
+            out.pop("super:" + nm, None)
+        rid = (pins.get(nm.lower()) or {}).get("rid")
+        if not L.get("league_cup") and isinstance(rid, int):
+            out.pop("ccup:FL_%03d_LCUP" % rid, None)
     return out
 
 
@@ -3338,6 +3504,31 @@ def cwc_champs(pl):
             seen.add((r, f))
             out.append((r, f))
     return out
+def assoc_rank(leagues, base):
+    """{regulation: rank in UEFA's association ranking (uefakey.DEFAULT_ORDER)} of the new leagues
+    with European places and of the access list's leagues of the game, for place_rank (B250).
+    Keys are strings, as the plan's JSON keeps them."""
+    import mkflags
+    import uefakey
+    cty = mkflags.countries(mkflags.table("Country", [base]))
+    rank = {r: uefakey.default_rank(c) for r, c in fl26world.ACCESS_COUNTRY.items()}
+    for p in leagues:
+        if p.get("europe") and p.get("rid"):
+            rank[p["rid"]] = uefakey.default_rank(mkflags.title((cty.get(p.get("country")) or ("", None))[0] or ""))
+    return {str(r): n for r, n in rank.items()}
+
+
+def place_rank(pl):
+    """the association ranks uefa_places hands the qualifying places out by, or None: a recipe
+    with a UEFA ranking of its own (uefa_seed) keeps its order. A world without one put its new
+    leagues' places first, and a world of many (the Europack: 31 in the Champions League's
+    qualifying) left the Greek champion and Portugal's second out of Europe (B250)"""
+    if pl.get("uefa_seed") or not pl.get("assoc_rank"):
+        return None
+    try:
+        return {int(r): int(n) for r, n in pl["assoc_rank"].items()}
+    except (AttributeError, TypeError, ValueError):
+        return None
 
 
 def all_places(pl):
@@ -4379,8 +4570,13 @@ def describe(pl):
     rounds = qual_rounds(pl)
     if any(s for _c, s in rounds):
         lines.append("  August qualifying: %s" % fl26world.rounds_text(rounds))
-    for c, (n, room) in sorted(fl26world.uefa_places(all_places(pl),
-                                                     pl.get("game_replace") or [], bool(pl.get("uecl")))[1].items()):
+    listed, over = fl26world.uefa_places(all_places(pl), pl.get("game_replace") or [], bool(pl.get("uecl")),
+                                         place_rank(pl))
+    # the counter (pepponeee 29.10.): each league phase's places against the clubs it takes
+    count = fl26world.europe_count([e[2] for e in listed or fl26world.SHIPPED_ACCESS], bool(pl.get("uecl")))
+    lines.append("  European places (listed / clubs straight into the league phase): %s"
+                 % fl26world.europe_count_text(count))
+    for c, (n, room) in sorted(over.items()):
         lines.append("  NOTE: %s has %d places listed for %d clubs; the last %d get none"
                      % (names[c], n, room, n - room))
     if pl.get("modern_libertadores_access") != "custom":
@@ -4595,6 +4791,14 @@ MONEY_MIN = 500
 MONEY_B = [(86, 1200000), (84, 900000), (82, 300000), (80, 50000), (78, 30000)]   # else 10000
 FAME_CLASS = [(84, 8), (82, 7), (80, 6), (79, 5), (78, 4), (77, 3), (76, 2), (75, 1)]
 FANS_PCT = [100, 40, 15, 8, 5]
+# B298 (vanni11 30.10.): the game's own clubs a world puts into a league that were in none of the
+# game's (the "Other" pools: Zalgiris, HJK, RFS, Hajduk, Ferencvaros...) have no money and no
+# following in Team.bin either (base 0, followers 0: 207 clubs of the game). Out of the ranking
+# like a new club, they counted as its top class, and the broadcasting fee paid them as better
+# than first: Zalgiris bought Endrick for 75M, HJK Estevao for 66M. Such a club gets the new
+# clubs' treatment: its money by squad and division, and a "fans" line. A club of the game with
+# money of its own keeps it; one with followers but no money (Rakow, Sheriff) gets the money and
+# keeps its followers.
 
 
 def recipe_ordered(filled, clubs):
@@ -4635,23 +4839,28 @@ def money_base(q, tier):
     return max(MONEY_MIN, int(round(v / 100.0)) * 100)
 
 
-def club_money(new_of, pl, db, log=print):
+def club_money(new_of, pl, db, log=print, game_of=None):
     """sets the money of the new clubs (new_of: {id: league or group}) in db's Team.bin by their
-    squads and divisions; returns the world's "fans" lines for fl26clubs"""
+    squads and divisions, and of the game's clubs in game_of ({id: league}) that have none of
+    their own (B298); returns the world's "fans" lines for fl26clubs"""
     import lbplayers
     lbplayers.SQUAD = SQUAD                # a new club's places: the squads Build makes
-    if not new_of:
+    game_of = {t: p for t, p in (game_of or {}).items() if t not in new_of}
+    if not new_of and not game_of:
         return []
     path = os.path.join(db, "Team.bin")
     raw = bytearray(pesdb.wesys_unpack(open(path, "rb").read()))
     mine = {p["rid"]: p for p in pl.get("leagues") or [] if "rid" in p}
     squads = lbplayers.Squads(db)
-    groups, n = {}, 0
+    groups, n, ng = {}, 0, 0
     for o in range(0, len(raw) - W.T_REC + 1, W.T_REC):
         tid = int.from_bytes(raw[o + W.T_ID:o + W.T_ID + 4], "little")
-        p = new_of.get(tid)
+        p, game = new_of.get(tid), False
         if p is None:
-            continue
+            p = game_of.get(tid)
+            if p is None or struct.unpack_from("<I", raw, o + 0x34)[0] & 0xffffff:
+                continue
+            ng, game = ng + 1, True
         q = club_strength(squads.squad(tid))
         tier = 1 if p.get("others") else lbplayers.tier_of(p, mine)
         a = money_base(q, tier) & 0xffffff
@@ -4659,7 +4868,8 @@ def club_money(new_of, pl, db, log=print):
         x = struct.unpack_from("<I", raw, o + 0x34)[0]
         struct.pack_into("<I", raw, o + 0x34, (x & 0xff000000) | a)
         x = struct.unpack_from("<I", raw, o + 0x38)[0]
-        struct.pack_into("<I", raw, o + 0x38, (x & ~0x7fffff & 0xffffffff) | (b & 0x7fffff))
+        if not (game and x & 0x7fffff):     # a club of the game keeps followers of its own
+            struct.pack_into("<I", raw, o + 0x38, (x & ~0x7fffff & 0xffffffff) | (b & 0x7fffff))
         cls = max(0, next((c for m, c in FAME_CLASS if q >= m), 0) - (tier - 1))
         pct = FANS_PCT[min(tier, len(FANS_PCT)) - 1]
         groups.setdefault((cls, pct), []).append(tid)
@@ -4669,7 +4879,9 @@ def club_money(new_of, pl, db, log=print):
     for (cls, pct), ids in sorted(groups.items()):
         for k in range(0, len(ids), 64):
             lines.append("fans %d %d %s" % (cls, pct, " ".join(str(t) for t in ids[k:k + 64])))
-    log("  money and following for %d new club(s), by squad and division" % n)
+    log("  money and following for %d new club(s), by squad and division" % (n - ng))
+    if ng:
+        log("  ... and for %d club(s) of the game that had none (B298: in no league of the game)" % ng)
     return lines
 
 
@@ -4783,6 +4995,11 @@ def build(pl, base, game, replace=False, log=print):
     pins_all = {t for p in pl["leagues"] + others for t in (p.get("prev_teams") or [])
                 if t and top_id < t <= CLUB_ID_MAX and t not in nl_ids and t not in mine}
 
+    # the team ids of the leagues the recipe left out (away_leagues): no other new club counts up
+    # into one while an id is free past them, so a league added again finds its own (B287)
+    away_tids = {t for q in pl.get("away_leagues") or [] for t in q.get("teams") or []
+                 if isinstance(t, int) and top_id < t <= CLUB_ID_MAX} - pins_all - nl_ids - mine
+
     def pinned_tid(p, k):
         prev, names = p.get("prev_teams") or [], p.get("prev_names") or []
         nm = str((p.get("club_names") or [])[k] if k < len(p.get("club_names") or []) else "").strip().lower()
@@ -4874,9 +5091,20 @@ def build(pl, base, game, replace=False, log=print):
         else:
             tid = top_id + 1 + own
             own += 1
-            while tid in have or tid in nl_ids or tid in pins_all or tid in clash:    # a NewLife club's pinned id may sit lower
+            while tid in have or tid in nl_ids or tid in pins_all or tid in clash or tid in away_tids:    # a NewLife club's pinned id may sit lower
                 tid = top_id + 1 + own
                 own += 1
+            if tid > CLUB_ID_MAX and away_tids:
+                # no id left past the away leagues' own: they are given out after all, from the start
+                log("  team ids: %d of the left-out leagues' ids are given to new clubs (no other was free)"
+                    % len(away_tids))
+                away_tids.clear()
+                own = 0
+                tid = top_id + 1 + own
+                own += 1
+                while tid in have or tid in nl_ids or tid in pins_all or tid in clash:
+                    tid = top_id + 1 + own
+                    own += 1
             if tid > CLUB_ID_MAX:
                 raise BuildError("no team ids left up to %d" % CLUB_ID_MAX)
         have.add(tid)
@@ -5056,7 +5284,7 @@ def build(pl, base, game, replace=False, log=print):
         raise BuildError(str(e))
     lap("squads")
     last = last_build_ids(game, pl["world"]) or twin_build_ids(game, pl["world"], clubs, log)
-    last = follow_clubs(last, club_newlife(clubs))
+    last = follow_clubs(with_away(last), club_newlife(clubs))
     try:
         retired = {int(x) for x in last.get("retired") or [] if lbplayers.PID_MAX >= int(x) > 0}
     except (TypeError, ValueError):
@@ -5131,7 +5359,10 @@ def build(pl, base, game, replace=False, log=print):
         used = collections.Counter(e["label"] for e in picked.values())
         log("  formations picked for %d clubs from their squads (%s)"
             % (len(picked), ", ".join("%s: %d" % fc for fc in sorted(used.items(), key=lambda kv: (-kv[1], kv[0])))))
-    fans = club_money(new_of, pl, db, log)
+    # B298: the game's clubs in the world's leagues, for the ones with no money of their own
+    game_of = {e["id"]: p for p in (pl.get("leagues") or []) + (pl.get("others") or [])
+               for e in game_places(p).values() if isinstance(e.get("id"), int)}
+    fans = club_money(new_of, pl, db, log, game_of)
     if os.path.exists(os.path.join(db, "Player.bin")):   # a world of cups only keeps the game's players
         lbplayers.sign_keepers(db, log)
         lbplayers.line_up(db, base, recipe_ordered(filled, clubs), log)
@@ -5158,7 +5389,7 @@ def build(pl, base, game, replace=False, log=print):
             now = club_newlife(clubs)
             json.dump({"world": pl["world"], "clubs": ids, "names": id_names(filled, ids),
                        "people": id_people(filled, ids), "club_nl": {k: v for k, v in now.items() if k in ids},
-                       "retired": sorted(gone)}, f, indent=1, sort_keys=True)
+                       "retired": sorted(gone), "away": away_part(last, ids, now)}, f, indent=1, sort_keys=True)
     lap("players")
     if faces:
         import lbfaces
@@ -5243,6 +5474,11 @@ def build(pl, base, game, replace=False, log=print):
             L["kickoff"] = kickoff_after(p, mine, confed)
         if p.get("exhibition"):
             L["exhibition"] = 1                        # fl26joindll leaves it out of the season
+        if p.get("select_team") and p["slot"] in fl26world.POOL_SLOTS:
+            # fl26clubs: a league put on a group's place by choice keeps its clubs in the Master
+            # League as well (Team Info, transfers); one there only because no other place was free
+            # leaves them out of the pools, as since GitHub #8
+            L["pick"] = 1
         if p["above"]:
             L["above"], L["promote"] = p["above"], p["exchange"]
         else:
@@ -5315,7 +5551,7 @@ def build(pl, base, game, replace=False, log=print):
         log("  warning: cup %d -- more than %d national and league cups in the world, the game "
             "fills it itself (Competition Info -> Fixtures may not draw it)" % (c[0], fl26world.MAX_CHAIN_CUPS))
     uefa, over = fl26world.uefa_places(all_places(pl),
-                                       pl.get("game_replace") or [], bool(pl.get("uecl")))
+                                       pl.get("game_replace") or [], bool(pl.get("uecl")), place_rank(pl))
     names = dict(fl26world.COMPETITIONS)
     for c, (n, room) in sorted(over.items()):
         log("  NOTE: %s has %d places listed for %d clubs; the last %d get none"
@@ -5351,6 +5587,7 @@ def build(pl, base, game, replace=False, log=print):
     lap("pictures and kits")
     region_modules(pl, tmp, game, log)
     mp_column(tmp, game, log)
+    team_crest(tmp, game, log)
 
     import lbtrophies
     lbtrophies.build(pl, tmp, db, log)
@@ -5681,26 +5918,22 @@ def keep_added(old, new, log=print, gone=()):
 
 def is_live(world, game):
     """is <world> the one the modules read now (the world line of modules/fl26world.txt)?"""
+    return world is not None and live_world(game) == world
+
+
+def live_world(game):
+    """the world the modules read now (the world line of modules/fl26world.txt), or None.
+    B295 (pepponeee98 30.10.): the whole rest of the line is the name, as fl26world.read reads it --
+    split() took "_FL26MyWorld 1.4B" for "_FL26MyWorld", another world of his: the modules check
+    held the switched-on world's regions against that one's ("older or damaged" after every Switch
+    it on), and a Build of the live world did not switch it on again"""
     try:
         with open(os.path.join(siderdir.find(game), "modules", MARK), encoding="utf-8", errors="replace") as f:
             # the file opens with its "# fl26world 1" header; the name is on the "world" line
             for line in f:
-                w = line.split()
-                if w[:1] == ["world"]:
-                    return w[1:2] == [world]
-        return False
-    except (OSError, BuildError):
-        return False
-
-
-def live_world(game):
-    """the world the modules read now (the world line of modules/fl26world.txt), or None"""
-    try:
-        with open(os.path.join(siderdir.find(game), "modules", MARK), encoding="utf-8", errors="replace") as f:
-            for line in f:
-                w = line.split()
-                if w[:1] == ["world"]:
-                    return w[1] if len(w) > 1 else None
+                line = line.strip()
+                if line == "world" or line.startswith(("world ", "world\t")):
+                    return line[6:].strip() or None
     except (OSError, BuildError):
         pass
     return None
@@ -6072,7 +6305,7 @@ def qual_rounds(pl):
     """the August qualifying rounds the world gets (fl26world.pick_rounds): as many as the European
     places it lists fill -- the play-offs alone with the game's own places"""
     uefa, _over = fl26world.uefa_places(all_places(pl),
-                                        pl.get("game_replace") or [], bool(pl.get("uecl")))
+                                        pl.get("game_replace") or [], bool(pl.get("uecl")), place_rank(pl))
     return fl26world.pick_rounds(uefa, bool(pl.get("uecl")))
 
 
@@ -7212,6 +7445,23 @@ def mp_column(root, game, log=print):
         log("  standings with an MP column")
 
 
+def team_crest(root, game, log=print):
+    """the clubs' crests in the Team List rows (a league's clubs in Database > Team Info): the
+    world's copy of teamSelectSingle.bin with a crest cell in each row (tools/mkteamcrest.py), which
+    fl26squadlist.dll fills. A layout it does not know (another mod's) is left as it is, and a
+    club row keeps the empty badge."""
+    import mkteamcrest
+    try:
+        out = call(mkteamcrest, ["--root", root, "--game", game])
+    except BuildError as e:
+        log("  no crests in the Team List: %s" % str(e).strip().splitlines()[0])
+        return
+    if out.startswith("left as it is"):
+        log("  no crests in the Team List: %s" % out.strip().splitlines()[0])
+    else:
+        log("  crests in the Team List")
+
+
 def region_modules(pl, root, game, log=print):
     """fl26regions.lua and fl26regnames.lua for this world, into <world>/modules/.
 
@@ -7225,7 +7475,8 @@ def region_modules(pl, root, game, log=print):
     comps = sorted({p["cid"] for p in pl["leagues"]})
     if not comps:
         return
-    exe = os.path.join(game, "FL_2026.exe")
+    import flpaths
+    exe = flpaths.game_exe(game)
     if not os.path.exists(exe):
         log("  no region headings: no %s" % exe)
         return
@@ -7252,6 +7503,59 @@ def region_modules(pl, root, game, log=print):
         log("  no region headings: %s" % str(e).strip().splitlines()[0])
         return
     log("  region headings for %d leagues" % len(comps))
+
+
+def mp_for_world(root, game, log=print):
+    """a world built before 0.2.5 (Worldpack r12, Europack eu4 ...) has no rankingTeam.bin of its
+    own, so its tables had no MP column: made at switch on as a Build makes it (mp_column). One
+    built before 0.3.0 has ours without the zone strips: made again the same way. A
+    layout of another mod's is left as it is."""
+    import mkmpcol
+    f = os.path.join(root, *mkmpcol.PACKAGE.split("/"))
+    if os.path.exists(f) and not (mkmpcol.has_mp(f) and not mkmpcol.has_zones(f)):
+        return
+    mp_column(root, game, log)
+
+
+def crest_for_world(root, game, log=print):
+    """a world built before the Team List had crests has no teamSelectSingle.bin of its own: made
+    at switch on as a Build makes it (team_crest)"""
+    import mkteamcrest
+    if os.path.exists(os.path.join(root, *mkteamcrest.PACKAGE.split("/"))):
+        return
+    team_crest(root, game, log)
+
+
+def regnames_for_exe(root, game, log=print):
+    """a world built before 0.2.6 brings an fl26regnames.lua with one cave (0x1426d1f20), and
+    FL27's exe (SmokePatch, 31.10.2026) has code there, so that module writes nothing: made again
+    from the world for the game's own exe, with every cave mkregnames knows"""
+    f = os.path.join(root, "modules", "fl26regnames.lua")
+    try:
+        if "local sets = {" in open(f, encoding="utf-8", errors="replace").read():
+            return
+    except OSError:
+        return
+    import flpaths, mkregnames
+    exe = flpaths.game_exe(game)
+    if not os.path.exists(exe):
+        return
+    flpaths.EXE = exe
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc = mkregnames.main(["--root", root, "--out", f + ".new"])
+    except SystemExit as e:
+        rc = e
+    if rc:
+        log("  region headings kept as the world has them: %s" % str(rc).strip().splitlines()[0])
+        try:
+            os.remove(f + ".new")
+        except OSError:
+            pass
+        return
+    os.replace(f + ".new", f)
+    log("  region headings made again for this game's exe (%s)" % os.path.basename(exe))
 
 
 # ---- install: the modules that read a world ----
@@ -7753,6 +8057,9 @@ def switch_on(world, game, log=print, redraw=False):
         lbstadiums.write(built, siderdir.find(game), log, lbstadiums.load_edits(root))
         lbservers.write(built, siderdir.find(game), log, root, redraw=redraw)
     mods = os.path.join(root, "modules")
+    regnames_for_exe(root, game, log)
+    mp_for_world(root, game, log)
+    crest_for_world(root, game, log)
     for f in sorted(os.listdir(mods)) if os.path.isdir(mods) else []:
         dst = os.path.join(siderdir.find(game), "modules", f)
         if os.path.exists(dst) and open(dst, "rb").read() != open(os.path.join(mods, f), "rb").read():
@@ -7877,7 +8184,8 @@ def check(game, log=print):
             "order -- Install now puts the lines right")
     # a DLL an antivirus took away (B15): the Lua loads, LoadLibraryA fails with error 126
     mdir = os.path.join(siderdir.find(game), "modules")
-    names = sorted({d for m in READERS + ["fl26regen", "fl26edit", "fl26walk", "fl26compcache"]
+    names = sorted({d for m in READERS + ["fl26regen", "fl26edit", "fl26walk", "fl26compcache",
+                                         "fl26squadlist"]
                     for d in dll_names(os.path.join(mdir, m + ".lua"))})
     bad_dlls = check_dlls(mdir, names)
     if bad_dlls:

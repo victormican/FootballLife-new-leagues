@@ -44,7 +44,7 @@ common/render/symbol/coach/coach_<coach id>.png, 256 pixels square (1001 of them
 A club names its manager in Team.bin +0x00, so the picture goes under the id of the club's
 manager in the world: the shipped one for a game club, the one mkcoaches added for a new club.
 """
-import collections, csv, os, re
+import collections, csv, functools, os, re
 
 import pesdb
 import playeredit as E
@@ -65,11 +65,13 @@ PID_MAX = 262143      # a player id Mod Studio hands out stays below this: the e
                       # player id into 18 bits (handle = id << 14 | n), and a world with a player
                       # id of 262144 or more crashes when a new Master League is created
                       # (FL_2026.exe+0xf325a4, the player lookup returns nothing; measured 14.10.2026)
+STAND_IN = 1 << 30    # a player's id while _keep_ids moves him (B282): past any real one, never kept
 T_NATIONAL = 0x53     # Team.bin: top bit set on the 144 national teams (leaguebuilder.T_NATIONAL)
 T_COUNTRY = 0x46      # Team.bin: the country, 9 bits from bit 2 (144 of 144 national teams)
 T_COACH = 0x00        # Team.bin: the id of the club's manager in Coach.bin (mkcoaches.T_COACH)
 PORTRAIT = 256        # a manager's portrait is a PNG this many pixels square
-PLAYER_PORTRAIT = 180  # a player's portrait (mini face) is a DDS this many pixels square
+PLAYER_PORTRAIT = 128  # a player's portrait (mini face) is a DDS this many pixels square: the game's
+                      # own size; FL27 does not survive bigger ones (180 until 02.11., lbpack.PORTRAIT)
 PICTURES = (".png", ".jpg", ".jpeg", ".bmp", ".webp", ".dds")
 BASIC = ["Registered Position", "Age", "Height (cm)", "Weight (kg)", "Stronger Foot", "Nationality"]
 KEYS = ["name", "shirt", "order"] + FIELDS
@@ -152,7 +154,10 @@ FOLD = str.maketrans({"\u0142": "l", "\u0141": "l", "\u00f8": "o", "\u00d8": "o"
                       "\u0140": "l", "\u013f": "l"})
 
 
+@functools.lru_cache(maxsize=1 << 18)
 def _letters(s):
+    """B303: cached -- B102's look-up compares every release row with the game's players of his
+    surname, three and a half million calls for one league, ten seconds of a frozen window"""
     import unicodedata
     s = unicodedata.normalize("NFKD", s.casefold()).translate(FOLD)
     return "".join(ch for ch in s if ch.isalnum())
@@ -354,10 +359,15 @@ def fill_newlife(pl, base, log=print):
     """pl's "players" with the prototype players who stay at a NewLife club brought to its level
     (fill_level), for recipes whose leagues were added before Mod Studio did it itself (Risto
     04.10.: a top club's clones at fourth-tier sides). A place the recipe edits is left alone.
-    Returns a new players dict; pl is not changed."""
+    Returns a new players dict; pl is not changed.
+    B299 (Risto 30.10.): a NewLife club with no rated player of its own in a league with none
+    either -- or with no squad from the release at all -- kept the clones of a top club (70-81
+    in a Polish fourth division). Those are brought to the division's level (TIER_LEVEL), as
+    fill_tiers does for a new club with no squad."""
     import copy
     out = copy.deepcopy(pl.get("players") or {})
-    proto, n = None, 0
+    mine = {p["rid"]: p for p in pl.get("leagues") or [] if "rid" in p}
+    proto, n, nt = None, 0, 0
     for L in pl.get("leagues") or []:
         nl = (L.get("newlife") or {}).get("clubs") or []
         if not nl:
@@ -370,19 +380,32 @@ def fill_newlife(pl, base, log=print):
         own = [[overall(ch) for ch in (c.get("edits") or {}).values() if "Registered Position" in ch] for c in clubs]
         league = [x for xs in own for x in xs]
         for k, c in enumerate(clubs):
-            if not c.get("edits"):
-                continue                  # not a squad Mod Studio set from the release
+            if not c.get("edits") and c.get("join"):
+                continue                  # the game's players take its places
             if proto is None:
                 proto = Squads(base).proto()
-            want = fill_level(own[k], league)
+                if not proto:
+                    return out
+            want = fill_level(own[k], league) if c.get("edits") else None
+            d = None
+            if want is None:
+                d = round(TIER_LEVEL[min(tier_of(L, mine), len(TIER_LEVEL)) - 1]
+                          - sum(overall(r) for r in proto) / len(proto))
+            edits = c.setdefault("edits", {})
             gone = set(c.get("remove") or [])
             for place in range(min(SQUAD, len(proto))):
                 key = str(place)
-                if want is not None and key not in c["edits"] and key not in gone:
-                    c["edits"][key] = at_level(proto[place], want)
+                if key not in edits and key not in gone:
+                    edits[key] = at_level(proto[place], want if d is None else overall(proto[place]) + d)
                     n += 1
-    if n:
-        log("  %d prototype players at NewLife clubs brought to their club's level" % n)
+                    nt += d is not None
+            if edits and new_key(L["name"], k) not in out:
+                out[new_key(L["name"], k)] = c
+    if n - nt:
+        log("  %d prototype players at NewLife clubs brought to their club's level" % (n - nt))
+    if nt:
+        log("  %d prototype players at NewLife clubs with no rated player brought to their division's level"
+            % nt)
     return out
 
 
@@ -1026,7 +1049,7 @@ def _media(faces, portraits, pid, ch):
 def player_portraits(portraits, root, log=print):
     r"""each (player id, picture) as the player's portrait, common\render\symbol\player\<id>.dds:
     PLAYER_PORTRAIT pixels square, DXT5, the picture centred on a clear background -- the form of
-    the regen faces' portraits, which the game showed in the Team Sheet (30.09.). It goes after
+    the game's own portraits and of the regen faces' (the game showed those in the Team Sheet, 30.09.). It goes after
     the faces, so it wins over a face folder's own portrait.dds."""
     from PIL import Image
     if not portraits:
@@ -1294,17 +1317,23 @@ def _keep_ids(prev, prev_names, changes, first, players, assigns, index, game_to
         log("  player ids: %d players keep the id of the last Build (%s); %d ids of players no longer "
             "in the world are not given to anyone else" % (
                 kept, ", ".join("%d by %s" % (n, k) for k, n in how.most_common()) or "none", len(retired)))
-    # every player in the way moves to a free id first: those pinned, whoever holds an id
-    # someone is pinned to, and whoever holds the id of a player who is gone; then the pinned
-    # ones take theirs
+    # every player in the way moves: those pinned to their ids, whoever holds an id someone is
+    # pinned to, and whoever holds the id of a player who is gone, to a free id
     moving = set(pin) | {pid for pid in wanted if pid in index} | {pid for pid in retired if pid in index}
     if not moving:
         return later
     # the first free ids above the game's own, not max + 1: a player moved out of the way and
     # not pinned himself keeps this id, and the engine packs a player id into 18 bits (PID_MAX);
-    # max + 1 left 500 players of the Modpack world at 279513..289512 (14.10.2026)
-    busy = set(index) | wanted | taken
+    # max + 1 left 500 players of the Modpack world at 279513..289512 (14.10.2026).
+    # B282 (juanjose 29.10., 1174 new clubs): every mover took a spare id on the way and kept the
+    # id he left taken too, so a world's second Build ran out of ids below PID_MAX that its first
+    # had room for. The ids the movers leave are free again (not a gone player's: retired), and
+    # each goes straight to the id he ends on, through a stand-in past PID_MAX that never stays.
+    busy = (set(index) - moving) | wanted | taken
     free = FreeIds(game_top, busy, retired, log)
+    final = dict(pin)
+    for pid in sorted(moving - set(pin)):
+        final[pid] = free.take()
     moved = {}                                         # player id before -> after
     # 0.2.4: where each player's assignments are, found once -- _renumber looked through every
     # assignment for every player it moved, and a rebuilt Modpack moves thousands (the Modpack's
@@ -1312,13 +1341,13 @@ def _keep_ids(prev, prev_names, changes, first, players, assigns, index, game_to
     where = collections.defaultdict(list)
     for i in range(len(assigns) // A_REC):
         where[u32(assigns, i * A_REC + E.A_PID)].append(i * A_REC)
+    stand_in = {}
+    for n, pid in enumerate(sorted(moving)):
+        stand_in[pid] = STAND_IN + n
+        _renumber(players, assigns, index, pid, stand_in[pid], where)
     for pid in sorted(moving):
-        spare = free.take()
-        moved[pid] = spare
-        _renumber(players, assigns, index, pid, spare, where)
-    for pid, want in pin.items():
-        _renumber(players, assigns, index, moved[pid], want, where)
-        moved[pid] = want
+        _renumber(players, assigns, index, stand_in[pid], final[pid], where)
+        moved[pid] = final[pid]
     # a player moved out of the way who is not pinned and gets dropped later frees his id again
     for club in first:                                 # every copy of a player follows him
         first[club] = [moved.get(pid, pid) for pid in first[club]]
@@ -1507,10 +1536,18 @@ def apply(pl, base, db, cap, log=print, faces=None, lineups=None, ids=None, port
     drop = set()
     touched = set()                                    # clubs whose squad order may have gaps
     later = {}                                         # club -> {ref: changes} of players who join it
+    tsrc = next((d for d in (db, base) if os.path.exists(os.path.join(d, "Team.bin"))), None)
+    known = set(teams(tsrc)) if tsrc else None         # None: no Team.bin to tell by
     for club, c in changes.items():
         tid = club_tid(club)
         if tid is None:
             log("  players of %s: the club was not built, skipped" % club)
+            continue
+        if club.isdigit() and known is not None and tid not in known:
+            # B311: a club of the other game -- FL26 and FL27 have clubs apart (FL26's SSC Bari,
+            # 319, is not in FL27, which has SS Arezzo, 4377, instead): its added players had no one
+            # to be copied from and the whole Build stopped
+            log("  NOTE: players of %s: the game has no club %s (a club of the other game?), skipped" % (club, club))
             continue
         sq = squad_of(tid)
         where = {}                                     # recipe key -> (pid, assignment offset)
@@ -1632,7 +1669,12 @@ def apply(pl, base, db, cap, log=print, faces=None, lineups=None, ids=None, port
                 mine = []
             if not national:
                 if pid in signed:
-                    raise Error("player %d joins two clubs (%s and %s)" % (pid, signed[pid], club))
+                    # B274 (juanjose6124, 29.10.): leagues of two packs in one world, each moving the
+                    # same player of the game -- Build stopped here after minutes of work. The first
+                    # club of the recipe keeps him, as a transfer of a player not in the game is skipped
+                    log("  NOTE: players of %s: player %d already joins %s in the recipe -- he stays there, "
+                        "this transfer is skipped" % (club, pid, signed[pid]))
+                    continue
                 signed[pid] = club
             if mine:                                   # a transfer: his club assignment moves
                 ao = mine[0]

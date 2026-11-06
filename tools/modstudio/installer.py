@@ -203,11 +203,11 @@ def face_pack_missing(sider_dir):
 
 README = """FL26 world: {world}
 
-Install it with FL26 Mod Studio: Import your world > drop this zip > Install. Mod Studio copies
+Install it with FL Mod Studio: Import your world > drop this zip > Install. Mod Studio copies
 SiderAddons\\livecpk\\{world}, puts its world file (fl26world.txt) in SiderAddons\\modules
 and switches the world on.
 
-REQUIRED: FL26 Mod Studio's modules with the face pack (SiderAddons\\modules\\{pack}).
+REQUIRED: FL Mod Studio's modules with the face pack (SiderAddons\\modules\\{pack}).
 Install them once: Home > Install now (or Build and install).
 {faces} new players of this world get a generated face from that pack: they are listed on
 the newfaces / faceapp lines of fl26world.txt. Without the modules, or without
@@ -278,7 +278,7 @@ def export_world(sider_dir, world, out, log=lambda t: None, menus=False):
     faces = face_players(use)
     info = {"format": "fl26world", "format_version": 1, "world": world, "face_players": faces,
             "world_file": "SiderAddons/livecpk/%s/%s" % (world, WORLD_FILE),
-            "needs": ["FL26 Mod Studio modules with the face pack (%s): Home > Install now"
+            "needs": ["FL Mod Studio modules with the face pack (%s): Home > Install now"
                       % FACE_PACK]}
     comps = world_competitions(use)
     content = os.path.join(sider_dir, "content")
@@ -598,6 +598,10 @@ def detect(top, label="mod"):
             p = Part("world", d, w, note=WORLD_NOTE)
             p.world_file = os.path.join(d, wf)
             parts.append(p)
+            return
+        # B317 (Jh, 04.11.): a folder with no file in it is nothing to put in place -- the copy
+        # made no "root (2)" for it and the mark written there stopped the install
+        if not any(fn for _dp, _dn, fn in os.walk(d)):
             return
         p = Part("root", d, safe(name))
         if os.path.isdir(os.path.join(d, "common", "etc", "pesdb")) or \

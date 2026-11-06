@@ -243,6 +243,54 @@ def select_team_text(L, b, plan):
     return _("yes")
 
 
+class PlaceBox(QComboBox):
+    """a combo in a table row: the mouse wheel scrolls the table, it does not change the pick"""
+
+    def wheelEvent(self, e):
+        e.ignore()
+
+
+def place_box(page, L, seen, b):
+    """the Select Team cell of a league (New leagues, the Leagues page's places table): where the
+    last Build put it, or the place of one of the game's "other" groups it takes (recipe
+    select_team; vmican 02.11.: with a South American world the Other Latin American Teams are
+    of no use)"""
+    box = PlaceBox()
+    # a table row gives its widget ~20 px: with the inputs' 4 px padding the text was cut at the bottom
+    box.setStyleSheet("QComboBox { padding: 1px 6px; }")
+    box.setFocusPolicy(Qt.StrongFocus)
+    box.addItem(_("Automatic: %s") % seen if seen else _("Automatic"), "")
+    for key, slot in fl26world.POOL_PICK.items():
+        box.addItem(_("in place of %s") % _(fl26world.POOL_SLOTS[slot]), key)
+    box.setCurrentIndex(max(0, box.findData(L.get("select_team") or "")))
+    tip = _("Automatic: the order (#) decides, and the game's Other ... groups give their place last. Pick "
+            "a group to give its place in Select Team to this league; that group's own clubs are then "
+            "not in Select Team. Build puts it there.")
+    want = fl26world.POOL_PICK.get(L.get("select_team"))
+    if want is not None and b and b.get("slot") != want:
+        tip += "\n" + _("Not built like this yet: press Build.")
+    box.setToolTip(tip)
+    box.currentIndexChanged.connect(lambda _n, box=box: pick_place(page, L, box.currentData()))
+    return box
+
+
+def pick_place(page, L, key):
+    leagues = page.project.recipe["leagues"]
+    if (L.get("select_team") or "") == (key or "") or not any(M is L for M in leagues):
+        return
+    other = next((M.get("name") for M in leagues if M is not L and key and M.get("select_team") == key), None)
+    if other:
+        page.say(_("%s has that place already: set it back to Automatic first.") % other, "warn")
+        QTimer.singleShot(0, page.refresh)
+        return
+    if key:
+        L["select_team"] = key
+    else:
+        L.pop("select_team", None)
+    # not from inside the combo's own signal: touch() rebuilds the table and the combo with it
+    QTimer.singleShot(0, page.project.touch)
+
+
 def fmt_text(L):
     if L.get("apertura"):
         return _("Apertura + Clausura")
@@ -396,6 +444,7 @@ class EuropeTable(QWidget):
         super().__init__()
         self.clubs = clubs
         self.modern = modern
+        self.changed = None             # called when a place changes (the European places counter)
         self.competitions = continental_place_choices(competitions or fl26world.COMPETITIONS, modern)
         self.cup_winner = bool(cup_winner)
         self.position_label = position_label
@@ -463,11 +512,18 @@ class EuropeTable(QWidget):
         self.table.setCellWidget(r, 0, sp)
         self.table.setCellWidget(r, 1, cb)
         self.table.setCellWidget(r, 2, x)
+        cb.currentIndexChanged.connect(lambda *_a: self._changed())
+        self._changed()
+
+    def _changed(self):
+        if self.changed:
+            self.changed()
 
     def remove_row(self, button):
         for r in range(self.table.rowCount()):
             if self.table.cellWidget(r, 2) is button:
                 self.table.removeRow(r)
+                self._changed()
                 return
 
     def set_places(self, places):
@@ -475,6 +531,7 @@ class EuropeTable(QWidget):
         # by position, the cup winner's place last
         for pos, comp in sorted(places, key=lambda e: (int(e[0]) == B.CUP_WINNER, int(e[0]))):
             self._row(pos, comp)
+        self._changed()
 
     def add(self):
         taken = {p for p, _c in self.places()}
@@ -707,7 +764,8 @@ class LeagueDialog(Dialog):
         # second Switzerland); the clubs say which league it really is
         clubs_of = {g[0]: g[3] for g in project.game_lgs}
         for r, n in project.parents:
-            two = [project.game_cl.get(t, ("",))[0] for t in clubs_of.get(r, [])[:2]]
+            two = [project.game_cl.get(t, ("",))[0]
+                   for t in clubs_of.get(getattr(project, "split_of", {}).get(r, r), [])[:2]]
             two = ", ".join(c for c in two if c)
             add("%s  [%d]%s" % (n, r, "  (%s ...)" % two if two else ""), r)
         cur = L.get("above")
@@ -803,7 +861,8 @@ class LeagueDialog(Dialog):
         self.europe = EuropeTable(L.get("europe"), self.clubs.value(), modern=modern_conmebol(project))
         self.form.addRow(_("Europe"), self.europe)
         self.form.addRow("", hint(_("league position -> European competition, for a top division; "
-                                    "leave it empty for lower tiers")))
+                                    "leave it empty for lower tiers. The country's cup winner: take the "
+                                    "position below 1 (it shows Cup winner)")))
         self.clubs.valueChanged.connect(self.europe.set_clubs)
         self.above.currentIndexChanged.connect(lambda _i: self.europe.set_top(self.above.currentData() is None))
         self.europe.set_top(self.above.currentData() is None)
@@ -1009,7 +1068,7 @@ class LeagueDialog(Dialog):
             if below:
                 error(self, "League", _("%s is below this league; an exhibition league has none.") % below[0])
                 return
-            for k in ("above", "cup", "supercup", "league_cup", "split", "apertura", "europe", "season"):
+            for k in ("above", "cup", "supercup", "league_cup", "split", "apertura", "europe", "season", "select_team"):
                 L.pop(k, None)
             L["exhibition"] = True
             L.pop("others", None)
@@ -2018,11 +2077,21 @@ class GameEuropeDialog(Dialog):
         right.addWidget(self.table, 1)
         body.addLayout(right, 1)
         self.v.insertLayout(1, body, 1)
-        self.scroll.hide()
+        # the counter (pepponeee 29.10.): every place of the world against what each league phase takes
+        self.recipe = project.recipe
+        self.l_count = hint("")
+        self.l_count.setToolTip(_("Places listed for each league phase (yours, the game's leagues', the title "
+                                  "holders') / the clubs it takes straight in. The game fills a gap with the next "
+                                  "clubs of England, Spain, Italy, Germany and France; places over go to the "
+                                  "competition's qualifying, or get none."))
+        self.v.insertWidget(2, self.l_count)
         self.cur = -1
+        self.table.changed = self.count
+        self.scroll.hide()
         self.list.currentRowChanged.connect(self.show_league)
         self.list.setCurrentRow(0)
         self.marks()
+        self.count()
         self.setMinimumSize(980, 640)
 
     def marks(self):
@@ -2058,6 +2127,23 @@ class GameEuropeDialog(Dialog):
         if 0 <= self.cur < len(self.tops) and self.own.isChecked():
             self.places[self.tops[self.cur][0]] = self.table.places()
 
+    def count(self):
+        """the counter's line: the game's leagues (their own places or the game's), the new leagues'
+        places and the title holders'"""
+        if not hasattr(self, "l_count"):
+            return
+        places = dict(self.places)
+        if 0 <= self.cur < len(self.tops) and self.own.isChecked():
+            places[self.tops[self.cur][0]] = self.table.places()
+        comps = [e[2] for e in fl26world.HOLDERS]
+        for rid, _name, _clubs, shipped in self.tops:
+            comps += [int(c) for _p, c in (places[rid] if rid in places else shipped)]
+        for L in self.recipe.get("leagues") or []:
+            comps += [int(c) for _p, c in L.get("europe") or []]
+        counts = fl26world.europe_count([c for c in comps if c in fl26world.UEFA_LINE],
+                                        bool(self.recipe.get("uecl", True)))
+        self.l_count.setText(_("European places: %s") % fl26world.europe_count_text(counts))
+
     def show_league(self, i):
         self.keep()
         self.cur = i
@@ -2073,6 +2159,7 @@ class GameEuropeDialog(Dialog):
         self.own.blockSignals(False)
         self.table.set_places(self.places[rid] if mine else shipped)
         self.table.setEnabled(mine)
+        self.count()
 
     def toggle(self, on):
         if not 0 <= self.cur < len(self.tops):
@@ -2086,6 +2173,7 @@ class GameEuropeDialog(Dialog):
         self.table.setEnabled(on)
         self.whose(on, rid, shipped)
         self.marks()
+        self.count()
 
     def ok(self):
         self.keep()
@@ -2099,7 +2187,8 @@ class EuropeFirstDialog(Dialog):
     ("<league>/<k>") or of the game (its team id)"""
     help = ("Pick the clubs that play the league phase of the Champions League, Europa League and Conference "
             "League in the first season of a new career.\n\n"
-            "Your clubs go in first; the game fills the rest of the 36 places as it always does. Leave a "
+            "Your clubs go in first; the game fills the rest of the 36 places as it always does. "
+            "With the summer qualifying on, part of the 36 are its winners: clubs past the direct places (28 in the Champions League, 20 in the other two) play the qualifying, from the play-off down. Leave a "
             "competition empty and it is filled the usual way. From the second season on, the European places "
             "of the leagues decide who goes.\n\n"
             "A club of the game must play in a league that season. Only a career started after Build gets "
@@ -2960,7 +3049,8 @@ class NewLeagues(BuilderPage):
                                                "file uses), given at Build"))
         self.tree.headerItem().setToolTip(9, _("The league's place in the order (Move up / Move down): the first "
                                                "ones get a place in Select Team"))
-        self.tree.headerItem().setToolTip(10, _("Where the last Build put the league in Select Team"))
+        self.tree.headerItem().setToolTip(10, _("Where the last Build put the league in Select Team. Pick a group "
+                                                "of the game's here and the league takes its place"))
         for c, w in enumerate((240, 80, 150, 60, 170, 230, 80, 150, 110, 40)):
             self.tree.setColumnWidth(c, w)
         self.tree.header().moveSection(9, 0)        # "#" shown first, as asked
@@ -2981,8 +3071,12 @@ class NewLeagues(BuilderPage):
     def set_world(self):
         w = self.world.text().strip()
         if w != self.project.recipe.get("world"):
-            if not w.startswith("_FL26"):
-                self.say(_("The world name must start with _FL26."), "err")
+            # B295 (pepponeee98 30.10.): this field took "_FL26MyWorld 1.4B", which Rename world
+            # refuses -- the same rules for a name here
+            from .. import worlds as WL
+            why = WL.name_form(w)
+            if why:
+                self.say(why, "err")
                 self.world.setText(self.project.recipe.get("world", ""))
                 return
             self.project.recipe["world"] = w
@@ -3034,6 +3128,9 @@ class NewLeagues(BuilderPage):
                 it.setIcon(0, pm)
             it.setData(0, Qt.UserRole, i)
             self.tree.addTopLevelItem(it)
+            if not L.get("others") and not L.get("exhibition"):
+                self.tree.setItemWidget(it, 10, place_box(self, L, seen, b))
+                it.setText(10, "")
         if cur is not None and cur < self.tree.topLevelItemCount():
             self.tree.setCurrentItem(self.tree.topLevelItem(cur))
         clubs = sum(B.new_club_count(L) for L in r["leagues"])
@@ -5254,7 +5351,7 @@ class Build(BuilderPage):
         """True when the game's tables Mod Studio unpacked are older than the game and the
         person chose to unpack them first; `again` runs once they are (GitHub #63: tables
         without the update's data_extra changed the starting elevens of the game's clubs)"""
-        if self.app.settings.get("tables"):
+        if self.project.own_tables():
             return False                      # a folder of tables picked by hand: left as it is
         why = B.tables_stale(self.app.game.folder, self.project.tables_dir())
         if not why or not ask(self, "Build", _("The game's tables Mod Studio uses are older than the game: %s. "

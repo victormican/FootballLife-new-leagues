@@ -36,8 +36,9 @@ save loader (0x1412e5eb0):
 
 FLAGS: 1 = new names, 2 = new potential; 3 = both.
 
-Log: the DLL keeps a small text log; this loader drains it into sider.log every so often and
-on F10, which also prints the counts.
+Log: the DLL keeps a small text log; this loader drains it into sider.log every so often.
+The counts show in the sider overlay (pick fl26regen there); F10 while it is shown also
+writes them into sider.log.
 
 Requires sider.ini: luajit.ext.enabled = 1 (global ffi).
 --]]
@@ -107,6 +108,21 @@ function m.rewrite(ctx, filename)
   return (filename:gsub(PORTRAIT, "symbol" .. sep .. "player" .. sep .. "regen.dds", 1))
 end
 
+-- sider hands key_down only to the module shown in its overlay, so the counts live there:
+-- open the overlay, pick fl26regen, and F10 also writes them into sider.log
+function m.overlay_on(ctx)
+  drain(nil)
+  if not dll_stats then return "fl26regen: not installed" end
+  dll_stats(statbuf)
+  return string.format("fl26regen  (F10 = write this into sider.log)\n"
+                       .. "regens %d: named %d, new potential %d, past the side table %d\n"
+                       .. "loads %d, named again %d, %d year(s) played; %d names in the pools\n"
+                       .. "faces in the pack %d; face/portrait requests of regens hidden %d",
+                       tonumber(statbuf[0]), tonumber(statbuf[1]), tonumber(statbuf[6]), tonumber(statbuf[7]),
+                       tonumber(statbuf[2]), tonumber(statbuf[3]), tonumber(statbuf[4]), tonumber(statbuf[5]),
+                       nfaces, hidden)
+end
+
 function m.key_down(ctx, vkey)
   if vkey == 0x79 then drain("F10 report") end      -- F10
 end
@@ -147,10 +163,42 @@ local function face_copies(copy, dllpath)
   return n
 end
 
+-- B294 (Pelda 30.10.): ctx.sider_dir is UTF-8, and LoadLibraryA reads a name in the system's
+-- code page: with the game in a folder named with a Czech u-ring, no DLL of ours loaded (error 126)
+-- and the leagues had no fixtures. LoadLibraryW takes any folder name. The wide calls are declared
+-- under this module's own names (as fl26slotnames does), so no other module's declaration can clash.
+local function load_dll(path)
+  local n = ffi.C.fl26regen_MultiByteToWideChar(65001, 0, path, -1, nil, 0)
+  if n > 0 then
+    local w = ffi.new("uint16_t[?]", n)
+    ffi.C.fl26regen_MultiByteToWideChar(65001, 0, path, -1, w, n)
+    local h = ffi.C.fl26regen_LoadLibraryW(w)
+    if h ~= nil then return h end
+  end
+  return ffi.C.LoadLibraryA(path)
+end
+
+-- B294: a path the DLL opens itself (fopen) goes in the system's code page, the way it reads it;
+-- a name that code page cannot hold stays as it was
+local function ansi_path(path)
+  local n = ffi.C.fl26regen_MultiByteToWideChar(65001, 0, path, -1, nil, 0)
+  if n <= 0 then return path end
+  local w = ffi.new("uint16_t[?]", n)
+  ffi.C.fl26regen_MultiByteToWideChar(65001, 0, path, -1, w, n)
+  local k = ffi.C.fl26regen_WideCharToMultiByte(0, 0, w, -1, nil, 0, nil, nil)
+  if k <= 0 then return path end
+  local a = ffi.new("char[?]", k)
+  ffi.C.fl26regen_WideCharToMultiByte(0, 0, w, -1, a, k, nil, nil)
+  return ffi.string(a)
+end
+
 function m.init(ctx)
   if ffi == nil then log("fl26regen: global ffi is nil -- set luajit.ext.enabled = 1"); return end
   ffi.cdef([[
     void*    LoadLibraryA(const char*);
+    void*    fl26regen_LoadLibraryW(const uint16_t*) __asm__("LoadLibraryW");
+    int      fl26regen_MultiByteToWideChar(unsigned int, unsigned long, const char*, int, uint16_t*, int) __asm__("MultiByteToWideChar");
+    int      fl26regen_WideCharToMultiByte(unsigned int, unsigned long, const uint16_t*, int, char*, int, const char*, int*) __asm__("WideCharToMultiByte");
     void*    GetProcAddress(void*, const char*);
     void*    GetModuleHandleA(const char*);
     unsigned long GetLastError(void);
@@ -165,7 +213,7 @@ function m.init(ctx)
   ]])
   local sep = string.char(92)
   local dllpath = ctx.sider_dir:gsub("[/" .. sep .. "]+$", "") .. sep .. "modules" .. sep .. "fl26regen.dll"
-  local h = ffi.C.LoadLibraryA(dllpath)
+  local h = load_dll(dllpath)
   if h == nil then
     log(string.format("fl26regen: LoadLibraryA failed (err %d): %s", tonumber(ffi.C.GetLastError()), dllpath)); return
   end
@@ -187,12 +235,13 @@ function m.init(ctx)
   local status = tonumber(install(base, FLAGS))
   if status == 0 then
     ctx.register("livecpk_make_key", m.make_key)
+    ctx.register("overlay_on", m.overlay_on)
     ctx.register("key_down", m.key_down)
     if FACES and pfl ~= nil and pf1 ~= nil and pfa ~= nil then
       dll_face  = ffi.cast("fl26_regen_is_t", pf1)
       dll_faces = ffi.cast("fl26_regen_faces_t", pfa)
       local pack = dllpath:gsub("fl26regen%.dll$", "fl26regen_faces.bin")
-      nfaces = tonumber(ffi.cast("fl26_regen_faces_load_t", pfl)(pack))
+      nfaces = tonumber(ffi.cast("fl26_regen_faces_load_t", pfl)(ansi_path(pack)))
       log(nfaces > 0 and string.format("fl26regen: face pack loaded, %d faces", nfaces)
                      or "fl26regen: no face pack (" .. pack .. "), regens keep the generic face")
       local pnew = ffi.C.GetProcAddress(h, "fl26_regen_new")
@@ -205,7 +254,7 @@ function m.init(ctx)
     end
     if FACES then ctx.register("livecpk_rewrite", m.rewrite) end
     drain(nil)
-    log("fl26regen: live (F10 = report)")
+    log("fl26regen: live (counts in the sider overlay, F10 there = report)")
   else
     local msg = ({ [2] = "regen function signature mismatch", [3] = "save loader signature mismatch",
                    [4] = "an operand is not what this build expects", [5] = "out of memory",

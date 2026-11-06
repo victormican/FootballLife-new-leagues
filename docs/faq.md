@@ -1,12 +1,27 @@
 # Questions people ask
 
-The first part is about **FL26 Mod Studio**, the program most people use. The second part is
+The first part is about **FL Mod Studio**, the program most people use. The second part is
 about the command-line scripts it grew out of. Your question is not here? Open an
 [issue](https://github.com/Matozanato/FootballLife-new-leagues/issues) with the report
 described in [What should I send when something is wrong?](#what-should-i-send-when-something-is-wrong)
 Just a question, not a bug? Ask on [Discord](https://discord.gg/StQqtk3G3M).
 
-## FL26 Mod Studio
+## FL Mod Studio
+
+### Does Mod Studio work with Football Life 2027?
+
+Yes, from 0.3.0: the same program for FL26 and FL27. In **5. Settings → Game folder** pick the
+folder with `FL_2027.exe`. Each game keeps its own tables and saves. In FL27 the Champions League
+and Europa League from the league phase on are FL27's own; Mod Studio sends your clubs into them
+and plays the qualifying rounds, and the Conference League is Mod Studio's. What is different and
+what is not done yet: [guide](../guides/en/mod-studio-guide.md#football-life-2027) ·
+[known issues](known-issues.md).
+
+### FL27 closes while a new Master League is being created
+
+Start FL27 through its launcher: **FL 2027 start.exe**, its shortcut, or **Start the game** in Mod
+Studio. FL_2027.exe started directly (or Sider and the game exe started apart) can close while a
+new Master League is created or on its first days; started through the launcher it did not.
 
 ### I updated Mod Studio. What do I do now?
 
@@ -310,7 +325,7 @@ on the *Players* page are left as they are.
 ### Can a player or a manager get a picture without a 3D face?
 
 Since 0.1.5.5, yes. A player: *Players* > select him > **Portrait** > **Choose...** a PNG or JPG;
-Build makes it his small portrait in the squad lists (180 x 180). A manager: **Manager picture** in
+Build makes it his small portrait in the squad lists (128 x 128, the size of the game's own portraits). A manager: **Manager picture** in
 **Edit club** (new clubs on *New leagues*, the game's clubs on *Game's leagues and clubs*), or
 **Manager portrait...** on the *Players* page -- both set the same picture. Build the world again
 after you change one.
@@ -467,7 +482,7 @@ another program (the game, an antivirus) holds it.
 
 Some of Mod Studio's modules are a `.lua` file with a `.dll` next to it in
 `SiderAddons\modules`: `fl26swiss.dll`, `fl26join.dll`, `fl26chain.dll`, `fl26clubs.dll`,
-`fl26regen.dll`, `fl26edit.dll`, `fl26walk.dll`, `fl26compcache.dll`. They change the game in
+`fl26regen.dll`, `fl26edit.dll`, `fl26walk.dll`, `fl26compcache.dll`, `fl26squadlist.dll`. They change the game in
 memory, which some antivirus programs (Windows Security included) mistake for malware: they
 quarantine the DLL a moment after it is copied. The `.lua` stays, so the game starts, but the
 parts the DLL runs are silently missing: no European draws, empty league phases, no regens,
@@ -483,6 +498,12 @@ names the missing file, and **Home** and **Diagnostics** say it as long as one i
 2. Press **Install now** on **Home** again (or restore the files from
    the antivirus' quarantine).
 3. Start a new Master League career if the old one was made without the DLLs.
+
+If every one of them says `LoadLibraryA failed (err 126)` while the DLLs are in `modules`, look at
+the game folder's name: up to Mod Studio 0.2.5 the modules could not load their DLLs from a folder with
+letters outside plain English ones (`C:\fůtbal lajf\...`). Rename the folder to plain letters,
+choose it again in **Settings**, **Install the modules**, and start a new career. Since 0.2.5.1
+any folder name works.
 
 ### What should I send when something is wrong?
 
@@ -500,7 +521,7 @@ names the missing file, and **Home** and **Diagnostics** say it as long as one i
 
 ### Is there a program instead of all the scripts?
 
-Yes: FL26 Mod Studio, a Windows program (beta). It installs the modules, builds leagues and
+Yes: FL Mod Studio, a Windows program (beta). It installs the modules, builds leagues and
 clubs, edits the players of any club, adds faces, installs other mods and content servers,
 and keeps restore points. Download it from the
 [latest release](https://github.com/Matozanato/FootballLife-new-leagues/releases/latest);

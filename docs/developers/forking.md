@@ -1,10 +1,10 @@
-# Making your own fork of FL26 Mod Studio
+# Making your own fork of FL Mod Studio
 
 > **0.2.0 is the last release of FL26 Mod Studio with new features.** After it this repository
 > only gets bug fixes from us, about once a week. New features now come from you, and this page
 > and the chapters below are written so that you can carry the project on without us.
 
-> **You do not have to go it alone.** If you would rather your work end up in FL26 Mod Studio
+> **You do not have to go it alone.** If you would rather your work end up in FL Mod Studio
 > itself, send it as a pull request: fork, change it on a branch, open the pull request, and we
 > test it and merge it into the next release (see
 > [Contributing](../../README.md#contributing)). Fixes and new features are both welcome. A
@@ -12,7 +12,7 @@
 
 Mod Studio is MIT licensed (see `LICENSE`). Fork it, rename it, change it, ship it: no
 permission needed. Keep the licence file and the copyright line, and say in your README that
-your fork is based on FL26 Mod Studio. That is all the licence asks.
+your fork is based on FL Mod Studio. That is all the licence asks.
 
 This page is the map: what lives where, how to run and build it, and how to add the usual
 things (a page, a recipe key, a module, a translation). The details are in the chapters:
@@ -47,7 +47,7 @@ python modstudio_main.py
 ```
 
 The first start asks for the game folder and unpacks the game's tables into
-`%APPDATA%\FL26ModStudio\tables` (Settings > Unpack the game's tables). Your settings are in
+`%APPDATA%\FL26ModStudio\tables` (FL27's: `tables27`) (Settings > Unpack the game's tables). Your settings are in
 `%APPDATA%\FL26ModStudio\settings.json`. A fork that wants its own settings and tables next to
 the official ones changes the folder name in `APPDIR` (`tools/modstudio/app.py`; the tables and
 recipe copies of `project.py` follow it) and in `CACHE` (`tools/modstudio/newlife.py`).

@@ -72,7 +72,8 @@ Sider's Lua also has no `debug` or `rawget`. Check every value before you index 
 | `fl26regions`, `fl26regnames` | per world | region (country) names and category flags of the world |
 | `fl26reg128` | itself | raises the number of regions (countries) from 29 to 128 (replaced `fl26reg64`, 64, in 0.2.2) |
 | `fl26catlist` | itself | our countries in ML > Database > Competition Info, in the world's `order` |
-| `fl26swiss` | itself + `fl26swiss.dll` | the 36-club league phase draw, play-offs, qualifying rounds, the UEFA access list, our continental/league/pre-season cups, cup draws and dates, the calendar of leagues that are not 20 clubs playing twice, seasons by region |
+| `fl26squadlist` | itself + `fl26squadlist.dll` | Select Team (Team Info, League mode...): on a league row the right panel lists the league's clubs with their crests under "Team List" instead of staying empty (the crest cell is in the world's teamSelectSingle.bin, tools/mkteamcrest.py); inside the league it shows the club's players under "Squad List", as before |
+| `fl26swiss` | itself + `fl26swiss.dll` | the 36-club league phase draw, play-offs, qualifying rounds, the UEFA access list, our continental/league/pre-season cups, cup draws and dates, the calendar of leagues that are not 20 clubs playing twice, seasons by region; in the standings the MP column and the coloured zone strip (Europe, up, play-off, down; the cells are in the world's rankingTeam.bin, tools/mkmpcol.py) |
 | `fl26augseason` | itself | a career started in one of our leagues starts in August |
 | `fl26superguard` | `fl26lateguards` | stops the UEFA Super Cup setup from reading entry -1 |
 | `fl26resultsguard` | `fl26lateguards` | keeps an empty matchday results list from ending the game |
@@ -157,6 +158,8 @@ writing the tables itself. The loaders drain `<dll>_log` and `<dll>_stats` into 
     broadcasting fee 0x141567ca0 paid as better than first place: EUR 250M a season) and
     wraps the followers total 0x141589e90, whose star-player part is cut to the line's
     percent for clubs below the top flight. Without `fans` lines nothing is hooked.
+    Build writes a line for every new club and for every club of the game it puts into a
+    league that the game gives no money and no followers (the "other clubs" of the pools).
 - **Status:**
   - 2 = count reader code not as expected, 3 = get reader code not as expected;
   - 4 / 5 = `VirtualProtect` on the count / get reader;
@@ -170,7 +173,8 @@ writing the tables itself. The loaders drain `<dll>_log` and `<dll>_stats` into 
   (0x1f080a7), the 750-team cap function (0x1ef21d0) and, since 0.2.2, the 1300-manager cap
   function (0x1eeddd0). The Edit data then has room for every club of a world and its
   manager: the old room in the save itself (749 clubs, 1299 managers), and the records past
-  that in `EDIT00000000.fl26x` next to the save (`FL26EDX2`: tag, four counts, then team data,
+  that in `EDIT00000000.fl26x` next to the save (the folder of `fl26savedir.h`, below;
+  `FL26EDX2`: tag, four counts, then team data,
   squad, tactics and managers; a 0.2.1 file is `FL26EDX1` with the first three only). Without
   the managers part, "Create Edit Data" fails in a big world: the check before the save
   (0x141ee85f0) wants every club's manager in the Edit data.
@@ -179,6 +183,20 @@ writing the tables itself. The loaders drain `<dll>_log` and `<dll>_stats` into 
   - 3 = the Edit data was made before the module loaded (load order);
   - 4 = out of memory;
   - 5 = a patch failed.
+
+### The save folder (`tools/native/fl26savedir.h`, B296)
+
+`fl26edit.dll` and `fl26swiss.dll` find the game's save folder with `fl26_save_dir`, and Mod Studio
+with `game.save_root` -- the same rule, checked against each other by `tools/test_savedir.py`:
+
+- Documents by `SHGetFolderPathW` (shell32 asked at run time: the DLLs import kernel32 only), so a
+  folder named in any letters works; the path travels in UTF-8 and `fl26_u8open` / `fl26_u8move`
+  turn it back into UTF-16 for the file calls.
+- Then `KONAMI\eFootball PES 2021 SEASON UPDATE\<id>\save`: `<id>` is `SteamID` of `sys.ini` next to
+  the exe (2026) when its `save` holds `SYSTEM00000000`; else the numbered folder whose
+  `SYSTEM00000000` was written last (the game saves under `0` when the Steam stand-in does not
+  read `sys.ini`); else sys.ini's.
+- Asked again at every load and save, as the game's first save can make the folder.
 
 ### fl26regen.dll (loader `sider/fl26regen.lua`)
 
@@ -221,7 +239,8 @@ writing the tables itself. The loaders drain `<dll>_log` and `<dll>_stats` into 
   fullest table of that regulation.
 - **Kept tables on disk** (`state_store` / `state_sync`, 0.2.4, B49): the final tables and cup
   winners kept at a season's end (`g_final`, `g_cupwin`) are written to
-  `Documents\KONAMI\eFootball PES 2021 SEASON UPDATE\2026\save\fl26swiss-state.bin`, 176-byte
+  `Documents\KONAMI\eFootball PES 2021 SEASON UPDATE\2026\save\fl26swiss-state.bin` (the save
+  folder of `fl26savedir.h`, see fl26edit.dll), 176-byte
   records after an 8-byte magic `FL26SST1`: the user's club (0x1414bb650), the game's date
   (year * 365 + day: the day at `TODAY_OFF`, the year 8 bytes after it), the regulation, kind
   (0 table, 1 cup winner), the clubs and an FNV-1a check. When the game's date and `abs_day`

@@ -30,8 +30,10 @@
  * The name is a pure function of the id and the database: the family name of one player of
  * the same nationality and the given name of another, in that nationality's own order
  * ("Sui Weijie" stays family-first), with the family name's own shirt spelling. The pools are
- * built once from the database (or, in a career that was never loaded, from the block before
- * the first regen -- the same names), sorted, so their order never depends on array order.
+ * built once from the database, sorted, so their order never depends on array order: a thread
+ * reads it while it sits in the block at the title screen (a load reads it from there too).
+ * Not the block before the first regen: by then a new career has dropped retired players
+ * (FL27: 25866 of 26395), and every regen would get another name at its first load.
  * The same id always gets the same name, so a regen keeps it across saves and loads. A world
  * built again with other players can change a regen's name; nothing else can.
  *
@@ -236,9 +238,17 @@ static int split(const char* name, const char* shirt, char* given, char* family,
   return -1;
 }
 
-static void build_pools(unsigned char* blk, uint32_t n)
+static SRWLOCK g_pool_lock = SRWLOCK_INIT;
+static void build_pools_locked(unsigned char* blk, uint32_t n, const char* from);
+static void build_pools(unsigned char* blk, uint32_t n, const char* from)
 {
   if (g_pool || !blk || !n) return;
+  AcquireSRWLockExclusive(&g_pool_lock);       /* the start thread and the game's hooks */
+  if (!g_pool) build_pools_locked(blk, n, from);
+  ReleaseSRWLockExclusive(&g_pool_lock);
+}
+static void build_pools_locked(unsigned char* blk, uint32_t n, const char* from)
+{
   entry_t* e = (entry_t*)malloc((size_t)n * sizeof(entry_t));
   if (!e) return;
   /* two passes. The first counts per country the given-first names, the family-first names and
@@ -280,8 +290,59 @@ static void build_pools(unsigned char* blk, uint32_t n)
     if (i == 0 || e[i].nat != e[i - 1].nat) g_nat_start[e[i].nat] = i;
     g_nat_end[e[i].nat] = i + 1;
   }
-  g_pool = e; g_npool = w; g_stat[5] = (uint32_t)w;
-  logf("name pools: %d names from %u players", w, n);
+  g_npool = w; g_stat[5] = (uint32_t)w;
+  MemoryBarrier();
+  g_pool = e;
+  logf("name pools: %d names from %u players (%s)", w, n, from);
+}
+
+/* the database at the title screen: the block holds it from the start until a career is made
+   or loaded. Taken once it has stood still for eight seconds -- never mid-load. */
+static int readable(const void* p, size_t len)
+{
+  const unsigned char* a = (const unsigned char*)p;
+  while (len) {
+    MEMORY_BASIC_INFORMATION mi;
+    if (!VirtualQuery(a, &mi, sizeof mi) || mi.State != MEM_COMMIT ||
+        (mi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) ||
+        !(mi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY |
+                        PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) return 0;
+    size_t left = (size_t)((const unsigned char*)mi.BaseAddress + mi.RegionSize - a);
+    if (left >= len) return 1;
+    a += left; len -= left;
+  }
+  return 1;
+}
+static uint64_t db_hash(unsigned char** pblk, uint32_t* pn)
+{
+  unsigned char* owner = *(unsigned char* volatile*)(uintptr_t)(g_base + OWNER_RVA);
+  unsigned char* blk = owner && readable(owner + 0x48, 8) ? *(unsigned char* volatile*)(owner + 0x48) : 0;
+  uint32_t n = blk && readable(blk + g_count_disp, 4) ? player_count(blk) : 0;
+  *pblk = blk; *pn = n;
+  if (!n || !readable(blk, (size_t)n * STRIDE)) return 0;
+  uint64_t h = mix((uint64_t)n);
+  for (uint32_t i = 0; i < n; i++) {
+    const unsigned char* r = blk + (size_t)i * STRIDE;
+    uint64_t nm; memcpy(&nm, r + R_NAME, 8);
+    h = mix(h ^ *(const uint32_t*)(r + R_ID) ^ ((uint64_t)(*(const uint16_t*)(r + R_NAT) & 0x1ff) << 32) ^ nm);
+  }
+  return h;
+}
+/* Only reads. (A career created with this running crashed twice at 0x141fea5ba -- the stock
+   null bug fl26nullguard.lua fixes; the build before this one, no thread, crashed there too.) */
+static uint64_t g_db_hash;                     /* the database the pools came from */
+static DWORD WINAPI pool_thread(LPVOID unused)
+{
+  (void)unused;
+  uint64_t last = 0; int still = 0;
+  for (int t = 0; t < 3600 && !g_pool; t++) {  /* an hour at most; then the hooks build them */
+    Sleep(1000);
+    unsigned char* blk; uint32_t n;
+    uint64_t h = db_hash(&blk, &n);
+    if (!h || h != last) { last = h; still = 0; continue; }
+    if (++still >= 8) { g_db_hash = h; build_pools(blk, n, "the database at the start"); }
+  }
+  return 0;
 }
 
 static void put_name(unsigned char* dst, const char* s)
@@ -543,7 +604,7 @@ static void regen_hook(unsigned char* rec)
   unsigned char* blk = block();
   if (rec && blk) {
     g_stat[0]++;
-    if (g_flags & 1) build_pools(blk, player_count(blk));    /* before any regen is renamed */
+    if (g_flags & 1) build_pools(blk, player_count(blk), "the block at the first regen");  /* only if the start thread never got the database */
     if (g_flags & 2) {
       unsigned idx = *(uint16_t*)(rec + R_INDEX);
       if (idx < g_side_lim) {                  /* the game itself writes entry 0 otherwise */
@@ -553,24 +614,44 @@ static void regen_hook(unsigned char* rec)
       } else g_stat[7]++;
     }
   }
+  uint32_t id = rec ? *(uint32_t*)(rec + R_ID) : 0;
+  int again = rec && id < (1u << SET_BITS) && (g_regen_set[id >> 3] >> (id & 7) & 1);
   g_regen(rec);
   if (rec) note_regen(rec);
+  /* The game can regen a player twice in one off-season (FL26: 11 of 1874). Named again, his
+     own new name would count as the "old" one and he would get the next -- and the load, which
+     names him from the database, the first. He keeps the first. */
+  if (again) {
+    static int told;
+    if (told++ < 20) {
+      char nm[NAME_LEN + 1]; memcpy(nm, rec + R_NAME, NAME_LEN); nm[NAME_LEN] = 0;
+      logf("regen again: %u \"%s\" keeps his name", id, nm);
+    }
+    return;
+  }
   if (rec && (g_flags & 1) && rename_player(rec)) g_stat[1]++;
 }
 
-/* id -> database age, for one load */
+/* id -> database age and name, for one load */
 static uint32_t* g_map_id;
 static uint8_t*  g_map_age;
-static void map_put(uint32_t id, uint8_t age)
+static uint64_t* g_map_name;
+static uint64_t name_hash(const unsigned char* r)
+{
+  uint64_t h = 0, w;
+  for (int i = 0; i + 8 <= NAME_LEN; i += 8) { memcpy(&w, r + R_NAME + i, 8); h = mix(h ^ w); }
+  return h;
+}
+static void map_put(uint32_t id, uint8_t age, uint64_t name)
 {
   uint32_t m = (1u << MAP_BITS) - 1, i = (uint32_t)mix(id) & m;
   while (g_map_id[i] && g_map_id[i] != id) i = (i + 1) & m;
-  g_map_id[i] = id; g_map_age[i] = age;
+  g_map_id[i] = id; g_map_age[i] = age; g_map_name[i] = name;
 }
-static int map_get(uint32_t id)
+static int map_get(uint32_t id, uint64_t* name)
 {
   uint32_t m = (1u << MAP_BITS) - 1, i = (uint32_t)mix(id) & m;
-  while (g_map_id[i]) { if (g_map_id[i] == id) return g_map_age[i]; i = (i + 1) & m; }
+  while (g_map_id[i]) { if (g_map_id[i] == id) { if (name) *name = g_map_name[i]; return g_map_age[i]; } i = (i + 1) & m; }
   return -1;
 }
 
@@ -580,12 +661,17 @@ static uint64_t unpack_hook(void* a)
   int have = 0;
   if (blk && *(uint64_t*)(uintptr_t)g_bh1 && g_map_id) {   /* a save is being read, block = database */
     uint32_t n = player_count(blk);
-    build_pools(blk, n);
+    build_pools(blk, n, "the database at a load");
+    if (g_db_hash) {                           /* a regen's name holds only if this is the same */
+      unsigned char* b2; uint32_t n2;
+      logf(db_hash(&b2, &n2) == g_db_hash ? "load: the database is the one the names came from"
+                                          : "load: the database differs from the one at the start (%u players)", n2);
+    }
     memset(g_map_id, 0, sizeof(uint32_t) << MAP_BITS);
     for (uint32_t i = 0; i < n; i++) {
       unsigned char* r = blk + (size_t)i * STRIDE;
       uint32_t id = *(uint32_t*)(r + R_ID);
-      if (id) map_put(id, r[R_AGE] & 0x3f);
+      if (id) map_put(id, r[R_AGE] & 0x3f, name_hash(r));
     }
     have = n > 0;
   }
@@ -595,28 +681,33 @@ static uint64_t unpack_hook(void* a)
     uint32_t n = player_count(blk), hist[128] = {0};
     for (uint32_t i = 0; i < n; i++) {
       unsigned char* r = blk + (size_t)i * STRIDE;
-      int db = map_get(*(uint32_t*)(r + R_ID));
+      int db = map_get(*(uint32_t*)(r + R_ID), 0);
       if (db >= 0) hist[((r[R_AGE] & 0x3f) - db + 64) & 127]++;
     }
     int k = 0;
     for (int d = 1; d < 128; d++) if (hist[d] > hist[k]) k = d;
     k -= 64;
     g_stat[4] = (uint32_t)(k < 0 ? 0 : k);
-    uint32_t named = 0;
+    uint32_t named = 0, kept = 0;
     memset(g_regen_set, 0, sizeof g_regen_set);  /* another save: other regens */
     g_nrlist = 0;
     for (uint32_t i = 0; i < n; i++) {
       unsigned char* r = blk + (size_t)i * STRIDE;
-      int db = map_get(*(uint32_t*)(r + R_ID));
+      uint64_t dbname;
+      int db = map_get(*(uint32_t*)(r + R_ID), &dbname);
       if (db < 0) continue;
       int age = r[R_AGE] & 0x3f;
       if (age - db != k && age < db + k) {
         note_regen(r);
+        /* The save keeps the name of a few players (FL26: 11 of 1874 regens). Such a regen comes
+           back with the name he was given, not the database's; naming him again would skip that
+           name as his "old" one and give him the next. */
+        if (name_hash(r) != dbname) { kept++; continue; }
         if (rename_player(r)) named++;
       }
     }
-    g_stat[3] += named;
-    logf("load: %u players, %d year(s) played, %u regens named again", n, k, named);
+    g_stat[3] += named + kept;
+    logf("load: %u players, %d year(s) played, %u regens named again, %u kept the name the save holds", n, k, named, kept);
   }
   return ret;
 }
@@ -697,7 +788,8 @@ __declspec(dllexport) int fl26_regen_install(uint64_t exe_base, int flags)
   g_ph1 = rip_target(exe_base + PH1_INSN, 7);
   g_map_id  = (uint32_t*)calloc((size_t)1 << MAP_BITS, sizeof(uint32_t));
   g_map_age = (uint8_t*)calloc((size_t)1 << MAP_BITS, 1);
-  if (!g_map_id || !g_map_age) return 5;
+  g_map_name = (uint64_t*)calloc((size_t)1 << MAP_BITS, sizeof(uint64_t));
+  if (!g_map_id || !g_map_age || !g_map_name) return 5;
   const unsigned char* ai = (const unsigned char*)(uintptr_t)(exe_base + APP_CNT_INSN);
   const unsigned char* ak = (const unsigned char*)(uintptr_t)(exe_base + APP_CAP_INSN);
   const unsigned char* at = (const unsigned char*)(uintptr_t)(exe_base + APP_TAB_INSN);
@@ -732,6 +824,10 @@ __declspec(dllexport) int fl26_regen_install(uint64_t exe_base, int flags)
   }
   if (!(g_regen = (regen_fn)wrap(regen, sizeof SIG_REGEN, (void*)regen_hook))) return 6;
   if (!(g_unpack = (unpack_fn)wrap(unpack, sizeof SIG_UNPACK, (void*)unpack_hook))) return 6;
+  if (flags & 1) {
+    HANDLE th = CreateThread(0, 0, pool_thread, 0, 0, 0);
+    if (th) CloseHandle(th);
+  }
   logf("regen@%llx and load@%llx wrapped; names %s, potential %s; count at block+%#x, side table +%#x (%u)",
        (unsigned long long)(exe_base + REGEN_RVA), (unsigned long long)(exe_base + UNPACK_RVA),
        (flags & 1) ? "on" : "off", (flags & 2) ? "on" : "off", g_count_disp, g_side_disp, g_side_lim);
