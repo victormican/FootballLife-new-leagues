@@ -95,7 +95,12 @@ function m.init(ctx)
   memory.write(VT, u64(vstub))
 
   local d = bin(DSTUB)
-  d = d:sub(1, 56) .. u32(DTOR_NEXT - (dstub + 60)) .. d:sub(61)
+  -- el stub son 61 bytes: el jmp esta en el 57 (offset 56) y su rel32 ocupa los bytes 58..61.
+  -- Se conserva el opcode e9 y el relativo se mide desde el final del jmp (dstub+61).  Con
+  -- d:sub(1,56) el e9 se perdia y el stub escribia e8 c3 a1 df 00 en +0x38: un call a
+  -- 0x161efa600, memoria libre -- el cierre al abrir/navegar la copa (2026-11-06).
+  d = d:sub(1, 57) .. u32(DTOR_NEXT - (dstub + 61)) .. d:sub(62)
+  if #d ~= 61 then log("fl26cupgrow: the destructor stub is not 61 bytes -- nothing written"); return end
   memory.write(dstub, d)
   memory.write(DTOR, "\233" .. u32(dstub - (DTOR + 5)))
 
