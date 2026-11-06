@@ -130,5 +130,54 @@ construye la lista** de cada modo. O sea:
   comportamiento raro al entrar (volver al menú, morir) es el mismo en Copa y en Liga.
 - `+0x120/0x128/0x130` son los otros métodos propios (transición, teardown, etc.).
 
+## Menú Copa a fondo: init, item y resolver por cid (2026-11-06)
+
+```
+MenuModeCupSelect +0xd8 = 0x140b1c990   (init)
+    call 0x140c6bb50        base: el MISMO init de MenuModeCompeSelectBase
+    call 0x140b1cc60        recorre la lista [this+0x90..0x98] de items de 12 B
+         para cada item: 0x140b1cda0(&item)   <-- resolver por competicion
+    call 0x140e3dc90        objeto de UI de la pagina
+    lea rdx, "page"         y lo asigna en el objeto +0x98
+```
+
+`0x140b1cda0(item)` es el que decide si una competicion puede pintarse:
+
+```
+owner() -> bloque
+g = phkind(cid, 2)      ; fase de grupos (0xffff = ninguna)
+k = phkind(cid, 3)      ; eliminatoria
+if k != 0xffff:
+    rec = findrec(bloque, k)
+    item[+4] = rec[0x30c] & 0x7f          ; CLUBES
+    item[+5] = 0                          ; sin grupos
+    item[+6] = (rec[0x300] >> 29 == 1) ? 1 : (== 2)
+    item[+7] = (rec[0x300] & 0xe0000000) == 0x40000000
+    item[+8] = (rec[0x304] >> 9) & 1
+if g != 0xffff:
+    rec = findrec(bloque, g)
+    item[+5] = 1
+    item[+4] = rec[0x30c] & 0x7f          ; CLUBES (de la fase de grupos)
+```
+
+**El item de la lista es, entonces:**
+
+| offset | campo |
+|---|---|
+| +0 | cid de competición (lo que se escribe al añadir) |
+| +4 | nº de clubes |
+| +5 | 1 = tiene fase de grupos, 0 = eliminatoria directa |
+| +6, +7, +8 | bits de formato leídos de `rec+0x300` / `rec+0x304` |
+
+Detalles que importan para lo insertado:
+
+- **No hay comprobación de nulo**: `findrec` se desreferencia directo (`[rax+0x30c]`). Si `phkind`
+  devuelve un id cuya regulación no está en el bloque, el juego peta ahí mismo. Es la clase de
+  fallo que hay que evitar al meter una copa nueva.
+- La copa nuestra (200, cid 131) da `k2=0xffff, k3=200`: entra por la rama de eliminatoria, con
+  **16 clubes** y `has_group=0` — la misma forma que la 36 (Mundial de Clubes).
+- El init **no** construye las filas de la pantalla: esas salen del enter común (`+0x58`,
+  0x140e43450) y de `[this+0x88]`, que es donde hay que mirar cuando "entra y vuelve".
+
 ## Cómo seguir con el menú Editar
 
