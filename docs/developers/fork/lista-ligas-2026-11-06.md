@@ -34,8 +34,8 @@ el mismo byte bajo que tienen entradas: son los que el motor mete en la misma li
 | 27 | Chilean First Division B | 147 | 82 | 16 | - | CDP Curicó Unido, Chilean First Division B 15, Chilean First Division B 16 |
 | 28 | Colombian Second Division | 150 | 85 | 16 | 918 | Atlético de Cali F.C., Barranquilla F.C., Boca Juniors de Cali F.C. |
 | 29 | Congo Ligue 1 | 244 | 239 | 10 | 756 | AS Otoho, Etoile du Congo, Diables Noirs |
-| 30 | Copa Colombia | 92 | -1 | 48 | 604,348 | Copa Colombia Club 25, Copa Colombia Club 26, Copa Colombia Club 27 |
-| 31 | Copa Especial Colombia | 65 | -1 | 30 | 833,321 | Copa Especial Colombia Club 01, Copa Especial Colombia Club 02, Copa Especial Colombia Club 03 |
+| 30 | Primera C Colombia | 92 | -1 | 48 | 604,348 | Copa Colombia Club 25, Copa Colombia Club 26, Copa Colombia Club 27 |
+| 31 | Primera C Especial Colombia | 65 | -1 | 30 | 833,321 | Copa Especial Colombia Club 01, Copa Especial Colombia Club 02, Copa Especial Colombia Club 03 |
 | 32 | Croacia Druga NL | 109 | 184 | 20 | 621,877,365 | Croacia Druga NL Club 01, Croacia Druga NL Club 02, Croacia Druga NL Club 03 |
 | 33 | Croacia Prva NL | 110 | 183 | 20 | 622,366 | Croacia Prva NL Club 01, Croacia Prva NL Club 02, Croacia Prva NL Club 03 |
 | 34 | Croatian First League | 214 | 135 | 10 | - | GNK Dinamo Zagreb, HNK Gorica, HNK Hajduk Split |
@@ -159,3 +159,9 @@ el mismo byte bajo que tienen entradas: son los que el motor mete en la misma li
 | 152 | Vysheyshaya Liga | 55 | 216 | 10 | 311 | BATE Borisov, Dinamo Minsk, Shakhtyor Soligorsk |
 | 153 | Yokary Liga | 359 | 207 | 8 | 615 | Yokary Liga Club 01, Yokary Liga Club 02, Yokary Liga Club 03 |
 | 154 | Zambian Premier League | 153 | 68 | 20 | - | Green Buffaloes FC, Green Eagles FC, Kabwe Warriors FC |
+
+> Nombres corregidos: los cid **92** y **65** son **ligas** (no copas) y se llaman **Primera C
+> Colombia** y **Primera C Especial Colombia**. En el world file venian como "Copa Colombia" y
+> "Copa Especial Colombia" (arrastrados del handoff) y sin slot (-1). Ojo: el cid **366** tambien
+> se llama "Primera C Colombia" (87 clubes, slot 246): hay dos ligas con el mismo nombre y toca
+> decidir cual se queda.

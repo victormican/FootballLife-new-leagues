@@ -37,6 +37,10 @@ Extras:
 ## 3. Copas (286 líneas `ccup`)
 
 - **Del juego, intactas**: 91 competiciones originales (no se pisó ninguna).
+- **Ojo con los nombres**: los cid **92** y **65** son **ligas**, no copas: *Primera C Colombia*
+  y *Primera C Especial Colombia* (en el world file venían como "Copa Colombia" y "Copa Especial
+  Colombia", sin slot). La única copa metida en una línea `league` es *Liechtensteiner Cup* (94).
+  Además el cid **366** también se llama "Primera C Colombia": hay dos con el mismo nombre.
 - **14 copas regionales nuevas** (creadas con `mk_regional_cups.py`, eliminatoria con byes):
 
 | copa | cid | equipos | tipo |
