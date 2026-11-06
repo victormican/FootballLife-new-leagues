@@ -22,6 +22,20 @@ const log = (text) => {
   send({ kind: 'log', text: s });
 };
 
+// A message sent from inside ExitProcess can lose the race with the process dying, so the exit
+// trace is written by the agent itself, before the game is allowed to go.
+const EXIT_LOG = 'C:\\Users\\viarm\\AppData\\Local\\Temp\\opencode\\exit-trace.txt';
+const note = (text) => {
+  const s = String(text);
+  try {
+    const f = new File(EXIT_LOG, 'a');
+    f.write(s + '\n');
+    f.flush();
+    f.close();
+  } catch (e) { /* the file is a nicety, the log line still goes out */ }
+  log(s);
+};
+
 function main() {
   const exe = Process.enumerateModules().find((m) => m.name.toLowerCase() === MODULE.toLowerCase());
   if (!exe) {
@@ -97,15 +111,18 @@ function main() {
   };
 
   // expose our competition to the DLL (it is the list fl26_swiss_cup_cids keeps).
-  // WANT_CUPS is the A/B switch: [] leaves only the game's own cups.
-  const want = [131];
-  log('cups to append: [' + want.join(',') + ']');
+  // WANT_CUPS is the A/B switch: [] leaves only the game's own cups, null leaves the world's own
+  // ccup line alone (what the Lua read at boot).
+  const want = null;
+  log('cups to append: [' + (want ? want.join(',') : 'world') + ']');
   try {
     const dll = Process.findModuleByName('fl26swiss.dll');
     if (dll) {
       const fn = new NativeFunction(dll.findExportByName('fl26_swiss_cup_cids'), 'int',
                                     ['pointer', 'int']);
-      if (want.length === 0) {
+      if (want === null) {
+        log('setcups skipped (the world line decides)');
+      } else if (want.length === 0) {
         log('setcups -> ' + fn(ptr(0), 0));
       } else {
         const buf = Memory.alloc(want.length * 2);
@@ -186,7 +203,7 @@ function main() {
 
   for (const [modName, fnName] of [['kernel32.dll', 'ExitProcess'],
                                    ['kernel32.dll', 'TerminateProcess'],
-                                   ['kernel32.dll', 'RtlExitUserProcess'],
+                                   ['ntdll.dll', 'RtlExitUserProcess'],
                                    ['ucrtbase.dll', 'abort']]) {
     try {
       const m = Process.findModuleByName(modName);
@@ -195,15 +212,48 @@ function main() {
       if (!addr) { log('exit hook: ' + modName + '!' + fnName + ' missing'); continue; }
       Interceptor.attach(addr, {
         onEnter(args) {
-          log('EXIT ' + modName + '!' + fnName + ' code=' + args[0] + ' from ' +
-                      this.returnAddress);
-          log('  backtrace ' + Thread.backtrace(this.context, Backtracer.ACCURATE)
-                                            .map(fmt).join(' '));
+          const bt = Thread.backtrace(this.context, Backtracer.ACCURATE)
+            .map((a) => {
+              const mm = Process.findModuleByAddress(a);
+              return mm ? mm.name + '+' + a.sub(mm.base) : a.toString();
+            }).join(' ');
+          note('EXIT ' + modName + '!' + fnName + ' code=' + args[0] + ' from ' +
+               this.returnAddress + ' bt ' + bt);
+          // let the agent write the file and flush the message before the process goes
+          try { Thread.sleep(1); } catch (e) { }
         },
       });
       log('hook ' + modName + '!' + fnName + ' installed');
     } catch (e) {
       log('exit hook ' + modName + '!' + fnName + ' failed: ' + e);
+    }
+  }
+
+  // C++ exceptions do not surface as access violations: they are RaiseException with the MSVC
+  // code and the throw site is in the backtrace.  A fatal unhandled one ends in the CRT's exit
+  // path, which is where the process-path map was seen faulting at shutdown.
+  for (const [modName, fnName] of [['kernel32.dll', 'RaiseException'],
+                                   ['ucrtbase.dll', '_CxxThrowException']]) {
+    try {
+      const m = Process.findModuleByName(modName);
+      if (!m) { log('throw hook: ' + modName + ' not loaded'); continue; }
+      const addr = m.findExportByName(fnName);
+      if (!addr) { log('throw hook: ' + modName + '!' + fnName + ' missing'); continue; }
+      Interceptor.attach(addr, {
+        onEnter(args) {
+          const bt = Thread.backtrace(this.context, Backtracer.ACCURATE)
+            .map((a) => {
+              const mm = Process.findModuleByAddress(a);
+              return mm ? mm.name + '+' + a.sub(mm.base) : a.toString();
+            }).join(' ');
+          note('THROW ' + modName + '!' + fnName + ' arg0=' + args[0] + ' from ' +
+               this.returnAddress + ' bt ' + bt);
+          try { Thread.sleep(0.3); } catch (e) { }
+        },
+      });
+      log('hook ' + modName + '!' + fnName + ' installed');
+    } catch (e) {
+      log('throw hook ' + modName + '!' + fnName + ' failed: ' + e);
     }
   }
 
