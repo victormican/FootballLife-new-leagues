@@ -179,5 +179,28 @@ Detalles que importan para lo insertado:
 - El init **no** construye las filas de la pantalla: esas salen del enter común (`+0x58`,
   0x140e43450) y de `[this+0x88]`, que es donde hay que mirar cuando "entra y vuelve".
 
+## Liga Master: mismos slots en todas las pantallas ML (2026-11-06)
+
+| clase | vtable | `+0x18` | `+0x58` | `+0xd8` | `+0x120` |
+|---|---|---|---|---|---|
+| `MenuModeMLTeamStatus` | 0x1426aff58 | 0x140b8ab20 | 0x140e43450 | 0x140b8acf0 | 0x140e3f520 |
+| `MenuModeMLPlayerManagement` | 0x1426a8c40 | 0x140b6e9c0 | 0x140e43450 | 0x140b6eca0 | 0x140e3f520 |
+| `MenuModeMLNegociationMenu` | 0x1426a8050 | 0x140b6c5b0 | 0x140e43450 | 0x140b6c660 | 0x140e3f520 |
+| `MenuModeMLCoachMenu` | 0x1426a7830 | 0x140b6b200 | 0x140e43450 | 0x140b6b2b0 | 0x140e3f520 |
+| `MenuModeMLJournalList` | 0x1426a5b30 | 0x140b61fc0 | 0x140e43450 | 0x140b620a0 | 0x140e3f520 |
+| `MenuModeMLTrainingSelect` | 0x14269cc78 | 0x140b37dd0 | 0x140e43450 | 0x140b385d0 | 0x140e3f520 |
+
+**Regla general del sistema de menús** (Copa, Liga, CompeSelect, ML y BL):
+
+- `+0x58` → **0x140e43450**, el enter común: llama al `+0xd8`, y si devuelve ≠0 recorre las filas
+  de `[this+0x88]` (0x50 B por fila), llama a 0x140e3f4c0 y cambia de modo.
+- `+0xd8` → constructor de la lista **de cada pantalla** (Copa 0x140b1c990, Liga 0x140b3be30,
+  MLTeamStatus 0x140b8acf0...). Es el punto de inyección universal.
+- `+0x120` → 0x140e3f520 en casi todas (base), y `+0x18` es el montaje propio de cada pantalla.
+
+Consecuencia práctica: lo aprendido de la lista de la Copa (items de 12 B, resolver 0x140b1cda0,
+filas en `+0x88`) se aplica **igual** a Liga y a Liga Master, cambiando solo el `+0xd8` de la
+clase que se quiera tocar.
+
 ## Cómo seguir con el menú Editar
 
