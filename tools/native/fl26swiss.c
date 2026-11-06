@@ -1323,6 +1323,23 @@ int rcal_test_today(void);
 /* La direccion del dia (TODAY_OFF) solo existe si el bloque tiene el juego de parches del
    calendario. En una instalacion limpia (sin fl26slots750/fl26regs1200) leerla revienta
    (0xc0000005 en fl26swiss.dll+0x119d1, 2026-11-06). Se comprueba que la pagina es legible. */
+/* El grupo (group set) lo mueve fl26caps: el desplazamiento real esta en el operando
+   parcheado de 0x140af353e (49 8d 8f <disp32>, lea rcx,[r15+disp]). Antes se llevaba
+   0x2cfe6e0 fijo, que es otro build de caps: en el de este repo el grupo esta 0x1d4c0 mas
+   abajo y el DLL leia fuera del bloque (0xc0000005 en +0x32b67, 2026-11-06). */
+#define GS_SITE 0xaf353e
+static uint32_t gs_off(void)
+{
+  static uint32_t cached = 0;
+  if (cached) return cached;
+  const unsigned char* p = (const unsigned char*)(uintptr_t)(g_base + GS_SITE);
+  if (p[0] == 0x49 && p[1] == 0x8d && p[2] == 0x8f) {
+    uint32_t d;
+    memcpy(&d, p + 3, 4);
+    if (d > 0x100000 && d < 0x4000000) return cached = d;
+  }
+  return 0x2cfe6e0;
+}
 static int blk_readable(const void* p, size_t n)
 {
   MEMORY_BASIC_INFORMATION mbi;
@@ -12716,7 +12733,8 @@ static void CALLBACK poll_edit_base(HWND hwnd, UINT msg, UINT_PTR id, DWORD time
   if (!owner) return;
   uint64_t edit = *(uint64_t*)(owner + 0x48);
   if (!edit) return;
-  uint64_t gs = edit + 0x2cfe6e0;
+  uint64_t gs = edit + gs_off();
+  if (!blk_readable((void*)(uintptr_t)(gs + 0x1d510), 4)) return;
   uint32_t total = *(uint32_t*)(gs + 0x1d510);
   if (total > 30000) return;          /* edit block not constructed yet */
   g_edit_base_seen = edit;
@@ -14505,7 +14523,8 @@ __declspec(dllexport) int fl26_swiss_log(char* out, int cap)
     if (owner) {
       uint64_t edit = *(uint64_t*)(owner + 0x48);
       if (edit) {
-        uint64_t gs = edit + 0x2cfe6e0;          /* group set (lower tail, patched) */
+        uint64_t gs = edit + gs_off();          /* group set (lower tail, patched) */
+        if (!blk_readable((void*)(uintptr_t)(gs + 0x1d510), 4)) return 0;
         uint32_t total = *(uint32_t*)(gs + 0x1d510);
         if (total <= 30000) {                     /* edit block actually constructed */
           g_edit_base_seen = edit;
