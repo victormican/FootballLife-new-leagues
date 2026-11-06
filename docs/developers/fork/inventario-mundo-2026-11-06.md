@@ -105,21 +105,42 @@ de 91 ligas y 0 copas). En el disco no queda copia de nuestras tablas (la mayor 
   `check_world.py`.
 - Los módulos y las DLL.
 
-## 7. Reconstrucción en la instalación limpia (orden)
+## 7. Orden de construccion: **clubes -> naciones -> copas**
 
-1. Base: instalar el **handoff de Matozanato** (`handoff-matozanato-20261104`) → 149 ligas, 168 copas.
-2. Quitar las dos ligas sin slot (cid 92 y 65) y añadir:
-   - **3 nuestras**: Otros Concacaf (221/247, 58), Otros OFC (382/248, 48) y Primera C Colombia
-     (366/246, 87);
-   - **2 líneas de competiciones del juego** (no son nuestras, solo se les da línea de mundo):
-     Jupiler Pro League (cid 111, slot 84) y Liga Profesional de Fútbol (cid 22, slot 245).
-   → **152 ligas** (149 del handoff − 2 + 5 líneas, de las que 3 son ligas nuevas nuestras).
-3. Copas: `mk_conf_cups.py` (continentales), `mk_regional_cups.py` (las 14), `dup_cups_groups.py`
-   (menú de copas), una copa + supercopa por país.
-4. `mkslots.py` (750), `cid16_migrate.py` (cids altos), `fix_cid2_entries.py` (copa 2).
-5. Escudos/kits/caras (`fetch_world_crests.py`, `mkcrests.py`, `mkkits.py`, `lbfaces.py`).
-6. `check_world.py` hasta **0 errores / 0 avisos**.
-7. Módulos + DLL + `sider.ini` (ver `instalacion-limpia-2026-11-06.md`).
+Por que ese orden (dependencias reales del formato):
+- Todo cuelga de `Team.bin`: sin el equipo no hay jugadores, ni entradas, ni competicion.
+- Las ligas necesitan clubes; las competiciones de selecciones necesitan selecciones.
+- **Las copas van al final** porque mezclan clubes y selecciones (una copa de naciones tira de
+  selecciones; una continental de clubes, de clubes y campeones de liga). Si se hacen antes, sus
+  entradas quedan apuntando a equipos que aun no existen o cambian de id, y hay que rehacerlas.
+- Las naciones son un bloque aparte de los clubes (fila de `Team.bin` con bit nacional y plantilla
+  propia), pero **antes** que las copas.
 
-Con esto se reproduce el mundo; lo que no se puede recuperar es el *arbol exacto* de decisiones
-de cada copa, pero está documentado bloque a bloque.
+### Fase 1 - Clubes
+1. Equipos de club en `Team.bin` (ids nuevos desde 71578; nombre, codigo de 3 letras, pais/bandera).
+2. Jugadores y asignaciones: 11 + portero por club (`grow_squads.py`, `lbfaces.py` para caras).
+3. Escudos y equipaciones (`fetch_world_crests.py`, `mkcrests.py`, `mkkits.py`).
+4. Ligas de clubes: competicion, regulacion y entradas; despues slots y filas de parametros
+   (`mkslots.py`, `fl26comptab`).
+5. Ajuste de la lista: quitar 92 y 65, anadir las 3 nuestras y las 2 lineas de competiciones del
+   juego (ver seccion 2).
+
+### Fase 2 - Naciones
+1. Selecciones en `Team.bin` (bit nacional, pais).
+2. Plantillas de cada seleccion.
+3. Escudos/banderas.
+4. Competiciones de selecciones: Mundial (cid 27), continentales de naciones y clasificatorios.
+
+### Fase 3 - Copas (las ultimas)
+1. Continentales de clubes (`mk_conf_cups.py`): Libertadores, Sudamericana, Champions, etc.
+2. Las **14 regionales** (`mk_regional_cups.py`), mezcla de clubes y selecciones.
+3. Una **copa + una supercopa por pais** (con los campeones de cada liga).
+4. Copas de selecciones: African Nations Championship, CAFA Nations, WAFF, ASEAN, EAFF...
+5. Menu de copas: `dup_cups_groups.py` hasta las 286 lineas `ccup`; `national=1` en las de
+   selecciones.
+
+### Fase 4 - Cierre
+1. `cid16_migrate.py` (cids altos) y `fix_cid2_entries.py` (copa 2).
+2. `check_world.py` hasta **0 errores / 0 avisos**.
+3. Modulos + DLL + `sider.ini` (`instalacion-limpia-2026-11-06.md`).
+4. Prueba en juego: Select Team (ligas y clubes), Copa (clubes y selecciones), Master League.
