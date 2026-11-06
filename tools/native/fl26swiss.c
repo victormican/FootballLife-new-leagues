@@ -12567,7 +12567,7 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
     char r0 = ((cupsel_fn)(uintptr_t)(g_base + CUPSEL_INIT_RVA))(self, a, b, c);
     unsigned char* b0 = *(unsigned char**)(self + 0x90);
     unsigned char* e0 = *(unsigned char**)(self + 0x98);
-    int n0 = (int)((e0 - b0) / 12);
+    int n0 = (b0 && e0 > b0 && blk_readable(b0, (size_t)(e0 - b0))) ? (int)((e0 - b0) / 12) : 0;
     logf("fl26swiss: CUPAFTER list=%d cap=%p", n0, (void*)*(unsigned char**)(self + 0xa0));
     for (int i = 0; i < n0 && i < 12; i++) {
       unsigned char* p0 = b0 + i * 12;
@@ -12575,12 +12575,12 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
            i, (unsigned)*(uint32_t*)p0, p0[0],p0[1],p0[2],p0[3], p0[4],p0[5],p0[6],p0[7], p0[8],p0[9],p0[10],p0[11]);
     }
     unsigned char* rows = *(unsigned char**)(self + 0x88);
-    if (rows) {
+    if (rows && blk_readable(rows, 0x80)) {
       logf("fl26swiss: CUPAFTER rows=%p r70=%p r78=%p", (void*)rows,
            (void*)*(unsigned char**)(rows + 0x70), (void*)*(unsigned char**)(rows + 0x78));
       unsigned char* rb = *(unsigned char**)(rows + 0x70);
       unsigned char* re = *(unsigned char**)(rows + 0x78);
-      int nr = (rb && re && re > rb) ? (int)((re - rb) / 0x50) : 0;
+      int nr = (rb && re > rb && blk_readable(rb, (size_t)(re - rb))) ? (int)((re - rb) / 0x50) : 0;
       logf("fl26swiss: CUPAFTER rowcount=%d", nr);
       for (int i = 0; i < nr && i < 4; i++) {
         unsigned char* q = rb + i * 0x50;
@@ -12591,7 +12591,8 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
              q[12],q[13],q[14],q[15], q[16],q[17],q[18],q[19], q[20],q[21],q[22],q[23]);
         for (int k = 0; k < 0x50 - 8; k += 8) {
           unsigned char* v = *(unsigned char**)(q + k);
-          if (v > (unsigned char*)0x10000 && v < (unsigned char*)0x7fffffffffffULL) {
+          if (v > (unsigned char*)0x10000 && v < (unsigned char*)0x7fffffffffffULL &&
+              blk_readable(v, 32)) {
             int printable = 0;
             for (int j = 0; j < 8; j++) if (v[j] >= 32 && v[j] < 127) printable++;
             if (printable >= 6)
