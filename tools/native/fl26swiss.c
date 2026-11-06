@@ -1320,6 +1320,22 @@ static int g_po_enabled = 1;
 #ifdef FL26_RCAL_TEST
 int rcal_test_today(void);
 #endif
+/* La direccion del dia (TODAY_OFF) solo existe si el bloque tiene el juego de parches del
+   calendario. En una instalacion limpia (sin fl26slots750/fl26regs1200) leerla revienta
+   (0xc0000005 en fl26swiss.dll+0x119d1, 2026-11-06). Se comprueba que la pagina es legible. */
+static int blk_readable(const void* p, size_t n)
+{
+  MEMORY_BASIC_INFORMATION mbi;
+  if (VirtualQuery(p, &mbi, sizeof mbi) != sizeof mbi) return 0;
+  if (mbi.State != MEM_COMMIT) return 0;
+  if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) return 0;
+  return 1;
+}
+static int today_at(unsigned char* blk, int* ok)
+{
+  *ok = (blk && blk_readable(blk + TODAY_OFF, 10));
+  return *ok ? *(uint16_t*)(blk + TODAY_OFF) : -1;
+}
 static int today(void)
 {
 #ifdef FL26_RCAL_TEST
@@ -1327,7 +1343,8 @@ static int today(void)
 #endif
   unsigned char* o = (unsigned char*)((owner_fn)(uintptr_t)(g_base + OWNER_RVA))();
   unsigned char* blk = o ? *(unsigned char**)(o + 0x48) : 0;
-  return blk ? *(uint16_t*)(blk + TODAY_OFF) : -1;
+  int ok;
+  return today_at(blk, &ok);
 }
 static int po_season_half(void) { int d = today(); return d >= 0 && d < PO_MONTHS_BEFORE; }
 /* The game's day counter is the day of the calendar year, so a guard that keeps "the day it last
@@ -1405,7 +1422,9 @@ static int season_year(void)
   unsigned char* o = (unsigned char*)((owner_fn)(uintptr_t)(g_base + OWNER_RVA))();
   unsigned char* blk = o ? *(unsigned char**)(o + 0x48) : 0;
   if (!blk) return was = 0;
-  int t = *(uint16_t*)(blk + TODAY_OFF), y = *(uint16_t*)(blk + TODAY_OFF + 8);
+  int ok; int t = today_at(blk, &ok);
+  if (!ok) return was = 0;
+  int y = *(uint16_t*)(blk + TODAY_OFF + 8);
   at = now;
   return was = t >= 365 || y < 1990 || y > 2200 ? 0 : t >= 175 ? y : y - 1;
 }
@@ -5985,7 +6004,9 @@ static void table_pool_old_slots(const char* when)
   unsigned char* std = o ? *(unsigned char**)(o + 0x78) : 0;
   unsigned char* blk = o ? *(unsigned char**)(o + 0x48) : 0;
   if (!std || !blk) return;
-  int t = *(uint16_t*)(blk + TODAY_OFF), y = *(uint16_t*)(blk + TODAY_OFF + 8);
+  int ok; int t = today_at(blk, &ok);
+  if (!ok) return;
+  int y = *(uint16_t*)(blk + TODAY_OFF + 8);
   if (y < 1990 || y > 2200 || t >= 365) return;
   /* B212 (r13, third season, 23.10.): the last season finished is two years back only until the
    * July rollover; from then on -- the European season of last year ended in May, the calendar
@@ -12844,7 +12865,9 @@ static int game_date(void)
   unsigned char* o = (unsigned char*)((owner_fn)(uintptr_t)(g_base + OWNER_RVA))();
   unsigned char* blk = o ? *(unsigned char**)(o + 0x48) : 0;
   if (!blk) return -1;
-  int t = *(uint16_t*)(blk + TODAY_OFF), y = *(uint16_t*)(blk + TODAY_OFF + 8);
+  int ok; int t = today_at(blk, &ok);
+  if (!ok) return -1;
+  int y = *(uint16_t*)(blk + TODAY_OFF + 8);
   return t >= 365 || y < 1990 || y > 2200 ? -1 : y * 365 + t;
 #endif
 }
