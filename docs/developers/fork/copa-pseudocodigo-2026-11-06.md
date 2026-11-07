@@ -365,6 +365,42 @@ vacío) o `0x1424bea50()` devuelve 0, la pantalla no se monta y el menú se qued
   constructor de widget con vtables (`0x142b391f8`, `0x142b39220`, `0x142b39240`) y el decompilador
   no sigue el flujo. Habría que recortar su región exacta o depurarlo en vivo.
 
+## 11. Resultado en juego (2026-11-07): el clon sí se juega
+
+Probado de punta a punta **con el stack de módulos fl26 apagado** y el clon de la 36 (cid nativo,
+nuestros 16 equipos) desplegado en `_FL26CupsTest`:
+
+1. Kick Off > Copa → lista.
+2. Pantalla de formato.
+3. Selección de equipo.
+4. **Sorteo** (cuadro).
+5. **Menú del torneo**.
+6. **El partido se juega**.
+
+O sea: el motor hace todo cuando la competición es un cid que él conoce. Con el stack encendido, en
+cambio, no pasa de la selección (y a veces el juego crashea).
+
+### Lo que NO era
+- `0x141e3f4c0` (el `mount` que decompilamos) **nunca se llamó** en este flujo: la pantalla se monta
+  por otro camino. Su condición (`rows[0x3d0] != rows[0x3d8]`) no es la del "no arranca".
+- El `ENTER` compartido (0x140e43450) se dispara en **muchas** pantallas y en casi todas llega con
+  `+0x90` vacío (`items=-1`), así que no sirve como señal de la lista de copas.
+- La lista de copas en vivo son **10 items** (`33, 2, 3, 5, 8, 27, 36, 34, 35, 37`) sin el DLL.
+
+### Conclusión práctica
+
+| vía | resultado |
+|---|---|
+| **Clon de copa nativa** (cid 36, nuestro nombre y equipos) | **jugable de punta a punta** con el stack apagado |
+| **Cid nuevo** (cid 50, reg 200 ≤255, byte de fechas `0x10`) | se lista y abre; el juego **no sortea ni fecha** (0 llamadas a `DRAW` y `DATESTUB`) |
+| Stack fl26 encendido | rompe el clon (no pasa de la selección) |
+
+Siguiente trabajo, por orden:
+1. **Bisect del stack** (mitades) para saber qué módulo rompe el clon; el sospechoso nº1 es el
+   handler del `+0xd8` que reescribe la lista.
+2. Con el stack arreglado, decidir: quedarse con el **clon** (hoy lo único jugable) o seguir con
+   cid nuevo (falta el objeto por competición que el juego crea al arrancar).
+
 ## 7. Nuestro uso
 
 ```

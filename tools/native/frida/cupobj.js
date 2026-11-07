@@ -21,8 +21,14 @@ const log = (s) => {
 };
 
 function main() {
-  const exe = Process.enumerateModules().find((m) => m.name.toLowerCase() === EXE);
-  if (!exe) { log('FL_2026.exe not loaded'); return; }
+  const exe = Process.enumerateModules().find(
+    (m) => m.name.toLowerCase().includes('fl_2026'));
+  if (!exe) {
+    log('FL_2026.exe not loaded; modules: ' +
+        Process.enumerateModules().slice(0, 8).map((m) => m.name).join(', '));
+    return;
+  }
+  log('module ' + exe.name + ' base ' + exe.base + ' size ' + exe.size);
   const targets = [VT, VT_EDIT].map((v) => ptr(v));
 
   const found = [];
