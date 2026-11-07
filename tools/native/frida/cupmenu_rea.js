@@ -257,6 +257,34 @@ function main() {
     }
   }
 
+  // The date stub (fl26caps, page 0x163000000) and the native group draw: does the game ask for
+  // regulation 200 at all?  date stub: the regulation id arrives in cx/di; draw: (reg, vector, flag).
+  try {
+    Interceptor.attach(ptr('0x163000000'), {
+      onEnter(args) {
+        const id = args[0].and(0xffff).toInt32();
+        if (id >= 190 && id <= 260) note('DATESTUB id=' + id);
+      },
+    });
+    log('hook date stub installed');
+  } catch (e) { log('hook date stub failed: ' + e); }
+
+  try {
+    Interceptor.attach(exe.base.add(0x15485c0), {
+      onEnter(args) {
+        try {
+          const reg = args[0].and(0xffff).toInt32();
+          const v = args[1];
+          const b = v.readPointer();
+          const e2 = v.add(8).readPointer();
+          const n = b.isNull() ? -1 : e2.sub(b).toInt32() / 4;
+          note('DRAW reg=' + reg + ' clubs=' + n + ' flag=' + args[2]);
+        } catch (err) { note('DRAW reg=? ' + err); }
+      },
+    });
+    log('hook draw installed');
+  } catch (e) { log('hook draw failed: ' + e); }
+
   Process.setExceptionHandler((details) => {
     if (details.type !== 'access-violation') return false;
     try {
