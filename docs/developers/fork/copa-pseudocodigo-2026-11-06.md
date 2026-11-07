@@ -436,6 +436,27 @@ undefined4 gate(short *reg)
 ~550 sitios; el que la escribe es el "constructor del mundo") y añadir uno para la regulación
 nueva con `+0x84 = 2`. Mientras no exista ese registro, ningún cid nuevo puede sortear.
 
+### Lo medido al intentarlo (2026-11-07)
+
+Se inyectó la copa (cid 50) en la lista con Frida y se puso `reg 200[0x84] = 2` en vivo:
+
+- La copa **se lista y deja avanzar** (formato), pero **`GATE` y `DRAW` no se llaman nunca**.
+- La regulación 200 **sí existe** en la tabla de 0x314 (slot 123) y su `+0x84` pasó de **3 a 2**.
+- La cadena del sorteo es:
+
+```
+0x141348340  (sin llamadores estáticos: es virtual/callback del planificador)
+   -> 0x141345cc0  (fase)
+      -> 0x141344920  (lista de la fase kind 2, kind 3, 0x141522b50)
+         -> gate 0x14150d2b0 == 2 ?
+            -> draw 0x1415485c0
+```
+
+Conclusión: **el muro no es el estado `+0x84`**; es que el juego nunca invoca esa cadena para una
+competición que no sea suya: `0x141348340` no tiene llamadores estáticos, lo llama el planificador
+del mundo, que solo conoce sus competiciones. Para la vía 1 hay que **registrar la competición en
+ese planificador** (el "constructor del mundo"), no basta con la tabla ni con el campo.
+
 ## 7. Nuestro uso
 
 ```
