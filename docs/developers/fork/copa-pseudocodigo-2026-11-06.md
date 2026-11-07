@@ -436,6 +436,37 @@ undefined4 gate(short *reg)
 ~550 sitios; el que la escribe es el "constructor del mundo") y añadir uno para la regulación
 nueva con `+0x84 = 2`. Mientras no exista ese registro, ningún cid nuevo puede sortear.
 
+### El planificador: `0x141348210` (2026-11-07)
+
+La cadena del sorteo no arranca sola: la llama el planificador por fase. Su raíz:
+
+```c
+void root(param_1, short reg, param_3, param_4)       /* 0x141348210 */
+{
+  block = owner()[0x48];
+  rec = findrec(block, reg);
+  if (rec && phfin(reg)) {                            /* 0x141546c70 */
+      /* tabla de 0x70 entradas {reg, ...} en 0x1434eecc4: rellena hasta 4 plazas
+         de un array en rec+0x430 con 0x1415561c0(...) */
+      if (FUN_141345cc0(param_1, reg, lista, param_4)) {   /* fase -> gate -> draw */
+          FUN_141343bf0(param_1, lista);
+          ...
+      }
+  }
+}
+```
+
+Y `phfin` (`0x141546c70`) es el "¿está lista/terminada esta fase?": mira
+`FUN_141546860(reg)` y recorre fases dependientes con `entry(otra_reg)`; también mira el campo
+`rec[0x84]` (el mismo que el gate) contra 6.
+
+**Registrar una competición, por tanto, es conseguir que el planificador llame a
+`0x141348210(param_1, reg, …)` para su regulación** con `phfin(reg) == true`. Eso lo hace el
+calendario del mundo (los partidos con fecha), no una tabla de alta.
+
+Sonda lista para comprobarlo en vivo: `injectcup.js` engancha `0x141348210` (`ROOT`) y
+`0x141546c70` (`PHFIN`) y avisa si se llaman con nuestra regulación (200) o con la del clon (46).
+
 ### Lo medido al intentarlo (2026-11-07)
 
 Se inyectó la copa (cid 50) en la lista con Frida y se puso `reg 200[0x84] = 2` en vivo:
