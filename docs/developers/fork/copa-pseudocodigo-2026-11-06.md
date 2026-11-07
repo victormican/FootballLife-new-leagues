@@ -488,6 +488,12 @@ competición que no sea suya: `0x141348340` no tiene llamadores estáticos, lo l
 del mundo, que solo conoce sus competiciones. Para la vía 1 hay que **registrar la competición en
 ese planificador** (el "constructor del mundo"), no basta con la tabla ni con el campo.
 
+**Confirmado a la última (2026-11-07)**: con `reg 200[0x84]=2`, la copa inyectada en la lista y
+`phfin(200)` **forzado a `true`** con Frida, el juego **sigue sin llamar a `ROOT`** (ni `GATE` ni
+`DRAW`). O sea: no es cuestión de satisfacer condiciones en runtime; el planificador simplemente no
+tiene a esa competición en su plan. La única vía completa es que nazca del **constructor del mundo**
+(con su calendario), como las del juego — o quedarse con el clon nativo, que sí está en el plan.
+
 ## 7. Nuestro uso
 
 ```
