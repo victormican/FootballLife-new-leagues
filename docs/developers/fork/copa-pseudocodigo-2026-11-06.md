@@ -218,6 +218,105 @@ El cuadro de eliminatoria no se sortea: se llena con los ganadores de la fase an
   quitar las copas de grupos >32; después, `fl26caps` (fechas) y los módulos de paridad.
 - Siguiente: bisect del stack módulo a módulo, y el pseudo-código de Ghidra del enter/sorteo.
 
+## 9. Pseudo-código verificado con Ghidra 12.1.4 (2026-11-06, noche)
+
+Salido de `rea decompile` sobre un **PE recortado** de 3,3 MB (0x140b1c000–0x140e45000) con la
+misma base: así Ghidra analiza en minutos en vez de expirar con los 438 MB. Nombres `FUN_xxx` son
+los de Ghidra; el resto es traducción nuestra.
+
+### 9.1 Enter común — 0x140e43450 (slot +0x58)
+
+```c
+undefined1 enter(longlong *self)
+{
+  char ok = (*(*self + 0xd8))(self);          // construir la lista de ESTA pantalla
+  if (ok == 0) return 0;                      // no hay lista -> no se entra
+
+  rows = self[0x11];                          // objeto de filas (self+0x88)
+  for (r = rows[0x70]; r != rows[0x78]; r += 0x50)
+      if (r[0x40]) 0x141e4c240(r[0x40], 0, 4); // prepara el objeto de cada fila
+
+  0x141e3f4c0(self);                          // monta la pantalla
+  s = 0x141e32980();
+  if (s) 0x141e32ad0(0x141e32980());
+
+  if (*(int*)rows == 0 && global_1446f9a98) {  // caso "sin contenido"
+      if (swap(global_1446f9a98[0x41], 0)) 0x141e52850();
+  }
+  return 1;
+}
+```
+
+**No decide nada sobre sorteo ni calendario**: solo monta la pantalla y devuelve 1.
+
+### 9.2 Init de Copa — 0x140b1c990 (slot +0xd8)
+
+```c
+undefined8 cup_init(longlong *self)
+{
+  0x141c6bb50();                              // init BASE (CompeSelectBase)
+  decorate(self);                             // 0x141b1cc60
+  ui = 0x141e3dc90(self);
+  label = (vtable[ui+0x98][+8])(ui+0x98, "page");   // literal "page"
+  0x141e4bba0(label, 0, 0, 2);
+  0x141c6c540(self, 0x2bc01f5);
+  0x141b1ca20(self, self + 0x17);
+  (*(*self + 0x148))(self, 0, 0);             // otro slot propio
+  0x141e51200(0x141e51150(), 0);
+  return 1;                                   // SIEMPRE 1
+}
+```
+
+### 9.3 Decorate — 0x140b1cc60
+
+```c
+void decorate(longlong self)
+{
+  for (i = 0; i < (self[0x98] - self[0x90]) / 12; i++) {
+      if (i >= (self[0x98] - self[0x90]) / 12) {   // aserción si la lista cambia de tamaño
+          (**_DAT_14352fa30)(0x1435a1fd8);          //   mientras se recorre
+          __debugbreak();
+          return;
+      }
+      item = { cid: *(u32*)(self[0x90] + i*12) };  // copia en pila
+      item.flags = 0;
+      resolve(&item);                              // 0x141b1cda0
+      slot = map_find(self + 0xd0, item);          // 0x141b1c290
+      map_insert(self + 0xd0, slot, item);         // 0x141b1c540
+  }
+}
+```
+
+`self+0xd0` es un **`std::map<cid, item>`** con lo que pinta la pantalla. La aserción de tamaño es
+la que puede saltar si alguien toca la lista mientras se decora (crecer/recortar en el hook).
+
+### 9.4 Resolver — 0x140b1cda0
+
+```c
+void resolve(item *it)                 // it = { cid, clubs, has_group, f6, f7, f8 }
+{
+  block = owner()[0x48];
+  g = phkind(&it->cid, 2);             // grupos     (-1 = no hay)
+  k = phkind(&it->cid, 3);             // eliminatoria
+  if (k != -1) {
+      rec = findrec(block, k);
+      it->has_group = 0;
+      it->clubs     = rec[0x30c] & 0x7f;
+      it->f6 = (rec[0x300] >> 29 == 1) ? 1 : (rec[0x300] >> 29 == 2);
+      it->f7 = (rec[0x300] & 0xe0000000) == 0x40000000;
+      it->f8 = (rec[0x304] >> 9) & 1;
+  }
+  if (g != -1) {
+      rec = findrec(block, g);
+      it->has_group = 1;
+      it->clubs     = rec[0x30c] & 0x7f;
+  }
+}
+```
+
+Confirma lo medido: **sin comprobación de nulos** (`findrec` se desreferencia directo) y la forma
+del item.
+
 ## 7. Nuestro uso
 
 ```
