@@ -401,6 +401,41 @@ Siguiente trabajo, por orden:
 2. Con el stack arreglado, decidir: quedarse con el **clon** (hoy lo único jugable) o seguir con
    cid nuevo (falta el objeto por competición que el juego crea al arrancar).
 
+## 12. El interruptor del sorteo (2026-11-07)
+
+El sorteo (`0x1415485c0`) solo se llama desde `0x141344920` (y otras tres funciones) cuando un
+**predicado** devuelve exactamente **2**:
+
+```c
+/* 0x141344920 */
+FUN_141346030(param_1, 2, &list);       // lista de clubes de la fase
+0x141522b50(reg, &list, 1);
+if (0x14150d2b0(&reg) == 2)             // <-- el interruptor
+    0x1415485c0(reg, &list, 1);         // sorteo
+```
+
+```c
+/* 0x14150d2b0 -- gate(short *reg) */
+undefined4 gate(short *reg)
+{
+  block = owner()[0x48];
+  for (i = 0; i < *(u32*)(block + 0xd0bcf4); i++)
+      if (*(u16*)(block + 0xc12e9c + i * 0x314) == *reg)
+          return *(u32*)(findrec(block, *reg) + 0x84);
+  return 7;                             // sin registro -> nunca sortea
+}
+```
+
+- La tabla es la de **registros de 0x314 B** (la misma que usa `regcid_fix` del DLL): cuenta en
+  `block+0xd0bcf4`, base `block+0xc12e9c`, y por registro un estado en `+0x84`.
+- **2** = "toca sortear"; **7** = "no encontrado".
+- Nuestra copa (reg 200) **no tiene registro** en esa tabla → devuelve 7 → no hay sorteo, ni cuadro,
+  ni fechas. El clon (reg 46) sí lo tiene porque es una competición del juego.
+
+**Siguiente paso de la vía 1**: encontrar quién crea esos registros al arrancar (la tabla se lee en
+~550 sitios; el que la escribe es el "constructor del mundo") y añadir uno para la regulación
+nueva con `+0x84 = 2`. Mientras no exista ese registro, ningún cid nuevo puede sortear.
+
 ## 7. Nuestro uso
 
 ```
