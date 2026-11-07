@@ -317,6 +317,54 @@ void resolve(item *it)                 // it = { cid, clubs, has_group, f6, f7, 
 Confirma lo medido: **sin comprobación de nulos** (`findrec` se desreferencia directo) y la forma
 del item.
 
+## 10. Init base y montaje de la pantalla (2026-11-06)
+
+### 10.1 Init base — 0x141c6bb50 (lo llama el de Copa)
+
+```c
+undefined8 base_init(longlong *self)
+{
+  (*(*self + 0x250))(self);                     // preparación base
+  0x141c6bc30(self);
+  0x141e41fe0(self, 0, (self[0x13] - self[0x12]) / 12, 1, 0);   // <-- construye las FILAS
+  ui = 0x141e3dc90(self);
+  label = (vtable[ui+0x98][+8])(ui+0x98, 0x143715e70);
+  if (label) 0x141e54900(label, 0x190250);
+  return 1;
+}
+```
+
+`self[0x12]/[0x13]` son `+0x90/+0x98`: **la lista**. O sea, las filas se construyen a partir de
+los items de 12 B, con `0x141e41fe0(self, 0, nº_items, 1, 0)`.
+
+### 10.2 Montar la pantalla — 0x141e3f4c0
+
+```c
+void mount(longlong *self)
+{
+  rows = self[0x11];                            // objeto de filas (self+0x88)
+  if ((rows[0x0a] != 0 || rows[0x0b] != 0) &&
+      (rows[0x3d0] != rows[0x3d8])) {           // <-- exige filas NO vacías
+      obj = 0x1424bea50();                      // "competición seleccionada"
+      if (obj) {
+          (self->vt[0x120])(self, obj[0x148] & 0xffffffff, obj[0x148] >> 32);
+          return;
+      }
+  }
+  /* si no, no se monta nada */
+}
+```
+
+**Esta es la condición del "no arranca"**: si `rows[0x3d0] == rows[0x3d8]` (vector de filas
+vacío) o `0x1424bea50()` devuelve 0, la pantalla no se monta y el menú se queda donde estaba.
+
+### 10.3 Estado de la descompilación
+
+- Hecho: enter, init de Copa, decorate, resolver, init base, mount.
+- `0x141e41fe0` (constructor de las filas) sale con *bad instruction data* en el recorte: es un
+  constructor de widget con vtables (`0x142b391f8`, `0x142b39220`, `0x142b39240`) y el decompilador
+  no sigue el flujo. Habría que recortar su región exacta o depurarlo en vivo.
+
 ## 7. Nuestro uso
 
 ```
