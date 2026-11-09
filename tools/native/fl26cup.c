@@ -238,6 +238,9 @@ static int recount_patch(void)
   cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x04; cave[n++] = 0x24; /* mov rax,[rsp] */
   cave[n++] = 0x48; cave[n++] = 0xa3;                                     /* mov [imm64],rax */
   *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_recount_ra; n += 8;
+  cave[n++] = 0x41; cave[n++] = 0x8b; cave[n++] = 0x47; cave[n++] = 0x78; /* mov eax,[r15+0x78] */
+  cave[n++] = 0x48; cave[n++] = 0xa3;                                     /* mov [imm64],rax */
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_mode_state; n += 8;
   cave[n++] = 0x48; cave[n++] = 0x89; cave[n++] = 0x5c; cave[n++] = 0x24; cave[n++] = 0x18;
   cave[n++] = 0xe9;
   *(int32_t*)(cave + n) = (int32_t)((uintptr_t)resume - (uintptr_t)(cave + n + 4)); n += 4;
@@ -269,7 +272,7 @@ static int state_patch(void)
   if (!cave) return 1;
 
   cave[n++] = 0x48; cave[n++] = 0xb8;                          /* mov rax, imm64 */
-  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)(g_base + 0x35ee48); n += 8;
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)(g_base + 0x36fed48); n += 8;
   cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x08;        /* mov rcx, [rax] */
   cave[n++] = 0x8b; cave[n++] = 0x41; cave[n++] = 0x78;        /* mov eax, [rcx+0x78] */
   cave[n++] = 0x48; cave[n++] = 0xa3;                          /* mov [imm64], rax */

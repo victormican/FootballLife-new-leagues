@@ -57,6 +57,18 @@ El estado hay que leerlo en un punto donde el objeto ya es válido (p. ej. el `r
 la llamada al recuento) o desde `tools/fl26inspect.py` durante la entrada, no repitiendo la
 desreferencia del global.
 
+## Lectura del estado: descartada
+
+Se corrigió la dirección del global (`0x1436fed48`, no `0x1435ee48`) y se leyó `[rcx+0x78]` en
+`0x141267104` durante las tres entradas. Los valores no son un estado de copa
+(`2009036240`, `67`, `11162048`): ese tick es un **recuento periódico**, no el cargador de la
+sesión de Copa, y `+0x78` no es el campo que ramifica. El recuento capturado
+(`0x1412671fa`) tampoco era el del llenado de la tabla de sesión.
+
+Conclusión: el cargador real no es este tick. Para encontrarlo hace falta un **watchpoint de
+escritura** sobre la tabla de sesión al entrar a una copa que funciona (CE o Frida estable),
+no más lecturas estáticas.
+
 ## Herramienta
 
 `tools/fl26inspect.py <pid>`: lee sin Frida (solo `ReadProcessMemory`, requiere elevación):

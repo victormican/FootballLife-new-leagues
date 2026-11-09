@@ -56,7 +56,7 @@ if owner:
             rows.append((i, key, cid, u32(r + 0x84)))
     print("slots", rows)
 
-state_obj = u64(BASE + 0x35EE48)
+state_obj = u64(BASE + 0x36FED48)
 print("state_obj", hex(state_obj))
 if state_obj:
     print("state [obj+0x78]", u32(state_obj + 0x78))
