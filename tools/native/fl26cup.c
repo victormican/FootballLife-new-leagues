@@ -197,10 +197,11 @@ static int date_patch(void)
    that fills the phase table for the selected cup.  This patch stores the caller's return
    address on every call and a small thread writes it to the log; no debugger, no timing. */
 static volatile uint64_t g_recount_ra;
+static volatile uint64_t g_mode_state;
 
 static DWORD WINAPI recount_watch(LPVOID arg)
 {
-  uint64_t last = 0;
+  uint64_t last = 0, last_state = 0;
   (void)arg;
   for (;;) {
     uint64_t ra = g_recount_ra;
@@ -208,6 +209,11 @@ static DWORD WINAPI recount_watch(LPVOID arg)
       last = ra;
       lfile("recount caller %llx (base+%llx)", (unsigned long long)ra,
             (unsigned long long)(ra - g_base));
+    }
+    uint64_t st = g_mode_state;
+    if (st != last_state) {
+      last_state = st;
+      lfile("mode state %llu", (unsigned long long)st);
     }
     Sleep(100);
   }
@@ -242,7 +248,42 @@ static int recount_patch(void)
   VirtualProtect(site, 5, old, &old);
   FlushInstructionCache(GetCurrentProcess(), site, 5);
   lfile("recount watcher at %p (cave %p)", site, cave);
-  CreateThread(NULL, 0, recount_watch, NULL, 0, NULL);
+  return 0;
+}
+
+static int state_patch(void)
+{
+  unsigned char* site = (unsigned char*)(uintptr_t)(g_base + 0x1267104);
+  unsigned char* resume = (unsigned char*)(uintptr_t)(g_base + 0x126710b);
+  unsigned char want[7] = { 0x48, 0x8b, 0x0d, 0x3d, 0x7c, 0x49, 0x02 };
+  unsigned char* cave = NULL;
+  int n = 0;
+  DWORD old = 0;
+
+  if (memcmp(site, want, 7)) { lfile("state: site mismatch"); return 3; }
+  for (uint64_t off = 0x20000000; off < 0x70000000; off += 0x04000000) {
+    cave = (unsigned char*)VirtualAlloc((void*)(uintptr_t)(g_base + off), 64,
+                                        MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (cave) break;
+  }
+  if (!cave) return 1;
+
+  cave[n++] = 0x48; cave[n++] = 0xb8;                          /* mov rax, imm64 */
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)(g_base + 0x35ee48); n += 8;
+  cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x08;        /* mov rcx, [rax] */
+  cave[n++] = 0x8b; cave[n++] = 0x41; cave[n++] = 0x78;        /* mov eax, [rcx+0x78] */
+  cave[n++] = 0x48; cave[n++] = 0xa3;                          /* mov [imm64], rax */
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_mode_state; n += 8;
+  cave[n++] = 0xe9;
+  *(int32_t*)(cave + n) = (int32_t)((uintptr_t)resume - (uintptr_t)(cave + n + 4)); n += 4;
+
+  if (!VirtualProtect(site, 7, PAGE_EXECUTE_READWRITE, &old)) return 2;
+  site[0] = 0xe9;
+  *(int32_t*)(site + 1) = (int32_t)((uintptr_t)cave - (uintptr_t)(site + 5));
+  site[5] = 0x90; site[6] = 0x90;
+  VirtualProtect(site, 7, old, &old);
+  FlushInstructionCache(GetCurrentProcess(), site, 7);
+  lfile("state watcher at %p (cave %p)", site, cave);
   return 0;
 }
 
@@ -280,5 +321,6 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
   lfile("load: CupSelect constructor replaced");
   date_patch();
   recount_patch();
+  CreateThread(NULL, 0, recount_watch, NULL, 0, NULL);
   return TRUE;
 }

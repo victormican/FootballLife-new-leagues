@@ -48,6 +48,15 @@ nuestra no llega a la rama que llena la tabla: por eso `count=0`.
 3. El global `0x1435ee48` es `rip+0x2497c3d` en `0x141267104`; en reposo puede estar sin
    inicializar (se leyó basura una vez), así que hay que leerlo durante el tick.
 
+## Intento de registrar el estado (descartado)
+
+Se probó un segundo desvío en `0x141267104` para guardar `[obj+0x78]` en cada tick. **Crasheaba
+al arrancar** (antes de construir el menú): el global `0x1435ee48` no siempre contiene un
+puntero válido cuando el tick pasa por ahí, y el cave lo desreferenciaba a ciegas. Se quitó.
+El estado hay que leerlo en un punto donde el objeto ya es válido (p. ej. el `r15` del tick en
+la llamada al recuento) o desde `tools/fl26inspect.py` durante la entrada, no repitiendo la
+desreferencia del global.
+
 ## Herramienta
 
 `tools/fl26inspect.py <pid>`: lee sin Frida (solo `ReadProcessMemory`, requiere elevación):
