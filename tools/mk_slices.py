@@ -40,7 +40,9 @@ slices = [
     ("owner", 0x14B5000, 0xC000),
     ("phase", 0x150A000, 0x8000),
     ("draw", 0x1540000, 0x10000),
-    ("dates", 0x157F000, 0x2000),
+    ("dates", 0x156F000, 0x12000),
+    ("tick", 0x125F000, 0x13000),
+    ("sched2", 0x13F0000, 0x12000),
     ("data", 0x339B000, 0x2000),
 ]
 
@@ -54,7 +56,7 @@ def align(x, a):
 
 hdr = bytearray(0x400)
 hdr[0:2] = b"MZ"
-struct.pack_into("<I", hdr, 0x3C, 0x40)
+struct.pack_into("<I", hdr, 0x3C, 0x80)
 stub = b"This program cannot be run in DOS mode.\r\r\n$"
 hdr[0x40 : 0x40 + len(stub)] = stub
 hdr[0x80:0x84] = b"PE\0\0"
@@ -81,6 +83,7 @@ struct.pack_into("<I", opt, 108, 16)
 
 out = bytearray()
 out += hdr[:0x80]
+out += b"PE\0\0"
 out += coff
 out += opt
 # section table (40 bytes each) right after the optional header

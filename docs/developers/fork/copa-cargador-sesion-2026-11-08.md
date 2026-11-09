@@ -69,6 +69,23 @@ Conclusión: el cargador real no es este tick. Para encontrarlo hace falta un **
 escritura** sobre la tabla de sesión al entrar a una copa que funciona (CE o Frida estable),
 no más lecturas estáticas.
 
+## El cargador real (2026-11-09)
+
+Con el watchpoint de escritura del puente de CE sobre `block+0xc12e9c` y Ghidra sobre el PE
+recortado:
+
+- El llenado de la tabla de sesión lo hace **`FUN_14126F000`** (rama 7 del tick): copia a
+  `block+0xc12e9c + i*0x314` los registros de **`param_1[9]..[10]`** (vector del objeto del
+  modo), uno por fase.
+- África Cup: `RCX = 0x6CD3DB90`, `[obj+0x78] = 7`, y el vector trae **1 registro** (key 46).
+- La 11ª: el cargador se llama, pero los hits capturados son objetos que **no son el del
+  modo** (`0x007B0010` con pinta de texto, `0x4CA3D2C0` con `"emblem_away"`). Al seleccionar
+  equipo el juego **vuelve al menú, sin sorteo**: el setup de la copa no llega a construir el
+  objeto del modo con el vector de la 200.
+
+Conclusión: el corte está en el **setup de la copa** (selección → objeto del modo), antes
+del cargador. La copa jugable sigue siendo la plaza Custom Cup (reg 1071).
+
 ## Herramienta
 
 `tools/fl26inspect.py <pid>`: lee sin Frida (solo `ReadProcessMemory`, requiere elevación):
