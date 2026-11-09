@@ -1,56 +1,35 @@
-// findlist -- locate the competition list by its content, not by a vtable.
-//
-// Every list item is 12 bytes: cid (u32), 0x0000ffff (u32), 0 (u32).  cid 33 (FIFA Club World Cup)
-// is in the shipped list, so its bytes are a fingerprint.  From a hit we dump the items and look
-// for a pointer to that address, which is the list begin stored in whichever object owns it
-// (begin at +0x90 for the select modes, but this finds it even when the class is another one).
-
+// findlist -- which master record carries the hardcoded list of the ten cup regulations?
+// The builder compares each regulation key against up to 15 u16 entries at rec+0x2ec
+// (20-byte stride).  Scan the live table for the record that lists 46 / 1071.
 'use strict';
 
-const log = (s) => {
-  const t = String(s);
-  console.log(t);
-  send({ kind: 'log', text: t });
-};
-
-function items(addr, max) {
-  const out = [];
-  for (let i = 0; i < max; i++) {
-    try {
-      const p = addr.add(i * 12);
-      const cid = p.readU32();
-      const tail = p.add(4).readU32();
-      if (tail !== 0xffff) break;
-      out.push(cid + '(c' + p.add(4).readU8() + ',g' + p.add(5).readU8() + ')');
-    } catch (e) { break; }
-  }
-  return out;
-}
+const log = (s) => { const t = String(s); console.log(t); send({ kind: 'log', text: t }); };
 
 function main() {
-  const ranges = Process.enumerateRanges('rw-');
-  const pat = '21000000ffff0000';            // cid 33 + 0x0000ffff
-  const hits = [];
-  for (const r of ranges) {
-    try {
-      for (const h of Memory.scanSync(r.base, r.size, pat)) hits.push(h.address);
-    } catch (e) { /* skip */ }
-  }
-  log('fingerprint hits: ' + hits.length);
+  const exe = Process.enumerateModules().find((m) => m.name.toLowerCase().includes('fl_2026'));
+  if (!exe) { log('FL_2026.exe not loaded'); return; }
+  const b = exe.base;
+  const owner = new NativeFunction(b.add(0x14b6a60), 'pointer', []);
+  const ctx = owner();
+  if (ctx.isNull()) { log('no ctx'); return; }
+  const block = ctx.add(0x48).readPointer();
+  const count = block.add(0xd0bcf4).readU32();
+  log('block=' + block + ' count=' + count);
 
-  for (const h of hits.slice(0, 12)) {
-    log('LIST? ' + h + ' -> ' + items(h, 40).join(' '));
-    // who points at this address (the object's begin field)?
-    const p8 = h.toString().replace('0x', '').padStart(16, '0');
-    for (const r of ranges) {
-      try {
-        const found = Memory.scanSync(r.base, r.size, p8);
-        for (const f of found) {
-          const q = f.address;
-          log('  referenced at ' + q + ' -> object ' + q.sub(0x90) +
-              ' (if begin is +0x90), or ' + q.sub(0x70) + ' (if rows begin)');
-        }
-      } catch (e) { /* skip */ }
+  for (let i = 0; i < Math.min(count, 400); i++) {
+    const rec = block.add(0xc12e9c).add(i * 0x314);
+    const key = rec.readU16();
+    if (key === 0xffff) continue;
+    let list = [];
+    let hit = false;
+    for (let j = 0; j < 15; j++) {
+      const w = rec.add(0x2ec + j * 20).readU16();
+      list.push(w);
+      if (w === 46 || w === 1071 || w === 1027) hit = true;
+    }
+    if (hit) {
+      log('record slot ' + i + ' key=' + key + ' cid=' + rec.add(0x80).readU32() +
+          ' list=[' + list.join(',') + ']');
     }
   }
   log('done');

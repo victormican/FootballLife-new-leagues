@@ -76,7 +76,7 @@ local REGCID = false
 
 -- 2026-11-06: cuantas copas del mundo se listan en Kick Off > Cup.  0 = ninguna (solo las 8
 -- del juego), -1 = todas.  Sirve para saber si el cierre lo causa nuestra lista.
-local EXPOSE = 0
+local EXPOSE = -1
 
 local dll_log, dll_stats, dll_ko_tick, logbuf, statbuf, regbuf
 local ticks = 0
@@ -101,11 +101,18 @@ function m.make_key(ctx, filename)
   ticks = ticks + 1
   -- the knockout bracket check (fl26_swiss_ko_tick) returns at once outside spring
   if dll_ko_tick and ticks % 64 == 0 then dll_ko_tick() end
-  if ticks % 32 == 0 then drain(nil) end
+  -- 2026-11-06: drain on every load while this A/B is on, so the cup menu's CUPIN/CUPVEC/
+  -- CUPAFTER reach sider.log before the game can close.
+  if EXPOSE >= 0 then
+    drain(nil)
+  elseif ticks % 32 == 0 then
+    drain(nil)
+  end
   return nil
 end
 
 function m.key_down(ctx, vkey)
+  if EXPOSE >= 0 then drain(nil) end
   if vkey == 0x77 then drain("F8 report") end      -- F8
 end
 
@@ -623,7 +630,7 @@ function m.init(ctx)
         end
       end
 
-      if #ccups > 0 then
+      if #ccups > 0 or #SHOWCUPS > 0 then
         -- the single-match league cups first: fl26_swiss_ccup takes their fields by these
         local nlike = 0
         for _, c in ipairs(ccups) do if c.like then nlike = nlike + 1 end end

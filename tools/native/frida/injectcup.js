@@ -92,7 +92,7 @@ function main() {
           const b = v.readPointer();
           const e2 = v.add(8).readPointer();
           const n = b.isNull() ? -1 : e2.sub(b).toInt32() / 4;
-          log('DRAW reg=' + reg + ' clubs=' + n);
+          log('DRAW reg=' + reg + ' clubs=' + n + ' ret=' + this.returnAddress);
         } catch (e) { log('DRAW log error ' + e); }
       },
     });
@@ -101,9 +101,13 @@ function main() {
 
   // 4. is the scheduler root called at all for our regulation?
   try {
-    Interceptor.attach(exe.base.add(0x1348210), {
+    Interceptor.attach(exe.base.add(0x13481f3), {
       onEnter(args) { this.reg = args[1].and(0xffff).toInt32(); },
-      onLeave(retval) { if (this.reg === REG || this.reg === 46) log('ROOT reg=' + this.reg + ' -> ' + retval); },
+      onLeave(retval) {
+        if (this.reg === REG || this.reg === 46) {
+          log('ROOT reg=' + this.reg + ' ret=' + this.returnAddress + ' -> ' + retval);
+        }
+      },
     });
     log('hook root installed');
   } catch (e) { log('root hook failed ' + e); }
@@ -111,7 +115,13 @@ function main() {
   try {
     Interceptor.attach(exe.base.add(0x1546c70), {
       onEnter(args) { this.reg = args[0].and(0xffff).toInt32(); },
-      onLeave(retval) { if (this.reg === REG || this.reg === 46) log('PHFIN reg=' + this.reg + ' -> ' + retval); },
+      onLeave(retval) {
+        if (this.reg === REG || this.reg === 46) log('PHFIN reg=' + this.reg + ' -> ' + retval);
+        if (this.reg === REG) {
+          retval.replace(ptr(1));                 // EXPERIMENTO: fingir que la fase esta lista
+          log('PHFIN reg=' + this.reg + ' forced -> 1');
+        }
+      },
     });
     log('hook phfin installed');
   } catch (e) { log('phfin hook failed ' + e); }

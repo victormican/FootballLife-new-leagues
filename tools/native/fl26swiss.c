@@ -12657,23 +12657,11 @@ char cupsel_handler(unsigned char* self, uint64_t a, uint64_t b, uint64_t c)
   clogf("fl26swiss: CUPTRACE regcid_fix done");
   unsigned char** pb = (unsigned char**)(self + 0x90);
   unsigned char** pe = (unsigned char**)(self + 0x98);
-  unsigned char* w = *pb;
+  unsigned char* w = *pe;                 /* 2026-11-08: APPEND-ONLY.  The filter (which
+                                             compacted the list in place) is what left the
+                                             menu inconsistent and closed the game; let the
+                                             game's own list be and just append at the end. */
   int gone = 0;
-  for (unsigned char* p = *pb; p && p + 12 <= *pe; p += 12) {
-    uint32_t cid = *(uint32_t*)p;
-    uint16_t g = (uint16_t)((phkind_fn)(uintptr_t)(g_base + PHKIND_RVA))(&cid, 2);
-    unsigned char* rec = g != 0xffff ? find_rec(g) : 0;
-    if (rec && (rec[0x30c] & 0x7f) > 32) {
-      if (g_cupsel_n++ < 8)
-        logf("fl26swiss: Cup mode -- competition %u left out (group phase %u has %u clubs)",
-             (unsigned)*(uint32_t*)p, (unsigned)g, (unsigned)(rec[0x30c] & 0x7f));
-      gone++;
-      continue;
-    }
-    if (w != p) memmove(w, p, 12);
-    w += 12;
-  }
-  if (gone) *pe = w;
   clogf("fl26swiss: CUPTRACE filter done gone=%d items=%u", gone,
         (unsigned)(*pb && w >= *pb ? (size_t)(w - *pb) / 12 : 0));
   /* add the world's own cups, if the vector has room; an entry is the 12 bytes of an existing
