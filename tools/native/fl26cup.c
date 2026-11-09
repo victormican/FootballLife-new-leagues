@@ -132,6 +132,21 @@ static char cup_handler(void* self, uint64_t a, uint64_t b, uint64_t c){
             i, (unsigned)*(uint32_t*)p0, p0[0], p0[1], p0[2], p0[3], p0[4], p0[5],
             p0[6], p0[7], p0[8], p0[9], p0[10], p0[11]);
     }
+    /* the source vectors of the object: {begin,end,cap} every 8 bytes.  Dump any that hold
+       12-byte entries, so we can see which one feeds the base list builder. */
+    for (int off = 0x50; off <= 0xc0; off += 8) {
+      unsigned char* vb = *(unsigned char**)((unsigned char*)self + off);
+      unsigned char* ve = *(unsigned char**)((unsigned char*)self + off + 8);
+      if (!vb || !ve || ve <= vb) continue;
+      size_t bytes = (size_t)(ve - vb);
+      if (bytes % 12 || bytes / 12 > 16) continue;
+      int n = (int)(bytes / 12);
+      char line[512]; int q = 0;
+      q += snprintf(line + q, sizeof line - q, "vec +%02x n=%d:", off, n);
+      for (int i = 0; i < n && q < (int)sizeof line - 12; i++)
+        q += snprintf(line + q, sizeof line - q, " %u", (unsigned)*(uint32_t*)(vb + i * 12));
+      lfile("%s", line);
+    }
   }
   return r;
 }
@@ -178,6 +193,59 @@ static int date_patch(void)
   return 0;
 }
 
+/* Who calls the session-table recount?  The recount (0x1414bc0a0) is the tail of the loader
+   that fills the phase table for the selected cup.  This patch stores the caller's return
+   address on every call and a small thread writes it to the log; no debugger, no timing. */
+static volatile uint64_t g_recount_ra;
+
+static DWORD WINAPI recount_watch(LPVOID arg)
+{
+  uint64_t last = 0;
+  (void)arg;
+  for (;;) {
+    uint64_t ra = g_recount_ra;
+    if (ra && ra != last) {
+      last = ra;
+      lfile("recount caller %llx (base+%llx)", (unsigned long long)ra,
+            (unsigned long long)(ra - g_base));
+    }
+    Sleep(100);
+  }
+  return 0;
+}
+
+static int recount_patch(void)
+{
+  unsigned char* site = (unsigned char*)(uintptr_t)(g_base + 0x14bc0a0);
+  unsigned char* resume = site + 5;
+  unsigned char* cave = NULL;
+  int n = 0;
+  DWORD old = 0;
+
+  for (uint64_t off = 0x20000000; off < 0x70000000; off += 0x04000000) {
+    cave = (unsigned char*)VirtualAlloc((void*)(uintptr_t)(g_base + off), 64,
+                                        MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (cave) break;
+  }
+  if (!cave) return 1;
+
+  cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x04; cave[n++] = 0x24; /* mov rax,[rsp] */
+  cave[n++] = 0x48; cave[n++] = 0xa3;                                     /* mov [imm64],rax */
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_recount_ra; n += 8;
+  cave[n++] = 0x48; cave[n++] = 0x89; cave[n++] = 0x5c; cave[n++] = 0x24; cave[n++] = 0x18;
+  cave[n++] = 0xe9;
+  *(int32_t*)(cave + n) = (int32_t)((uintptr_t)resume - (uintptr_t)(cave + n + 4)); n += 4;
+
+  if (!VirtualProtect(site, 5, PAGE_EXECUTE_READWRITE, &old)) return 2;
+  site[0] = 0xe9;
+  *(int32_t*)(site + 1) = (int32_t)((uintptr_t)cave - (uintptr_t)(site + 5));
+  VirtualProtect(site, 5, old, &old);
+  FlushInstructionCache(GetCurrentProcess(), site, 5);
+  lfile("recount watcher at %p (cave %p)", site, cave);
+  CreateThread(NULL, 0, recount_watch, NULL, 0, NULL);
+  return 0;
+}
+
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
 {
   uint64_t* slot;
@@ -211,5 +279,6 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
   VirtualProtect(slot, sizeof *slot, old, &old);
   lfile("load: CupSelect constructor replaced");
   date_patch();
+  recount_patch();
   return TRUE;
 }
