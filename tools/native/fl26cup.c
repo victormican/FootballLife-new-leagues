@@ -92,6 +92,8 @@ __declspec(dllexport) int fl26_swiss_log(char* out, int cap)
   return n;
 }
 
+static void find_our_record(void);
+
 static char cup_handler(void* self, uint64_t a, uint64_t b, uint64_t c){
   unsigned char** pb = (unsigned char**)((unsigned char*)self + 0x90);
   unsigned char** pe = (unsigned char**)((unsigned char*)self + 0x98);
@@ -100,6 +102,7 @@ static char cup_handler(void* self, uint64_t a, uint64_t b, uint64_t c){
   size_t room = (*cp && *cp > *pb) ? (size_t)(*cp - *pb) / 12 : have;
   int added = 0, i;
   char r;
+  find_our_record();
 
   for (i = 0; i < g_ncid && have + (size_t)added < room; i++) {
     uint32_t cid = g_cid[i];
@@ -198,10 +201,48 @@ static int date_patch(void)
    address on every call and a small thread writes it to the log; no debugger, no timing. */
 static volatile uint64_t g_recount_ra;
 static volatile uint64_t g_mode_state;
+static volatile uint64_t g_loader_self, g_loader_begin, g_loader_end, g_loader_cap;
+static volatile uint32_t g_loader_key;
+static volatile uint64_t g_our_record;
+
+static int readable_span(const void* p, size_t n)
+{
+  MEMORY_BASIC_INFORMATION m;
+  if (!p) return 0;
+  if (VirtualQuery(p, &m, sizeof m) == 0) return 0;
+  if (m.State != MEM_COMMIT) return 0;
+  if (m.Protect & (PAGE_NOACCESS | PAGE_GUARD)) return 0;
+  return ((const unsigned char*)p + n) <= ((const unsigned char*)m.BaseAddress + m.RegionSize);
+}
+
+static void find_our_record(void)
+{
+  g_our_record = 0;
+  if (!readable_span((void*)(uintptr_t)(g_base + 0x3705e10), 8)) return;
+  uint64_t owner = *(uint64_t*)(uintptr_t)(g_base + 0x3705e10);
+  if (!owner || !readable_span((void*)(uintptr_t)(owner + 0x48), 8)) return;
+  uint64_t block = *(uint64_t*)(uintptr_t)(owner + 0x48);
+  if (!block || !readable_span((void*)(uintptr_t)(block + 0xd0bcf4), 4)) return;
+  uint32_t cnt = *(uint32_t*)(uintptr_t)(block + 0xd0bcf4);
+  if (!cnt || cnt > 400) return;
+  for (uint32_t i = 0; i < cnt; i++) {
+    uint64_t r = block + 0xc12e9c + (uint64_t)i * 0x314;
+    if (!readable_span((void*)(uintptr_t)r, 0x314)) return;
+    if (*(uint16_t*)(uintptr_t)r == 200) {
+      g_our_record = r;
+      lfile("find: owner=%llx block=%llx cnt=%u found=%llx", (unsigned long long)owner,
+            (unsigned long long)block, (unsigned)cnt, (unsigned long long)r);
+      return;
+    }
+  }
+  lfile("find: owner=%llx block=%llx cnt=%u NOT FOUND", (unsigned long long)owner,
+        (unsigned long long)block, (unsigned)cnt);
+}
 
 static DWORD WINAPI recount_watch(LPVOID arg)
 {
   uint64_t last = 0, last_state = 0;
+  uint64_t ls = 0, lb = 0, le = 0, lk = 0;
   (void)arg;
   for (;;) {
     uint64_t ra = g_recount_ra;
@@ -214,6 +255,18 @@ static DWORD WINAPI recount_watch(LPVOID arg)
     if (st != last_state) {
       last_state = st;
       lfile("mode state %llu", (unsigned long long)st);
+    }
+    uint64_t s = g_loader_self;
+    if (s != ls) {
+      ls = s;
+      lfile("loader self %llx", (unsigned long long)s);
+    }
+    uint64_t b = g_loader_begin, e = g_loader_end, k = g_loader_key;
+    if (b != lb || e != le || k != lk) {
+      lb = b; le = e; lk = k;
+      lfile("loader vec begin=%llx end=%llx count=%lld key=%u",
+            (unsigned long long)b, (unsigned long long)e,
+            (long long)((int64_t)(e - b) / 0x314), (unsigned)k);
     }
     Sleep(100);
   }
@@ -290,6 +343,74 @@ static int state_patch(void)
   return 0;
 }
 
+static int loader_patch(void)
+{
+  unsigned char* site = (unsigned char*)(uintptr_t)(g_base + 0x126f000);
+  unsigned char* resume = site + 5;
+  unsigned char want[5] = { 0x48, 0x89, 0x4c, 0x24, 0x08 };
+  unsigned char* cave = NULL;
+  int n = 0;
+  DWORD old = 0;
+
+  if (memcmp(site, want, 5)) { lfile("loader: site mismatch"); return 3; }
+  for (uint64_t off = 0x20000000; off < 0x70000000; off += 0x04000000) {
+    cave = (unsigned char*)VirtualAlloc((void*)(uintptr_t)(g_base + off), 128,
+                                        MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (cave) break;
+  }
+  if (!cave) return 1;
+
+  cave[n++] = 0x50;                                       /* push rax */
+  cave[n++] = 0x52;                                       /* push rdx */
+  /* if the cup's record vector is empty, point it at our regulation 200 record */
+  cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x41; cave[n++] = 0x48;
+  cave[n++] = 0x48; cave[n++] = 0x3b; cave[n++] = 0x41; cave[n++] = 0x50;
+  cave[n++] = 0x75; cave[n++] = 0x25;                     /* jne over the fill */
+  cave[n++] = 0x48; cave[n++] = 0xa1;                      /* mov rax,[imm64] */
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_our_record; n += 8;
+  cave[n++] = 0x48; cave[n++] = 0x85; cave[n++] = 0xc0;   /* test rax,rax */
+  cave[n++] = 0x74; cave[n++] = 0x16;                     /* jz over the writes */
+  cave[n++] = 0x66; cave[n++] = 0x81; cave[n++] = 0x38;   /* cmp word [rax],200 */
+  *(uint16_t*)(cave + n) = 200; n += 2;
+  cave[n++] = 0x75; cave[n++] = 0x0f;                     /* jne over the writes */
+  cave[n++] = 0x48; cave[n++] = 0x89; cave[n++] = 0x41; cave[n++] = 0x48;
+  cave[n++] = 0x48; cave[n++] = 0x8d; cave[n++] = 0x90;   /* lea rdx,[rax+0x314] */
+  *(uint32_t*)(cave + n) = 0x314; n += 4;
+  cave[n++] = 0x48; cave[n++] = 0x89; cave[n++] = 0x51; cave[n++] = 0x50;
+  cave[n++] = 0x48; cave[n++] = 0xba;                      /* mov rdx, imm64 */
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_loader_self; n += 8;
+  cave[n++] = 0x48; cave[n++] = 0x89; cave[n++] = 0x0a;    /* mov [rdx], rcx */
+  cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x41; cave[n++] = 0x48;
+  cave[n++] = 0x48; cave[n++] = 0xa3;
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_loader_begin; n += 8;
+  cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x41; cave[n++] = 0x50;
+  cave[n++] = 0x48; cave[n++] = 0xa3;
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_loader_end; n += 8;
+  cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x41; cave[n++] = 0x58;
+  cave[n++] = 0x48; cave[n++] = 0xa3;
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_loader_cap; n += 8;
+  cave[n++] = 0x48; cave[n++] = 0x8b; cave[n++] = 0x41; cave[n++] = 0x48;
+  cave[n++] = 0x48; cave[n++] = 0x85; cave[n++] = 0xc0;   /* test rax,rax */
+  cave[n++] = 0x74; cave[n++] = 0x0f;                     /* jz over the key read */
+  cave[n++] = 0x0f; cave[n++] = 0xb7; cave[n++] = 0x10;   /* movzx edx,[rax] */
+  cave[n++] = 0x48; cave[n++] = 0xb8;                      /* mov rax, imm64 */
+  *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_loader_key; n += 8;
+  cave[n++] = 0x89; cave[n++] = 0x10;                      /* mov [rax], edx */
+  cave[n++] = 0x5a;                                       /* pop rdx */
+  cave[n++] = 0x58;                                       /* pop rax */
+  memcpy(cave + n, want, 5); n += 5;                       /* original */
+  cave[n++] = 0xe9;
+  *(int32_t*)(cave + n) = (int32_t)((uintptr_t)resume - (uintptr_t)(cave + n + 4)); n += 4;
+
+  if (!VirtualProtect(site, 5, PAGE_EXECUTE_READWRITE, &old)) return 2;
+  site[0] = 0xe9;
+  *(int32_t*)(site + 1) = (int32_t)((uintptr_t)cave - (uintptr_t)(site + 5));
+  VirtualProtect(site, 5, old, &old);
+  FlushInstructionCache(GetCurrentProcess(), site, 5);
+  lfile("loader watcher at %p (cave %p)", site, cave);
+  return 0;
+}
+
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
 {
   uint64_t* slot;
@@ -324,6 +445,7 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
   lfile("load: CupSelect constructor replaced");
   date_patch();
   recount_patch();
+  loader_patch();
   CreateThread(NULL, 0, recount_watch, NULL, 0, NULL);
   return TRUE;
 }

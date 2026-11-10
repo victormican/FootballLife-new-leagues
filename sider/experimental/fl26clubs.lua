@@ -143,8 +143,7 @@ local function from_world(world, pools)
   -- `pool <slot> <regulation>`: a group of clubs the game never fills (slot 75, "Other Clubs
   -- (Africa)") answered from a regulation of its own, without a league line on the slot
   for _, P in ipairs(pools or {}) do slots[#slots + 1] = { P[1], P[2] } end
-  -- 2026-11-06: se sirve solo lo que el juego llena con listas suyas (SERVED); el resto de
-  -- slots conserva la lista del juego.
+  -- 2026-11-06: vuelta a servir solo los slots de SERVED (el juego conserva sus listas).
   for _, L in ipairs(world) do
     if L.slot and SERVED[L.slot] then slots[#slots + 1] = { L.slot, L.id } end
     -- `serve=75`: answer that slot from this regulation without asking fl26comptab for a

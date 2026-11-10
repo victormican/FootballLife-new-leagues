@@ -213,7 +213,10 @@ static int rebuild(int i)
   g_stat[2]++;
   if (!g_said[i]) {
     g_said[i] = 1;
-    logf("fl26clubs: slot %u <- reg %u: %d clubs", g_cfg[i].slot, g_cfg[i].reg, n);
+    char hb[200]; int hl = 0;
+    for (int k = 0; k < n && k < 8; k++)
+      hl += snprintf(hb + hl, sizeof hb - hl, " %08x/%u", h[k], h[k] >> HANDLE_SHIFT);
+    logf("fl26clubs: slot %u <- reg %u: %d clubs [%s]", g_cfg[i].slot, g_cfg[i].reg, n, hb);
   }
   return n;
 }
