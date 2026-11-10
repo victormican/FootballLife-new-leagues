@@ -1,0 +1,14 @@
+{
+  "world": "_FL26Sud",
+  "leagues": [
+    {
+      "name": "Liga Nueva",
+      "country": "Bolivia",
+      "clubs": 16,
+      "legs": 2,
+      "cup": true,
+      "cup_name": "Copa Nueva",
+      "europe": [[1, 9], [2, 9], [3, 9], [4, 9]]
+    }
+  ]
+}
