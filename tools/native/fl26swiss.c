@@ -13451,11 +13451,31 @@ static int rec_day(unsigned char* blk, uint16_t id)
   if (mo < 1 || mo > 12 || dd < 1 || dd > 31) return -1;
   return MONTH0[mo - 1] + dd - 1;
 }
+static int cal_mapped(unsigned char* blk)
+{
+  size_t off = 0;
+  const size_t total = (size_t)365 * CAL_STRIDE;
+  while (off < total) {
+    MEMORY_BASIC_INFORMATION m;
+    unsigned char* p = blk + CAL_BASE + off;
+    if (VirtualQuery(p, &m, sizeof m) != sizeof m) return 0;
+    if (m.State != MEM_COMMIT || (m.Protect & (PAGE_NOACCESS | PAGE_GUARD))) return 0;
+    size_t step = (size_t)((unsigned char*)m.BaseAddress + m.RegionSize - p);
+    if (!step) return 0;
+    off += step;
+  }
+  return 1;
+}
 static void cal_dedupe(void)
 {
   unsigned char* o = (unsigned char*)((owner_fn)(uintptr_t)(g_base + OWNER_RVA))();
   unsigned char* blk = o ? *(unsigned char**)(o + 0x48) : 0;
   if (!blk) return;
+  if (!cal_mapped(blk)) {          /* Cup mode: a career's calendar is not committed here */
+    static int said;
+    if (!said) { said = 1; logf("fl26swiss: day lists -- the calendar is not committed here; dedupe skipped"); }
+    return;
+  }
   static uint8_t seen[65536 / 8];
   int same = 0, cross = 0, fixed = 0, total = 0, ex = 0;
   char exs[200]; size_t el = 0; exs[0] = 0;
