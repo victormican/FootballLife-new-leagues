@@ -94,6 +94,7 @@ __declspec(dllexport) int fl26_swiss_log(char* out, int cap)
 
 static void find_our_record(void);
 
+static int g_chain;
 static char cup_handler(void* self, uint64_t a, uint64_t b, uint64_t c){
   unsigned char** pb = (unsigned char**)((unsigned char*)self + 0x90);
   unsigned char** pe = (unsigned char**)((unsigned char*)self + 0x98);
@@ -102,6 +103,11 @@ static char cup_handler(void* self, uint64_t a, uint64_t b, uint64_t c){
   size_t room = (*cp && *cp > *pb) ? (size_t)(*cp - *pb) / 12 : have;
   int added = 0, i;
   char r;
+  if (g_chain) {
+    r = (char)g_orig(self, a, b, c);
+    find_our_record();
+    return r;
+  }
   find_our_record();
 
   for (i = 0; i < g_ncid && have + (size_t)added < room; i++) {
@@ -179,9 +185,9 @@ static int date_patch(void)
 
   cave[n++] = 0x0f; cave[n++] = 0xb7; cave[n++] = 0xf9;              /* movzx edi, cx */
   cave[n++] = 0x81; cave[n++] = 0xff;                                 /* cmp edi, imm32 */
-  *(uint32_t*)(cave + n) = 1071; n += 4;
+  *(uint32_t*)(cave + n) = 318; n += 4;
   cave[n++] = 0x75; cave[n++] = 0x05;                                 /* jne +5 */
-  cave[n++] = 0xbf; *(uint32_t*)(cave + n) = 122; n += 4;             /* mov edi, 122 */
+  cave[n++] = 0xbf; *(uint32_t*)(cave + n) = 9; n += 4;               /* mov edi, 9 */
   cave[n++] = 0xe8;                                                   /* call owner */
   *(int32_t*)(cave + n) = (int32_t)(target - (uintptr_t)(cave + n + 4)); n += 4;
   cave[n++] = 0xe9;                                                   /* jmp resume */
@@ -192,7 +198,7 @@ static int date_patch(void)
   *(int32_t*)(site + 1) = (int32_t)((uintptr_t)cave - (uintptr_t)(site + 5));
   VirtualProtect(site, 5, old, &old);
   FlushInstructionCache(GetCurrentProcess(), site, 5);
-  lfile("load: date 1071 -> 122 detour at %p (cave %p)", (void*)site, (void*)cave);
+  lfile("load: date 318 -> 9 detour at %p (cave %p)", (void*)site, (void*)cave);
   return 0;
 }
 
@@ -228,7 +234,7 @@ static void find_our_record(void)
   for (uint32_t i = 0; i < cnt; i++) {
     uint64_t r = block + 0xc12e9c + (uint64_t)i * 0x314;
     if (!readable_span((void*)(uintptr_t)r, 0x314)) return;
-    if (*(uint16_t*)(uintptr_t)r == 200) {
+    if (*(uint16_t*)(uintptr_t)r == 318) {
       g_our_record = r;
       lfile("find: owner=%llx block=%llx cnt=%u found=%llx", (unsigned long long)owner,
             (unsigned long long)block, (unsigned)cnt, (unsigned long long)r);
@@ -370,8 +376,8 @@ static int loader_patch(void)
   *(uint64_t*)(cave + n) = (uint64_t)(uintptr_t)&g_our_record; n += 8;
   cave[n++] = 0x48; cave[n++] = 0x85; cave[n++] = 0xc0;   /* test rax,rax */
   cave[n++] = 0x74; cave[n++] = 0x16;                     /* jz over the writes */
-  cave[n++] = 0x66; cave[n++] = 0x81; cave[n++] = 0x38;   /* cmp word [rax],200 */
-  *(uint16_t*)(cave + n) = 200; n += 2;
+  cave[n++] = 0x66; cave[n++] = 0x81; cave[n++] = 0x38;   /* cmp word [rax],318 */
+  *(uint16_t*)(cave + n) = 318; n += 2;
   cave[n++] = 0x75; cave[n++] = 0x0f;                     /* jne over the writes */
   cave[n++] = 0x48; cave[n++] = 0x89; cave[n++] = 0x41; cave[n++] = 0x48;
   cave[n++] = 0x48; cave[n++] = 0x8d; cave[n++] = 0x90;   /* lea rdx,[rax+0x314] */
@@ -432,7 +438,20 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
         (unsigned long long)*slot, (unsigned long long)(g_base + CUPSEL_INIT_RVA));
 
   if (*slot != g_base + CUPSEL_INIT_RVA) {
-    lfile("load: vtable slot is not the constructor -- not patched");
+    /* fl26swiss owns the slot: chain after its handler instead of giving up */
+    lfile("load: slot taken -- chaining after the installed handler");
+    g_chain = 1;
+    if (VirtualProtect(slot, sizeof *slot, PAGE_READWRITE, &old)) {
+      g_orig = (int (*)(void*, uint64_t, uint64_t, uint64_t))(uintptr_t)*slot;
+      *slot = (uint64_t)(uintptr_t)cup_handler;
+      VirtualProtect(slot, sizeof *slot, old, &old);
+      FlushInstructionCache(GetCurrentProcess(), slot, sizeof *slot);
+      lfile("load: chained after the installed CupSelect handler");
+    }
+    date_patch();
+    /* recount_patch(); -- diagnostico: su detour crasheaba en 0x1414bc0a5 */
+    loader_patch();
+    CreateThread(NULL, 0, recount_watch, NULL, 0, NULL);
     return TRUE;
   }
   if (!VirtualProtect(slot, sizeof *slot, PAGE_READWRITE, &old)) {
@@ -444,7 +463,7 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r)
   VirtualProtect(slot, sizeof *slot, old, &old);
   lfile("load: CupSelect constructor replaced");
   date_patch();
-  recount_patch();
+  /* recount_patch(); -- diagnostico: su detour crasheaba en 0x1414bc0a5 */
   loader_patch();
   CreateThread(NULL, 0, recount_watch, NULL, 0, NULL);
   return TRUE;
