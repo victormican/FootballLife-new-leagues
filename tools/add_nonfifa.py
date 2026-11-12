@@ -107,7 +107,6 @@ NATIONS = [
 ]
 
 
-
 def text(b):
     return b.split(b"\0")[0].decode("utf-8", "replace")
 
@@ -195,9 +194,11 @@ def main():
     free = E.free_ids(players, len(NATIONS) * len(squad))
 
     made, team_ids = 0, []
+    by_conf = {}
     for k, (name, cid, _conf) in enumerate(NATIONS):
         tid = top + 1 + k
         team_ids.append(tid)
+        by_conf.setdefault(_conf, []).append(tid)
         row = bytearray(teams_raw[tpl_off : tpl_off + T_REC])
         row[T_ID : T_ID + 4] = tid.to_bytes(4, "little")
         row[T_ALT : T_ALT + 4] = (top_alt + 1 + k).to_bytes(4, "little")
@@ -239,22 +240,18 @@ def main():
             players += pr
             made += 1
 
-    cid_c, reg = 110, 216
+    # One league per confederation, so no league grows past what the game's calendar can hold.
+    CONF = [
+        (6, "Non-FIFA Caribbean", 104, 200),
+        (2, "Non-FIFA Europe", 105, 201),
+        (5, "Non-FIFA Africa", 106, 202),
+        (3, "Non-FIFA Asia", 107, 203),
+        (4, "Non-FIFA South America", 108, 204),
+        (7, "Non-FIFA Oceania", 109, 205),
+    ]
     comp = bytearray(M.load(base, "Competition.bin"))
     regs = bytearray(M.load(base, "CompetitionRegulation.bin"))
     ents = bytearray(M.load(base, "CompetitionEntry.bin"))
-    M.add_league(
-        comp,
-        regs,
-        ents,
-        cid_c,
-        reg,
-        M.enc_region(25),
-        "Non-FIFA Nations",
-        "FL_NONF",
-        team_ids,
-        tier=1,
-    )
 
     open(os.path.join(base, "Country.bin"), "wb").write(
         pesdb.wesys_pack(bytes(cty_raw))
@@ -264,6 +261,34 @@ def main():
     open(os.path.join(base, "PlayerAssignment.bin"), "wb").write(
         pesdb.wesys_pack(bytes(assigns))
     )
+
+    lines = open(wf, encoding="utf-8", errors="replace").read().splitlines()
+    for conf, lname, cid_c, reg in CONF:
+        tids = by_conf.get(conf, [])
+        if not tids:
+            continue
+        M.add_league(
+            comp,
+            regs,
+            ents,
+            cid_c,
+            reg,
+            M.enc_region(25),
+            lname,
+            "FL_NF%d" % conf,
+            tids,
+            tier=1,
+        )
+        line = (
+            "league %d cid=%d region=25 country=200 conf=%d slot=-1 tier=1 promote=0 "
+            "demote=0 clubs=%d legs=1 kickoff=166 name=%s"
+            % (reg, cid_c, conf, len(tids), lname)
+        )
+        lines = [l for l in lines if not l.startswith("league %d " % reg)]
+        lines.append(line)
+        print("  %s: %d club(s) league %d cid %d" % (lname, len(tids), reg, cid_c))
+    open(wf, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")
+
     open(os.path.join(base, "Competition.bin"), "wb").write(
         pesdb.wesys_pack(bytes(comp))
     )
@@ -274,23 +299,10 @@ def main():
         pesdb.wesys_pack(bytes(ents))
     )
 
-    line = (
-        "league %d cid=%d region=25 country=200 conf=6 slot=-1 tier=1 promote=0 demote=0 "
-        "clubs=%d legs=1 kickoff=166 name=Non-FIFA Nations"
-        % (reg, cid_c, len(team_ids))
-    )
-    lines = [
-        l
-        for l in open(wf, encoding="utf-8", errors="replace").read().splitlines()
-        if not l.startswith("league %d " % reg)
-    ]
-    lines.append(line)
-    open(wf, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")
     print(
-        "%d team(s) %d..%d, %d players; league %d cid %d"
-        % (len(team_ids), team_ids[0], team_ids[-1], made, reg, cid_c)
+        "%d team(s) %d..%d, %d players, %d league(s)"
+        % (len(team_ids), team_ids[0], team_ids[-1], made, len(by_conf))
     )
-    print(line)
     return 0
 
 
