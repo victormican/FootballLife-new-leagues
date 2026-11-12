@@ -235,9 +235,11 @@ static void find_our_record(void)
     uint64_t r = block + 0xc12e9c + (uint64_t)i * 0x314;
     if (!readable_span((void*)(uintptr_t)r, 0x314)) return;
     if (*(uint16_t*)(uintptr_t)r == 318) {
+      uint32_t state = *(uint32_t*)(uintptr_t)(r + 0x84);
+      *(uint32_t*)(uintptr_t)(r + 0x84) = 2;   /* "toca sortear" para el gate 0x14150d2b0 */
       g_our_record = r;
-      lfile("find: owner=%llx block=%llx cnt=%u found=%llx", (unsigned long long)owner,
-            (unsigned long long)block, (unsigned)cnt, (unsigned long long)r);
+      lfile("find: owner=%llx block=%llx cnt=%u found=%llx state %u -> 2", (unsigned long long)owner,
+            (unsigned long long)block, (unsigned)cnt, (unsigned long long)r, (unsigned)state);
       return;
     }
   }
