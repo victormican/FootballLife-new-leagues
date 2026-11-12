@@ -76,7 +76,7 @@ local REGCID = false
 
 -- 2026-11-06: cuantas copas del mundo se listan en Kick Off > Cup.  0 = ninguna (solo las 8
 -- del juego), -1 = todas.  Sirve para saber si el cierre lo causa nuestra lista.
-local EXPOSE = 0   -- Kick Off > Cup solo lista las 10 del juego; una copa nueva se juega en temporada
+local EXPOSE = 0
 
 local dll_log, dll_stats, dll_ko_tick, logbuf, statbuf, regbuf
 local ticks = 0
