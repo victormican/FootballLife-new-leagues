@@ -6141,6 +6141,24 @@ typedef void (*cs_subfill_fn)(unsigned char* entry, uint64_t year, uint64_t flag
 #define CS_TABN 600
 typedef void (*cs_tabclr_fn)(unsigned char* t);
 static const uint32_t CS_TABCLR_RVA[5] = { 0x14ff000, 0x14ff070, 0x14ff010, 0x14fefa0, 0x14ff090 };
+/* Cup mode has no season pool: the block [owner+0x78] is not committed there.  The reap and the
+   old-slot walk read it without a guard and crash (SLOTFREE on a null slot, rip 0x14158f86e,
+   2026-11-12).  Verify the whole span before touching it. */
+static int span_committed(const void* p, size_t n)
+{
+  size_t off = 0;
+  while (off < n) {
+    MEMORY_BASIC_INFORMATION m;
+    const unsigned char* q = (const unsigned char*)p + off;
+    if (VirtualQuery(q, &m, sizeof m) != sizeof m) return 0;
+    if (m.State != MEM_COMMIT || (m.Protect & (PAGE_NOACCESS | PAGE_GUARD))) return 0;
+    size_t step = (size_t)((unsigned char*)m.BaseAddress + m.RegionSize - q);
+    if (!step) return 0;
+    if (step > n - off) step = n - off;
+    off += step;
+  }
+  return 1;
+}
 static int table_pool_reap(const char* when)
 {
   static uint8_t held[CS_TABN];
@@ -6149,6 +6167,7 @@ static int table_pool_reap(const char* when)
   unsigned char* o = (unsigned char*)((owner_fn)(uintptr_t)(g_base + OWNER_RVA))();
   unsigned char* std = o ? *(unsigned char**)(o + 0x78) : 0;
   if (!std || year < 1990 || tabbase < 0x4650 || tabbase > 0x10000 || tabbase % 0xb4) return -1;
+  if (!span_committed(std + tabbase, (size_t)pool_tables(tabbase) * 0x187c)) return -1;
   /* 595 behind fl26hdr255's headers: 600 from there read past the pool into the members after it */
   int ntab = (int)pool_tables(tabbase);
   memset(held, 0, sizeof held);
@@ -6205,6 +6224,7 @@ static void table_pool_old_slots(const char* when)
   unsigned char* std = o ? *(unsigned char**)(o + 0x78) : 0;
   unsigned char* blk = o ? *(unsigned char**)(o + 0x48) : 0;
   if (!std || !blk) return;
+  if (!span_committed(std, (size_t)tabbase + (size_t)pool_tables(tabbase) * 0x187c)) return;
   int ok; int t = today_at(blk, &ok);
   if (!ok) return;
   int y = *(uint16_t*)(blk + TODAY_OFF + 8);
