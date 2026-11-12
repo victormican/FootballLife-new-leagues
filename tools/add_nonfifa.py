@@ -43,6 +43,7 @@ NATIONS = [
     ("BONAIRE", 102, 6),
     ("CATALONIA", 118, 2),
     ("PADANIA", 123, 2),
+    ("BASQUE COUNTRY", 126, 2),
 ]
 
 
