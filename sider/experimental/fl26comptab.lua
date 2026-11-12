@@ -199,7 +199,7 @@ local KICKORDER = {}
 -- So a real slot is not the answer: the Cup menu needs the per-slot competition object the game
 -- builds at boot for shipped competitions, and a competition of ours has none.  Listed but not
 -- openable is where an added cup stands in Kick Off > Cup.
-local CUP_SLOT = 123
+local CUP_SLOT = 84
 local WORLD_CUPS = {}
 -- the cup ids whose row is a cup row of ours: they may share CUP_SLOT with one another
 local CUPROWS = {}
@@ -634,6 +634,11 @@ function m.init(ctx)
     end
     if made > 0 then
       log(string.format("fl26comptab: %d hidden row(s) for the world's cups", made))
+    end
+    if CUP_SLOT < 123 and WORLD_CUPS[1] then
+      ffi.cast("uint16_t*", 0x1434eecc0 + CUP_SLOT * 8)[0] = CUP_SLOT
+      ffi.cast("int32_t*", 0x1434eecc4 + CUP_SLOT * 8)[0] = WORLD_CUPS[1]
+      log(string.format("fl26comptab: phase slot %d -> reg %d", CUP_SLOT, WORLD_CUPS[1]))
     end
   end
 
