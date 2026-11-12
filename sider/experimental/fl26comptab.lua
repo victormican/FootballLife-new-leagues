@@ -214,6 +214,8 @@ local function read_world(ctx)
   for line in f:lines() do
     local creg = line:match("^%s*ccup%s+(%d+)")
     if creg then WORLD_CUPS[#WORLD_CUPS + 1] = tonumber(creg) end
+    local cko = line:match("^%s*ccup%s+%d+%s+ko=(%d+)")
+    if cko then WORLD_CUPS[#WORLD_CUPS + 1] = tonumber(cko) end
     local ko = line:match("^%s*kickorder%s+([%d:,]+)")
     for kid, krank in (ko or ""):gmatch("(%d+):(%d+)") do
       KICKORDER[#KICKORDER + 1] = { tonumber(kid), tonumber(krank) }

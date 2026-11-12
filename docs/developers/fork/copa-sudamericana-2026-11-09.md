@@ -83,3 +83,23 @@ la Sudamericana del mundo vive en la temporada y la jugable de Kick Off es el cl
 - `tools/clone_shipped_cup.py` (clon)
 - `sider/experimental/fl26swiss.lua` (`EXPOSE = 0`)
 - `tools/native/fl26swiss.c` (guarda del calendario en `cal_dedupe`)
+
+## 5. Cid 132 directo en el menu (2026-11-12)
+
+La copa del mundo se expone directa (sin clon) con dos piezas:
+
+- `fl26swiss.lua` vuelve a `EXPOSE = -1`: el `ccup` cid 132 se anade a la lista.
+- `fl26comptab.lua` anade fila de parametros para **318 (grupos) y 319 (KO)**, no solo
+  la maestra. La tabla se copia a un buffer propio y se suben los cuatro contadores
+  (`0xa5`); el limite de 165 filas/177 ids queda roto.
+
+Resultado en juego (2026-11-12): el item **Copa Sudamericana** sale el ultimo, con 32
+equipos, grupos, ida y vuelta y final unica; al elegirlo pasa por **Opciones generales**
+y **Seleccionar equipo**. Se queda en negro al confirmar el equipo: falta el
+**sorteo/calendario** (el planificador no conoce la competicion).
+
+El slot real (84) no vale: el arranque se queda cargando; el objeto por slot es de liga.
+El 123 oculto mantiene la lista estable.
+
+Siguiente: registrar 318/319 en el planificador (`0x141348210`, tabla de fases
+`0x1434eecc4`) o enganchar el arranque del modo para llamar al sorteo nativo.
