@@ -15,7 +15,7 @@ MAP = {
     "SINT MAARTEN": (101, "Sint Maarten"),
     "BONAIRE": (102, "Bonaire"),
     "GUNA": (267, "Guna people"),
-    "HAWAII": (268, "Hawaii"),
+    "HAWAII": (251, "Hawaii"),
     "CASCADIA": (269, "Cascadia (bioregion)"),
     "INDIGENOUS ALBERTA": (270, None),
     "CATALONIA": (118, "Catalonia"),

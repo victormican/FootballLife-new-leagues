@@ -35,18 +35,15 @@ C_EN = 288
 
 # name, country id (a free flag id), confederation (6 CONCACAF, 2 UEFA)
 NATIONS = [
-    # Caribbean (CONCACAF)
+    # Caribbean + Hawaii (CONCACAF)
     ("MARTINIQUE", 96, 6),
     ("GUADELOUPE", 97, 6),
     ("FRENCH GUIANA", 99, 6),
     ("SAINT MARTIN", 100, 6),
     ("SINT MAARTEN", 101, 6),
     ("BONAIRE", 102, 6),
-    ("GUNA", 267, 6),
-    ("HAWAII", 268, 6),
-    ("CASCADIA", 269, 6),
-    ("INDIGENOUS ALBERTA", 270, 6),
-    # Europe (UEFA): autonomous regions and stateless sides
+    ("HAWAII", 251, 6),
+    # Europe (UEFA)
     ("CATALONIA", 118, 2),
     ("PADANIA", 123, 2),
     ("BASQUE COUNTRY", 126, 2),
@@ -70,41 +67,24 @@ NATIONS = [
     ("GUERNSEY", 181, 2),
     ("JERSEY", 182, 2),
     ("GOZO", 183, 2),
-    ("AGRO PONTINO", 185, 2),
-    ("TICINO", 186, 2),
-    ("CHAMERIA", 187, 2),
-    ("CUMANN SACAIRE GAEILGE", 188, 2),
-    ("KARPATALJA", 233, 2),
-    ("RAETIA", 242, 2),
-    ("SZEKELY LAND", 243, 2),
     # Africa (CAF)
-    ("SOMALILAND", 244, 5),
-    ("WESTERN SAHARA", 246, 5),
-    ("KABYLIE", 247, 5),
-    ("MAYOTTE", 248, 5),
+    ("SOMALILAND", 186, 5),
+    ("WESTERN SAHARA", 187, 5),
+    ("KABYLIE", 188, 5),
+    ("MAYOTTE", 185, 5),
     # Asia (AFC)
-    ("ARTSAKH", 249, 3),
-    ("KURDISTAN", 251, 3),
-    ("TAMIL EELAM", 252, 3),
-    ("TIBET", 253, 3),
-    ("EAST TURKESTAN", 254, 3),
-    ("GIRL POWER", 255, 3),
-    ("HMONG", 256, 3),
-    ("KASHMIR", 257, 3),
-    ("KHALISTAN", 258, 3),
-    ("PANJAB", 259, 3),
-    ("PALESTINE REFUGEE", 261, 3),
-    ("ROJAVA", 262, 3),
+    ("ARTSAKH", 233, 3),
+    ("KURDISTAN", 242, 3),
+    ("TAMIL EELAM", 243, 3),
+    ("TIBET", 244, 3),
     # South America (CONMEBOL)
-    ("MAPUCHE", 263, 4),
-    ("AYMARA", 264, 4),
-    ("RAPA NUI", 265, 4),
-    ("SAO PAULO", 266, 4),
+    ("MAPUCHE", 246, 4),
+    ("AYMARA", 247, 4),
     # Oceania (OFC)
-    ("WALLIS AND FUTUNA", 271, 7),
-    ("NIUE", 272, 7),
-    ("WEST PAPUA", 273, 7),
+    ("WALLIS AND FUTUNA", 248, 7),
+    ("NIUE", 249, 7),
 ]
+
 
 
 def text(b):
